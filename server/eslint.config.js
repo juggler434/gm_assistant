@@ -24,6 +24,17 @@ export default [
         clearTimeout: "readonly",
         setInterval: "readonly",
         clearInterval: "readonly",
+        // Node.js 20+ built-in fetch API globals
+        fetch: "readonly",
+        Request: "readonly",
+        Response: "readonly",
+        Headers: "readonly",
+        AbortController: "readonly",
+        AbortSignal: "readonly",
+        ReadableStream: "readonly",
+        WritableStream: "readonly",
+        TextDecoder: "readonly",
+        TextEncoder: "readonly",
       },
     },
     plugins: {
@@ -43,8 +54,20 @@ export default [
   },
   {
     files: ["tests/**/*.ts"],
+    languageOptions: {
+      parserOptions: {
+        project: null, // Tests don't need type-aware linting
+      },
+      globals: {
+        global: "writable", // Node.js global object for mocking
+      },
+    },
     rules: {
       "no-console": "off",
+      "@typescript-eslint/no-unsafe-assignment": "off",
+      "@typescript-eslint/no-unsafe-member-access": "off",
+      "@typescript-eslint/no-unsafe-call": "off",
+      "require-yield": "off", // Allow generators that throw before yielding
     },
   },
   prettierConfig,
