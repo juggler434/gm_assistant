@@ -21,6 +21,20 @@ const envSchema = z
       })
       .optional(),
 
+    // Redis
+    REDIS_URL: z
+      .string()
+      .startsWith("redis://", {
+        message: "REDIS_URL must start with redis://",
+      })
+      .optional(),
+
+    // S3-Compatible Storage
+    S3_ENDPOINT: z.string().url().optional(),
+    S3_BUCKET: z.string().optional(),
+    S3_ACCESS_KEY: z.string().optional(),
+    S3_SECRET_KEY: z.string().optional(),
+
     // LLM
     LLM_MODEL: z.string().default("llama3"),
     LLM_BASE_URL: z.string().url().default("http://localhost:11434"),
@@ -28,10 +42,6 @@ const envSchema = z
     // Auth
     JWT_SECRET: z.string().optional(),
     JWT_EXPIRES_IN: z.string().default("7d"),
-
-    // Storage
-    UPLOAD_DIR: z.string().default("./uploads"),
-    MAX_FILE_SIZE_MB: z.coerce.number().int().positive().default(50),
   })
   .superRefine((data, ctx) => {
     // In production, require critical environment variables
@@ -56,6 +66,27 @@ const envSchema = z
           message: "DATABASE_URL is required in production",
           path: ["DATABASE_URL"],
         });
+      }
+
+      if (!data.REDIS_URL) {
+        ctx.addIssue({
+          code: z.ZodIssueCode.custom,
+          message: "REDIS_URL is required in production",
+          path: ["REDIS_URL"],
+        });
+      }
+
+      if (!data.S3_ENDPOINT || !data.S3_BUCKET || !data.S3_ACCESS_KEY || !data.S3_SECRET_KEY) {
+        const missing = ["S3_ENDPOINT", "S3_BUCKET", "S3_ACCESS_KEY", "S3_SECRET_KEY"].filter(
+          (key) => !data[key as keyof typeof data]
+        );
+        for (const key of missing) {
+          ctx.addIssue({
+            code: z.ZodIssueCode.custom,
+            message: `${key} is required in production`,
+            path: [key],
+          });
+        }
       }
     }
   });
