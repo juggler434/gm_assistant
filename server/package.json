@@ -16,7 +16,12 @@
     "format:check": "prettier --check \"src/**/*.ts\" \"tests/**/*.ts\"",
     "typecheck": "tsc --noEmit",
     "test": "vitest run",
-    "test:watch": "vitest"
+    "test:watch": "vitest",
+    "db:generate": "drizzle-kit generate",
+    "db:migrate": "drizzle-kit migrate",
+    "db:push": "drizzle-kit push",
+    "db:studio": "drizzle-kit studio",
+    "db:setup": "tsx src/db/setup.ts"
   },
   "keywords": [
     "rpg",
@@ -30,8 +35,10 @@
   "private": true,
   "devDependencies": {
     "@types/node": "^22.0.0",
+    "@types/pg": "^8.16.0",
     "@typescript-eslint/eslint-plugin": "^8.0.0",
     "@typescript-eslint/parser": "^8.0.0",
+    "drizzle-kit": "^0.31.8",
     "eslint": "^9.0.0",
     "eslint-config-prettier": "^9.0.0",
     "prettier": "^3.0.0",
@@ -40,6 +47,8 @@
     "vitest": "^2.0.0"
   },
   "dependencies": {
+    "drizzle-orm": "^0.45.1",
+    "postgres": "^3.4.8",
     "zod": "^4.3.6"
   }
 }
