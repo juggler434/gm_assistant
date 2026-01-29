@@ -6,10 +6,18 @@ export default defineConfig({
     globals: false,
     environment: "node",
     include: ["tests/**/*.test.ts"],
+    setupFiles: ["./tests/setup.ts"],
     coverage: {
       provider: "v8",
       reporter: ["text", "json", "html"],
-      exclude: ["node_modules/", "dist/", "tests/"],
+      exclude: [
+        "node_modules/",
+        "dist/",
+        "tests/",
+        "*.config.ts",
+        "*.config.js",
+        "drizzle/",
+      ],
     },
   },
   resolve: {
