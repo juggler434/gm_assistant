@@ -38,6 +38,9 @@ const envSchema = z
     // LLM
     LLM_MODEL: z.string().default("llama3"),
     LLM_BASE_URL: z.string().url().default("http://localhost:11434"),
+    LLM_TIMEOUT: z.coerce.number().int().positive().default(60000),
+    LLM_MAX_TOKENS: z.coerce.number().int().positive().default(2048),
+    LLM_TEMPERATURE: z.coerce.number().min(0).max(2).default(0.7),
 
     // Auth
     JWT_SECRET: z.string().optional(),

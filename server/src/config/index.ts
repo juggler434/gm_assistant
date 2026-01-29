@@ -20,6 +20,9 @@ export const config = {
   llm: {
     model: env.LLM_MODEL,
     baseUrl: env.LLM_BASE_URL,
+    timeout: env.LLM_TIMEOUT,
+    maxTokens: env.LLM_MAX_TOKENS,
+    temperature: env.LLM_TEMPERATURE,
   },
   auth: {
     jwtSecret: env.JWT_SECRET ?? "dev-secret-change-in-production",
