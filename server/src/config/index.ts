@@ -1,22 +1,24 @@
+import { env } from "./env.js";
+
 export const config = {
   appName: "GM Assistant",
   version: "0.1.0",
-  env: process.env.NODE_ENV ?? "development",
-  port: parseInt(process.env.PORT ?? "3000", 10),
+  env: env.NODE_ENV,
+  port: env.PORT,
   database: {
-    url: process.env.DATABASE_URL ?? "postgresql://localhost:5432/gm_assistant",
+    url: env.DATABASE_URL ?? "postgresql://localhost:5432/gm_assistant",
   },
   llm: {
-    model: process.env.LLM_MODEL ?? "llama3",
-    baseUrl: process.env.LLM_BASE_URL ?? "http://localhost:11434",
+    model: env.LLM_MODEL,
+    baseUrl: env.LLM_BASE_URL,
   },
   auth: {
-    jwtSecret: process.env.JWT_SECRET ?? "dev-secret-change-in-production",
-    jwtExpiresIn: process.env.JWT_EXPIRES_IN ?? "7d",
+    jwtSecret: env.JWT_SECRET ?? "dev-secret-change-in-production",
+    jwtExpiresIn: env.JWT_EXPIRES_IN,
   },
   storage: {
-    uploadDir: process.env.UPLOAD_DIR ?? "./uploads",
-    maxFileSizeMb: parseInt(process.env.MAX_FILE_SIZE_MB ?? "50", 10),
+    uploadDir: env.UPLOAD_DIR,
+    maxFileSizeMb: env.MAX_FILE_SIZE_MB,
   },
 } as const;
 
