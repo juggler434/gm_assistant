@@ -45,6 +45,15 @@ const envSchema = z
     // Auth
     JWT_SECRET: z.string().optional(),
     JWT_EXPIRES_IN: z.string().default("7d"),
+
+    // Server
+    CORS_ORIGIN: z
+      .string()
+      .default("http://localhost:5173")
+      .transform((val) => val.split(",").map((s) => s.trim())),
+    RATE_LIMIT_MAX: z.coerce.number().int().positive().default(100),
+    RATE_LIMIT_WINDOW_MS: z.coerce.number().int().positive().default(60000),
+    MAX_FILE_SIZE: z.coerce.number().int().positive().default(10485760), // 10MB
   })
   .superRefine((data, ctx) => {
     // In production, require critical environment variables

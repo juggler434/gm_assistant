@@ -28,6 +28,14 @@ export const config = {
     jwtSecret: env.JWT_SECRET ?? "dev-secret-change-in-production",
     jwtExpiresIn: env.JWT_EXPIRES_IN,
   },
+  server: {
+    corsOrigin: env.CORS_ORIGIN,
+    rateLimit: {
+      max: env.RATE_LIMIT_MAX,
+      timeWindow: env.RATE_LIMIT_WINDOW_MS,
+    },
+    maxFileSize: env.MAX_FILE_SIZE,
+  },
 } as const;
 
 export type Config = typeof config;
