@@ -25,6 +25,7 @@
       "@/*": ["./src/*"],
       "@/config/*": ["./src/config/*"],
       "@/db/*": ["./src/db/*"],
+      "@/plugins/*": ["./src/plugins/*"],
       "@/services/*": ["./src/services/*"],
       "@/models/*": ["./src/models/*"],
       "@/routes/*": ["./src/routes/*"],
