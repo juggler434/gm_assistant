@@ -5,6 +5,7 @@ import {
   registerRateLimit,
   registerMultipart,
   registerWebSocket,
+  registerAuth,
 } from "@/plugins/index.js";
 
 export interface AppOptions {
@@ -21,6 +22,7 @@ export async function buildApp(options: AppOptions = {}): Promise<FastifyInstanc
   await registerRateLimit(app);
   await registerMultipart(app);
   await registerWebSocket(app);
+  await registerAuth(app);
 
   // Global error handler
   app.setErrorHandler((error: FastifyError, request, reply) => {
