@@ -4,31 +4,9 @@ import { db } from "@/db/index.js";
 import { sessions } from "@/db/schema/index.js";
 import { config } from "@/config/index.js";
 import { ok, err, type Result } from "@/types/index.js";
+import type { SessionToken, ValidatedSession, SessionError } from "./types.js";
 
-/** Session token format: <sessionId>.<sessionSecret> */
-export interface SessionToken {
-  sessionId: string;
-  secret: string;
-  token: string;
-}
-
-/** Session with associated user ID */
-export interface ValidatedSession {
-  id: string;
-  userId: string;
-  createdAt: Date;
-  lastVerifiedAt: Date;
-}
-
-/** Error types for session operations */
-export type SessionError =
-  | { code: "INVALID_TOKEN_FORMAT" }
-  | { code: "SESSION_NOT_FOUND" }
-  | { code: "SESSION_EXPIRED" }
-  | { code: "INVALID_SECRET" }
-  | { code: "DATABASE_ERROR"; cause: unknown };
-
-const ALPHABET = "abcdefghijkmnpqrstuvwxyz23456789";
+const ALLOWED_CHARACTERS = "abcdefghijkmnpqrstuvwxyz23456789";
 const SESSION_ID_LENGTH = 24;
 const SECRET_LENGTH = 24;
 
@@ -41,7 +19,7 @@ function generateSecureRandomString(length: number): string {
   let result = "";
   for (let i = 0; i < length; i++) {
     // Use 5 bits per byte to index into 32-character alphabet
-    result += ALPHABET[bytes[i]! >> 3];
+    result += ALLOWED_CHARACTERS[bytes[i]! >> 3];
   }
   return result;
 }

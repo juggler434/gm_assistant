@@ -1,3 +1,6 @@
+// Auth types
+export type { SessionToken, ValidatedSession, SessionError } from "./types.js";
+
 // Session management
 export {
   generateSessionToken,
@@ -7,9 +10,6 @@ export {
   invalidateSession,
   invalidateAllUserSessions,
   cleanupExpiredSessions,
-  type SessionToken,
-  type ValidatedSession,
-  type SessionError,
 } from "./session.js";
 
 // Fastify middleware and utilities

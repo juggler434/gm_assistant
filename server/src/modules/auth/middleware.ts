@@ -1,7 +1,8 @@
 import type { FastifyInstance, FastifyRequest, FastifyReply } from "fastify";
 import fp from "fastify-plugin";
 import { config } from "@/config/index.js";
-import { validateSessionToken, type ValidatedSession } from "./session.js";
+import { validateSessionToken } from "./session.js";
+import type { ValidatedSession } from "./types.js";
 
 declare module "fastify" {
   interface FastifyRequest {
