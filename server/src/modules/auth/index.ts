@@ -9,7 +9,6 @@ export {
   validateSessionToken,
   invalidateSession,
   invalidateAllUserSessions,
-  cleanupExpiredSessions,
 } from "./session.js";
 
 // Fastify middleware and utilities

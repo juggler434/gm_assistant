@@ -1,7 +1,6 @@
 import { randomBytes, createHash, timingSafeEqual } from "node:crypto";
-import { eq, lt } from "drizzle-orm";
-import { db } from "@/db/index.js";
-import { sessions } from "@/db/schema/index.js";
+import type { Redis as RedisType } from "ioredis";
+import { createRedisConnection } from "@/jobs/connection.js";
 import { config } from "@/config/index.js";
 import { ok, err, type Result } from "@/types/index.js";
 import type { SessionToken, ValidatedSession, SessionError } from "./types.js";
@@ -9,6 +8,26 @@ import type { SessionToken, ValidatedSession, SessionError } from "./types.js";
 const ALLOWED_CHARACTERS = "abcdefghijkmnpqrstuvwxyz23456789";
 const SESSION_ID_LENGTH = 24;
 const SECRET_LENGTH = 24;
+const SESSION_KEY_PREFIX = "session:";
+
+/** Session data stored in Redis */
+interface StoredSession {
+  userId: string;
+  secretHash: string;
+  createdAt: string;
+}
+
+/** Lazy-initialized Redis connection for sessions */
+let sessionRedis: RedisType | null = null;
+
+function getSessionRedis(): RedisType {
+  if (!sessionRedis) {
+    sessionRedis = createRedisConnection(config.redis.url, {
+      maxRetriesPerRequest: 3,
+    });
+  }
+  return sessionRedis;
+}
 
 /**
  * Generate a cryptographically secure random string using a human-readable alphabet.
@@ -40,6 +59,13 @@ function constantTimeEqual(a: Buffer, b: Buffer): boolean {
 }
 
 /**
+ * Get session TTL in seconds.
+ */
+function getSessionTtlSeconds(): number {
+  return config.session.maxAgeDays * 24 * 60 * 60;
+}
+
+/**
  * Generate a new session token.
  */
 export function generateSessionToken(): SessionToken {
@@ -65,17 +91,23 @@ export function parseSessionToken(token: string): Result<{ sessionId: string; se
  */
 export async function createSession(userId: string): Promise<Result<{ session: ValidatedSession; token: string }, SessionError>> {
   try {
+    const redis = getSessionRedis();
     const { sessionId, secret, token } = generateSessionToken();
     const secretHash = hashSecret(secret).toString("hex");
     const now = new Date();
 
-    await db.insert(sessions).values({
-      id: sessionId,
+    const sessionData: StoredSession = {
       userId,
       secretHash,
-      createdAt: now,
-      lastVerifiedAt: now,
-    });
+      createdAt: now.toISOString(),
+    };
+
+    await redis.set(
+      `${SESSION_KEY_PREFIX}${sessionId}`,
+      JSON.stringify(sessionData),
+      "EX",
+      getSessionTtlSeconds()
+    );
 
     return ok({
       session: {
@@ -93,7 +125,7 @@ export async function createSession(userId: string): Promise<Result<{ session: V
 
 /**
  * Validate a session token and return the session if valid.
- * Implements inactivity timeout and periodic lastVerifiedAt updates.
+ * Implements sliding expiration by refreshing TTL on each validation.
  */
 export async function validateSessionToken(token: string): Promise<Result<ValidatedSession, SessionError>> {
   const parseResult = parseSessionToken(token);
@@ -104,13 +136,15 @@ export async function validateSessionToken(token: string): Promise<Result<Valida
   const { sessionId, secret } = parseResult.value;
 
   try {
-    const session = await db.query.sessions.findFirst({
-      where: eq(sessions.id, sessionId),
-    });
+    const redis = getSessionRedis();
+    const key = `${SESSION_KEY_PREFIX}${sessionId}`;
+    const data = await redis.get(key);
 
-    if (!session) {
+    if (!data) {
       return err({ code: "SESSION_NOT_FOUND" });
     }
+
+    const session: StoredSession = JSON.parse(data);
 
     // Verify the secret using constant-time comparison
     const providedHash = hashSecret(secret);
@@ -120,31 +154,15 @@ export async function validateSessionToken(token: string): Promise<Result<Valida
       return err({ code: "INVALID_SECRET" });
     }
 
-    // Check for inactivity timeout
+    // Refresh TTL (sliding expiration)
+    await redis.expire(key, getSessionTtlSeconds());
+
     const now = new Date();
-    const maxAgeMs = config.session.maxAgeDays * 24 * 60 * 60 * 1000;
-    const lastVerifiedAt = new Date(session.lastVerifiedAt);
-
-    if (now.getTime() - lastVerifiedAt.getTime() > maxAgeMs) {
-      // Session has expired due to inactivity
-      await db.delete(sessions).where(eq(sessions.id, sessionId));
-      return err({ code: "SESSION_EXPIRED" });
-    }
-
-    // Update lastVerifiedAt if enough time has passed (reduces DB writes)
-    const updateAgeMs = config.session.updateAgeHours * 60 * 60 * 1000;
-    if (now.getTime() - lastVerifiedAt.getTime() > updateAgeMs) {
-      await db
-        .update(sessions)
-        .set({ lastVerifiedAt: now })
-        .where(eq(sessions.id, sessionId));
-    }
-
     return ok({
-      id: session.id,
+      id: sessionId,
       userId: session.userId,
       createdAt: new Date(session.createdAt),
-      lastVerifiedAt: now, // Return the current time since we just verified
+      lastVerifiedAt: now,
     });
   } catch (cause) {
     return err({ code: "DATABASE_ERROR", cause });
@@ -152,11 +170,12 @@ export async function validateSessionToken(token: string): Promise<Result<Valida
 }
 
 /**
- * Invalidate a session by deleting it from the database.
+ * Invalidate a session by deleting it from Redis.
  */
 export async function invalidateSession(sessionId: string): Promise<Result<void, SessionError>> {
   try {
-    await db.delete(sessions).where(eq(sessions.id, sessionId));
+    const redis = getSessionRedis();
+    await redis.del(`${SESSION_KEY_PREFIX}${sessionId}`);
     return ok(undefined);
   } catch (cause) {
     return err({ code: "DATABASE_ERROR", cause });
@@ -165,31 +184,43 @@ export async function invalidateSession(sessionId: string): Promise<Result<void,
 
 /**
  * Invalidate all sessions for a user.
+ * Uses SCAN to find matching keys without blocking Redis.
  */
 export async function invalidateAllUserSessions(userId: string): Promise<Result<void, SessionError>> {
   try {
-    await db.delete(sessions).where(eq(sessions.userId, userId));
+    const redis = getSessionRedis();
+    let cursor = "0";
+    const keysToDelete: string[] = [];
+
+    // Use SCAN to iterate through all session keys
+    do {
+      const [nextCursor, keys] = await redis.scan(
+        cursor,
+        "MATCH",
+        `${SESSION_KEY_PREFIX}*`,
+        "COUNT",
+        100
+      );
+      cursor = nextCursor;
+
+      // Check each key to see if it belongs to the user
+      for (const key of keys) {
+        const data = await redis.get(key);
+        if (data) {
+          const session: StoredSession = JSON.parse(data);
+          if (session.userId === userId) {
+            keysToDelete.push(key);
+          }
+        }
+      }
+    } while (cursor !== "0");
+
+    // Delete all matching keys
+    if (keysToDelete.length > 0) {
+      await redis.del(...keysToDelete);
+    }
+
     return ok(undefined);
-  } catch (cause) {
-    return err({ code: "DATABASE_ERROR", cause });
-  }
-}
-
-/**
- * Clean up expired sessions from the database.
- * Should be run periodically (e.g., via a cron job or background worker).
- */
-export async function cleanupExpiredSessions(): Promise<Result<number, SessionError>> {
-  try {
-    const maxAgeMs = config.session.maxAgeDays * 24 * 60 * 60 * 1000;
-    const expirationDate = new Date(Date.now() - maxAgeMs);
-
-    const result = await db
-      .delete(sessions)
-      .where(lt(sessions.lastVerifiedAt, expirationDate))
-      .returning({ id: sessions.id });
-
-    return ok(result.length);
   } catch (cause) {
     return err({ code: "DATABASE_ERROR", cause });
   }
