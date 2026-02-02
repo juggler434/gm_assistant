@@ -46,6 +46,11 @@ const envSchema = z
     JWT_SECRET: z.string().optional(),
     JWT_EXPIRES_IN: z.string().default("7d"),
 
+    // Session
+    SESSION_SECRET: z.string().optional(),
+    SESSION_MAX_AGE_DAYS: z.coerce.number().int().positive().default(30),
+    SESSION_UPDATE_AGE_HOURS: z.coerce.number().int().positive().default(1),
+
     // Server
     CORS_ORIGIN: z
       .string()
@@ -69,6 +74,20 @@ const envSchema = z
           code: z.ZodIssueCode.custom,
           message: "JWT_SECRET must be at least 32 characters in production",
           path: ["JWT_SECRET"],
+        });
+      }
+
+      if (!data.SESSION_SECRET) {
+        ctx.addIssue({
+          code: z.ZodIssueCode.custom,
+          message: "SESSION_SECRET is required in production",
+          path: ["SESSION_SECRET"],
+        });
+      } else if (data.SESSION_SECRET.length < 32) {
+        ctx.addIssue({
+          code: z.ZodIssueCode.custom,
+          message: "SESSION_SECRET must be at least 32 characters in production",
+          path: ["SESSION_SECRET"],
         });
       }
 

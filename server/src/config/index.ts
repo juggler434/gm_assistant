@@ -28,6 +28,12 @@ export const config = {
     jwtSecret: env.JWT_SECRET ?? "dev-secret-change-in-production",
     jwtExpiresIn: env.JWT_EXPIRES_IN,
   },
+  session: {
+    secret: env.SESSION_SECRET ?? "dev-session-secret-change-in-production",
+    maxAgeDays: env.SESSION_MAX_AGE_DAYS,
+    updateAgeHours: env.SESSION_UPDATE_AGE_HOURS,
+    cookieName: "session_token",
+  },
   server: {
     corsOrigin: env.CORS_ORIGIN,
     rateLimit: {

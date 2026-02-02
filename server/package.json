@@ -18,10 +18,10 @@
     "test": "vitest run",
     "test:watch": "vitest",
     "test:coverage": "vitest run --coverage",
-    "db:generate": "drizzle-kit generate",
-    "db:migrate": "drizzle-kit migrate",
-    "db:push": "drizzle-kit push",
-    "db:studio": "drizzle-kit studio",
+    "db:generate": "tsx node_modules/drizzle-kit/bin.cjs generate",
+    "db:migrate": "tsx node_modules/drizzle-kit/bin.cjs migrate",
+    "db:push": "tsx node_modules/drizzle-kit/bin.cjs push",
+    "db:studio": "tsx node_modules/drizzle-kit/bin.cjs studio",
     "db:setup": "tsx src/db/setup.ts"
   },
   "keywords": [
@@ -50,15 +50,16 @@
     "vitest": "^2.0.0"
   },
   "dependencies": {
-    "bullmq": "^5.67.2",
-    "drizzle-orm": "^0.45.1",
-    "ioredis": "^5.9.2",
+    "@fastify/cookie": "^11.0.2",
     "@fastify/cors": "^11.2.0",
     "@fastify/multipart": "^9.4.0",
     "@fastify/rate-limit": "^10.3.0",
     "@fastify/websocket": "^11.2.0",
+    "bullmq": "^5.67.2",
     "drizzle-orm": "^0.45.1",
     "fastify": "^5.7.2",
+    "fastify-plugin": "^5.1.0",
+    "ioredis": "^5.9.2",
     "postgres": "^3.4.8",
     "zod": "^4.3.6"
   }
