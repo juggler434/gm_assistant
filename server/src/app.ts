@@ -7,6 +7,7 @@ import {
   registerWebSocket,
   registerAuth,
 } from "@/plugins/index.js";
+import { authRoutes } from "@/modules/auth/index.js";
 
 export interface AppOptions {
   logger?: boolean;
@@ -36,6 +37,9 @@ export async function buildApp(options: AppOptions = {}): Promise<FastifyInstanc
       message: statusCode >= 500 ? "Internal Server Error" : error.message,
     });
   });
+
+  // Register routes
+  await app.register(authRoutes, { prefix: "/api/auth" });
 
   // Health check endpoint
   app.get("/health", async () => {
