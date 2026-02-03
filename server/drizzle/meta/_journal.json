@@ -15,6 +15,13 @@
       "when": 1769822311412,
       "tag": "0001_add_sessions_table",
       "breakpoints": true
+    },
+    {
+      "idx": 2,
+      "version": "7",
+      "when": 1769846400000,
+      "tag": "0002_add_campaigns_table",
+      "breakpoints": true
     }
   ]
 }
