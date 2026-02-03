@@ -21,3 +21,12 @@ export {
   getSessionToken,
   verifyRequestOrigin,
 } from "./middleware.js";
+
+// Routes
+export { authRoutes } from "./routes.js";
+
+// Schemas
+export { registerBodySchema, type RegisterBody } from "./schemas.js";
+
+// Repository
+export { findUserByEmail, createUser } from "./repository.js";
