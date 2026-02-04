@@ -32,7 +32,7 @@ import type {
   ListResponse,
   FileInfo,
 } from "../types.js";
-import type { StorageProvider } from "./provider.interface.js";
+import type { StorageProvider } from "./interface.js";
 
 /** Default signed URL expiration (1 hour) */
 const DEFAULT_EXPIRES_IN = 3600;

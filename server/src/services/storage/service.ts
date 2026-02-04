@@ -8,7 +8,7 @@
 import type { Readable } from "node:stream";
 import type { Result } from "@/types/index.js";
 import type { StorageError } from "./errors.js";
-import type { StorageProvider } from "./providers/provider.interface.js";
+import type { StorageProvider } from "./providers/interface.js";
 import type {
   UploadRequest,
   UploadResponse,
