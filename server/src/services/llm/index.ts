@@ -31,7 +31,7 @@
 export { createLLMService, createLLMServiceWithConfig } from "./factory.js";
 
 // Service class
-export { LLMService, type LLMLogger, type LLMServiceOptions } from "./llm.service.js";
+export { LLMService, type LLMLogger, type LLMServiceOptions } from "./service.js";
 
 // Types
 export type {

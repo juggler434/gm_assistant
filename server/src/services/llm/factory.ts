@@ -5,8 +5,8 @@
  */
 
 import { config } from "@/config/index.js";
-import { OllamaProvider } from "./providers/ollama.provider.js";
-import { LLMService, type LLMServiceOptions } from "./llm.service.js";
+import { OllamaProvider } from "./providers/ollama.js";
+import { LLMService, type LLMServiceOptions } from "./service.js";
 import type { LLMConfig } from "./types.js";
 
 /**

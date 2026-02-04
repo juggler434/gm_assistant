@@ -2,5 +2,5 @@
  * LLM Provider Exports
  */
 
-export type { LLMProvider } from "./provider.interface.js";
-export { OllamaProvider } from "./ollama.provider.js";
+export type { LLMProvider } from "./interface.js";
+export { OllamaProvider } from "./ollama.js";
