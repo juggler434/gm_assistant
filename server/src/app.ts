@@ -9,6 +9,7 @@ import {
 } from "@/plugins/index.js";
 import { authRoutes } from "@/modules/auth/index.js";
 import { campaignRoutes } from "@/modules/campaigns/index.js";
+import { documentRoutes } from "@/modules/documents/index.js";
 
 export interface AppOptions {
   logger?: boolean;
@@ -42,6 +43,7 @@ export async function buildApp(options: AppOptions = {}): Promise<FastifyInstanc
   // Register routes
   await app.register(authRoutes, { prefix: "/api/auth" });
   await app.register(campaignRoutes, { prefix: "/api/campaigns" });
+  await app.register(documentRoutes, { prefix: "/api/campaigns" });
 
   // Health check endpoint
   app.get("/health", async () => {
