@@ -1,6 +1,6 @@
 import { describe, it, expect, vi, beforeEach } from "vitest";
-import { LLMService, type LLMLogger } from "../../../src/services/llm/llm.service.js";
-import type { LLMProvider } from "../../../src/services/llm/providers/provider.interface.js";
+import { LLMService, type LLMLogger } from "../../../src/services/llm/service.js";
+import type { LLMProvider } from "../../../src/services/llm/providers/interface.js";
 import type { LLMConfig, GenerateResponse, ChatResponse } from "../../../src/services/llm/types.js";
 import { LLMError } from "../../../src/services/llm/errors.js";
 import { ok, err } from "../../../src/types/index.js";
