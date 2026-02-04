@@ -5,7 +5,7 @@
  */
 
 import type { Result } from "@/types/index.js";
-import type { LLMProvider } from "./providers/provider.interface.js";
+import type { LLMProvider } from "./providers/interface.js";
 import type { LLMError } from "./errors.js";
 import type {
   GenerateRequest,

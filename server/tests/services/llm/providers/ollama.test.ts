@@ -1,6 +1,6 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
-import { OllamaProvider } from "../../../src/services/llm/providers/ollama.provider.js";
-import type { LLMConfig } from "../../../src/services/llm/types.js";
+import { OllamaProvider } from "../../../../src/services/llm/providers/ollama.js";
+import type { LLMConfig } from "../../../../src/services/llm/types.js";
 
 const mockConfig: LLMConfig = {
   model: "llama3",

@@ -9,7 +9,7 @@
 
 import { ok, err, type Result } from "@/types/index.js";
 import { LLMError } from "../errors.js";
-import type { LLMProvider } from "./provider.interface.js";
+import type { LLMProvider } from "./interface.js";
 import type {
   GenerateRequest,
   GenerateResponse,
