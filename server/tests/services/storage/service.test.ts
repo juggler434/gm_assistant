@@ -3,7 +3,7 @@ import {
   StorageService,
   type StorageLogger,
 } from "../../../src/services/storage/service.js";
-import type { StorageProvider } from "../../../src/services/storage/providers/provider.interface.js";
+import type { StorageProvider } from "../../../src/services/storage/providers/interface.js";
 import type {
   UploadResponse,
   DownloadResponse,
