@@ -55,7 +55,7 @@ export {
   StorageService,
   type StorageLogger,
   type StorageServiceOptions,
-} from "./storage.service.js";
+} from "./service.js";
 
 // Types
 export type {

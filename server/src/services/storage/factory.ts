@@ -6,7 +6,7 @@
 
 import { config } from "@/config/index.js";
 import { S3Provider } from "./providers/s3.provider.js";
-import { StorageService, type StorageServiceOptions } from "./storage.service.js";
+import { StorageService, type StorageServiceOptions } from "./service.js";
 import type { StorageConfig } from "./types.js";
 
 /**

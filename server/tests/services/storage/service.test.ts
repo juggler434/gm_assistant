@@ -2,7 +2,7 @@ import { describe, it, expect, vi, beforeEach } from "vitest";
 import {
   StorageService,
   type StorageLogger,
-} from "../../../src/services/storage/storage.service.js";
+} from "../../../src/services/storage/service.js";
 import type { StorageProvider } from "../../../src/services/storage/providers/provider.interface.js";
 import type {
   UploadResponse,
