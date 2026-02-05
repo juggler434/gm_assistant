@@ -12,6 +12,14 @@ export {
   estimateTokenCount,
 } from "./text.js";
 
+// PDF processor
+export {
+  createPdfProcessor,
+  extractPdfMetadata,
+  parsePdfDate,
+  extractMetadata,
+} from "./pdf.js";
+
 // Types
 export type {
   DocumentProcessor,
@@ -20,4 +28,11 @@ export type {
   TextProcessorErrorCode,
   TextProcessorOptions,
   TextProcessorResult,
+  // PDF types
+  PdfPage,
+  PdfMetadata,
+  PdfProcessorError,
+  PdfProcessorErrorCode,
+  PdfProcessorOptions,
+  PdfProcessorResult,
 } from "./types.js";
