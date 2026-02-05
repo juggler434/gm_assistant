@@ -31,3 +31,17 @@ export {
   deleteDocument,
   type FindDocumentsOptions,
 } from "./repository.js";
+
+// Processors
+export {
+  createTextProcessor,
+  detectMarkdownSections,
+  detectPlainTextSections,
+  estimateTokenCount,
+  type DocumentProcessor,
+  type DocumentSection,
+  type TextProcessorError,
+  type TextProcessorErrorCode,
+  type TextProcessorOptions,
+  type TextProcessorResult,
+} from "./processors/index.js";
