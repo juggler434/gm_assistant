@@ -11,7 +11,7 @@ export {
   chunkSemantic,
   chunkMarkdownAware,
   type ChunkingService,
-} from "./chunking.service.js";
+} from "./service.js";
 
 export type {
   ChunkingStrategy,

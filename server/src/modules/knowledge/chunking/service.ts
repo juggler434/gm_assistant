@@ -45,6 +45,9 @@ const DEFAULT_SEMANTIC_OPTIONS: Required<SemanticChunkingOptions> = {
   maxHeadingLevel: 3,
 };
 
+/** Field name used to identify PDF chunking inputs */
+const PDF_PAGES_FIELD = "pages";
+
 /** Default markdown chunking options */
 const DEFAULT_MARKDOWN_OPTIONS: Required<MarkdownChunkingOptions> = {
   targetTokens: 512,
@@ -110,7 +113,7 @@ function buildChunk(
  * Check if input is a PDF chunking input
  */
 function isPdfInput(input: ChunkingInput): input is PdfChunkingInput {
-  return "pages" in input && Array.isArray(input.pages);
+  return PDF_PAGES_FIELD in input && Array.isArray(input.pages);
 }
 
 /**
