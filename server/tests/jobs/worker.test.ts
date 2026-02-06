@@ -1,10 +1,10 @@
 import { describe, it, expect, vi, beforeEach } from "vitest";
-import { JobError } from "../../src/jobs/errors.js";
+
 import type { JobLogger } from "../../src/jobs/types.js";
 
 describe("JobWorker", () => {
   // Store the processor function
-  let capturedProcessor: ((job: any) => Promise<any>) | null = null;
+  let capturedProcessor: ((job: unknown) => Promise<unknown>) | null = null;
 
   // Mock worker methods
   const mockOn = vi.fn();
@@ -24,8 +24,8 @@ describe("JobWorker", () => {
   };
 
   vi.doMock("bullmq", () => ({
-    Worker: vi.fn((_name: string, processor: any, _opts: any) => {
-      capturedProcessor = processor;
+    Worker: vi.fn((_name: string, processor: unknown, _opts: unknown) => {
+      capturedProcessor = processor as (job: unknown) => Promise<unknown>;
       return mockWorkerInstance;
     }),
   }));
