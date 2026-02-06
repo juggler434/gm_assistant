@@ -1,3 +1,4 @@
+/* eslint-disable no-console */
 /**
  * Database setup script
  * Run this once to initialize the database with required extensions

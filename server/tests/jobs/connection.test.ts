@@ -1,4 +1,5 @@
 import { describe, it, expect, vi, beforeEach } from "vitest";
+import type { Redis } from "ioredis";
 import {
   createRedisConnection,
   checkRedisHealth,
@@ -60,7 +61,7 @@ describe("connection", () => {
         options: { host: "localhost" },
       };
 
-      const result = await checkRedisHealth(mockConnection as any);
+      const result = await checkRedisHealth(mockConnection as unknown as Redis);
 
       expect(result.ok).toBe(true);
       if (result.ok) {
@@ -74,7 +75,7 @@ describe("connection", () => {
         options: { host: "localhost" },
       };
 
-      const result = await checkRedisHealth(mockConnection as any);
+      const result = await checkRedisHealth(mockConnection as unknown as Redis);
 
       expect(result.ok).toBe(true);
       if (result.ok) {
@@ -88,7 +89,7 @@ describe("connection", () => {
         options: { host: "localhost" },
       };
 
-      const result = await checkRedisHealth(mockConnection as any);
+      const result = await checkRedisHealth(mockConnection as unknown as Redis);
 
       expect(result.ok).toBe(false);
       if (!result.ok) {
@@ -104,7 +105,7 @@ describe("connection", () => {
         quit: vi.fn().mockResolvedValue("OK"),
       };
 
-      await closeRedisConnection(mockConnection as any);
+      await closeRedisConnection(mockConnection as unknown as Redis);
 
       expect(mockConnection.quit).toHaveBeenCalled();
     });
