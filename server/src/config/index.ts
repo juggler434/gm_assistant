@@ -34,6 +34,10 @@ export const config = {
     updateAgeHours: env.SESSION_UPDATE_AGE_HOURS,
     cookieName: "session_token",
   },
+  posthog: {
+    apiKey: env.POSTHOG_API_KEY,
+    host: env.POSTHOG_HOST,
+  },
   server: {
     corsOrigin: env.CORS_ORIGIN,
     rateLimit: {
