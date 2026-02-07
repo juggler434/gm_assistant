@@ -19,6 +19,8 @@ import { db } from "@/db/index.js";
 import { chunks, type NewChunk } from "@/db/schema/chunks.js";
 import { documents } from "@/db/schema/documents.js";
 import { config } from "@/config/index.js";
+import { ok, err } from "@/types/index.js";
+import type { Result } from "@/types/index.js";
 import { createPdfProcessor } from "@/modules/documents/processors/pdf.js";
 import { createTextProcessor } from "@/modules/documents/processors/text.js";
 import { createChunkingService } from "@/modules/knowledge/chunking/service.js";
@@ -31,6 +33,7 @@ import {
 import { registerHandler } from "./handlers/index.js";
 import type { BaseJobData, JobContext } from "./types.js";
 import type { ChunkingInput } from "@/modules/knowledge/chunking/types.js";
+import type { ChunkingResult } from "@/modules/knowledge/chunking/types.js";
 
 // ============================================================================
 // Types
@@ -45,6 +48,30 @@ export interface DocumentIndexingJobData extends BaseJobData {
 /** Ollama embed API response */
 interface OllamaEmbedResponse {
   embeddings: number[][];
+}
+
+/** Error codes for document indexing */
+export type DocumentIndexingErrorCode =
+  | "DOCUMENT_NOT_FOUND"
+  | "UNSUPPORTED_MIME_TYPE"
+  | "EXTRACTION_FAILED"
+  | "CHUNKING_FAILED"
+  | "EMBEDDING_FAILED"
+  | "STORAGE_FAILED"
+  | "CANCELLED";
+
+/** Structured error for document indexing */
+export interface DocumentIndexingError {
+  code: DocumentIndexingErrorCode;
+  message: string;
+  cause?: unknown;
+}
+
+/** Result of text extraction */
+interface ExtractionResult {
+  content: string;
+  chunkingInput: ChunkingInput;
+  metadata: Record<string, unknown>;
 }
 
 // ============================================================================
@@ -81,7 +108,7 @@ const TEXT_MIME_TYPES = new Set([
 async function generateEmbeddings(
   texts: string[],
   signal: AbortSignal,
-): Promise<number[][]> {
+): Promise<Result<number[][], DocumentIndexingError>> {
   const controller = new AbortController();
   const timeoutId = setTimeout(() => controller.abort(), EMBEDDING_TIMEOUT);
 
@@ -102,13 +129,25 @@ async function generateEmbeddings(
 
     if (!response.ok) {
       const body = await response.text();
-      throw new Error(
-        `Embedding request failed (${response.status}): ${body}`,
-      );
+      return err({
+        code: "EMBEDDING_FAILED",
+        message: `Embedding request failed (${response.status}): ${body}`,
+      });
     }
 
     const data = (await response.json()) as OllamaEmbedResponse;
-    return data.embeddings;
+    return ok(data.embeddings);
+  } catch (error) {
+    if (signal.aborted) {
+      return err({ code: "CANCELLED", message: "Job cancelled" });
+    }
+    return err({
+      code: "EMBEDDING_FAILED",
+      message: error instanceof Error
+        ? `Embedding request error: ${error.message}`
+        : "Embedding request failed",
+      cause: error,
+    });
   } finally {
     clearTimeout(timeoutId);
     signal.removeEventListener("abort", onAbort);
@@ -126,16 +165,20 @@ async function extractText(
   campaignId: string,
   documentId: string,
   mimeType: string,
-) {
+): Promise<Result<ExtractionResult, DocumentIndexingError>> {
   const storage = createStorageService();
 
   if (PDF_MIME_TYPES.has(mimeType)) {
     const processor = createPdfProcessor({ storage });
     const result = await processor.process(campaignId, documentId);
     if (!result.ok) {
-      throw new Error(`PDF extraction failed: ${result.error.message}`);
+      return err({
+        code: "EXTRACTION_FAILED",
+        message: `PDF extraction failed: ${result.error.message}`,
+        cause: result.error,
+      });
     }
-    return {
+    return ok({
       content: result.value.content,
       chunkingInput: {
         content: result.value.content,
@@ -146,16 +189,20 @@ async function extractText(
         pageCount: result.value.pageCount,
         extractedText: result.value.hasExtractedText,
       },
-    };
+    });
   }
 
   if (TEXT_MIME_TYPES.has(mimeType)) {
     const processor = createTextProcessor({ storage });
     const result = await processor.process(campaignId, documentId);
     if (!result.ok) {
-      throw new Error(`Text extraction failed: ${result.error.message}`);
+      return err({
+        code: "EXTRACTION_FAILED",
+        message: `Text extraction failed: ${result.error.message}`,
+        cause: result.error,
+      });
     }
-    return {
+    return ok({
       content: result.value.content,
       chunkingInput: {
         content: result.value.content,
@@ -164,22 +211,31 @@ async function extractText(
       metadata: {
         extractedText: true,
       },
-    };
+    });
   }
 
-  throw new Error(`Unsupported MIME type for indexing: ${mimeType}`);
+  return err({
+    code: "UNSUPPORTED_MIME_TYPE",
+    message: `Unsupported MIME type for indexing: ${mimeType}`,
+  });
 }
 
 /**
  * Stage 2: Chunk the extracted text.
  */
-function chunkContent(input: ChunkingInput) {
+function chunkContent(
+  input: ChunkingInput,
+): Result<ChunkingResult, DocumentIndexingError> {
   const chunker = createChunkingService();
   const result = chunker.chunk(input);
   if (!result.ok) {
-    throw new Error(`Chunking failed: ${result.error.message}`);
+    return err({
+      code: "CHUNKING_FAILED",
+      message: `Chunking failed: ${result.error.message}`,
+      cause: result.error,
+    });
   }
-  return result.value;
+  return ok(result.value);
 }
 
 /**
@@ -189,23 +245,26 @@ async function embedChunks(
   chunkTexts: string[],
   signal: AbortSignal,
   onBatchComplete: (completed: number, total: number) => Promise<void>,
-): Promise<number[][]> {
+): Promise<Result<number[][], DocumentIndexingError>> {
   const allEmbeddings: number[][] = [];
   const total = chunkTexts.length;
 
   for (let i = 0; i < total; i += EMBEDDING_BATCH_SIZE) {
     if (signal.aborted) {
-      throw new Error("Job cancelled");
+      return err({ code: "CANCELLED", message: "Job cancelled" });
     }
 
     const batch = chunkTexts.slice(i, i + EMBEDDING_BATCH_SIZE);
-    const batchEmbeddings = await generateEmbeddings(batch, signal);
-    allEmbeddings.push(...batchEmbeddings);
+    const result = await generateEmbeddings(batch, signal);
+    if (!result.ok) {
+      return result;
+    }
+    allEmbeddings.push(...result.value);
 
     await onBatchComplete(allEmbeddings.length, total);
   }
 
-  return allEmbeddings;
+  return ok(allEmbeddings);
 }
 
 /**
@@ -222,8 +281,8 @@ async function storeChunks(
     section?: string;
     embedding: number[];
   }>,
-): Promise<number> {
-  if (chunkData.length === 0) return 0;
+): Promise<Result<number, DocumentIndexingError>> {
+  if (chunkData.length === 0) return ok(0);
 
   const rows: NewChunk[] = chunkData.map((c) => ({
     documentId,
@@ -236,14 +295,24 @@ async function storeChunks(
     section: c.section ?? null,
   }));
 
-  // Insert in batches of 100 to avoid oversized queries
-  const INSERT_BATCH = 100;
-  for (let i = 0; i < rows.length; i += INSERT_BATCH) {
-    const batch = rows.slice(i, i + INSERT_BATCH);
-    await db.insert(chunks).values(batch);
-  }
+  try {
+    // Insert in batches of 100 to avoid oversized queries
+    const INSERT_BATCH = 100;
+    for (let i = 0; i < rows.length; i += INSERT_BATCH) {
+      const batch = rows.slice(i, i + INSERT_BATCH);
+      await db.insert(chunks).values(batch);
+    }
 
-  return rows.length;
+    return ok(rows.length);
+  } catch (error) {
+    return err({
+      code: "STORAGE_FAILED",
+      message: error instanceof Error
+        ? `Failed to store chunks: ${error.message}`
+        : "Failed to store chunks",
+      cause: error,
+    });
+  }
 }
 
 /**
@@ -256,6 +325,37 @@ async function deleteDocumentChunks(documentId: string): Promise<void> {
 // ============================================================================
 // Job Handler
 // ============================================================================
+
+/**
+ * Handle a pipeline stage failure: clean up partial data, mark document failed.
+ */
+async function handleFailure(
+  documentId: string,
+  error: DocumentIndexingError,
+  context: JobContext,
+): Promise<void> {
+  context.logger.error("Document indexing failed, cleaning up", {
+    documentId,
+    code: error.code,
+    error: error.message,
+  });
+
+  // Remove any chunks that were partially inserted
+  try {
+    await deleteDocumentChunks(documentId);
+  } catch (cleanupError) {
+    context.logger.error("Failed to clean up chunks after error", {
+      documentId,
+      cleanupError:
+        cleanupError instanceof Error
+          ? cleanupError.message
+          : String(cleanupError),
+    });
+  }
+
+  // Mark document as failed with the error message
+  await updateDocumentStatus(documentId, "failed", error.message);
+}
 
 /**
  * Main document indexing handler.
@@ -273,198 +373,213 @@ async function handleDocumentIndexing(
   // ---- Validate document exists and is in a processable state ----
   const document = await findDocumentById(documentId);
   if (!document) {
-    throw new Error(`Document ${documentId} not found`);
+    const error: DocumentIndexingError = {
+      code: "DOCUMENT_NOT_FOUND",
+      message: `Document ${documentId} not found`,
+    };
+    await updateDocumentStatus(documentId, "failed", error.message);
+    throw new Error(error.message);
   }
 
   // Mark document as processing
   await updateDocumentStatus(documentId, "processing");
 
-  try {
-    // ---- Stage 1: Extract text (0 → 20%) ----
-    await context.updateProgress({
-      percentage: 0,
-      message: "Extracting text from document",
-      metadata: { stage: "extraction" },
-    });
+  // ---- Stage 1: Extract text (0 → 20%) ----
+  await context.updateProgress({
+    percentage: 0,
+    message: "Extracting text from document",
+    metadata: { stage: "extraction" },
+  });
 
-    if (context.signal.aborted) throw new Error("Job cancelled");
-
-    const extracted = await extractText(
-      campaignId,
-      documentId,
-      document.mimeType,
-    );
-
-    // Persist extraction metadata on the document
-    await db
-      .update(documents)
-      .set({
-        metadata: {
-          ...(document.metadata as Record<string, unknown> | null),
-          ...extracted.metadata,
-        },
-      })
-      .where(eq(documents.id, documentId));
-
-    await context.updateProgress({
-      percentage: 20,
-      message: "Text extracted successfully",
-      metadata: { stage: "extraction" },
-    });
-
-    context.logger.info("Text extraction complete", {
-      documentId,
-      contentLength: extracted.content.length,
-    });
-
-    // ---- Stage 2: Chunk content (20 → 35%) ----
-    if (context.signal.aborted) throw new Error("Job cancelled");
-
-    await context.updateProgress({
-      percentage: 20,
-      message: "Chunking document content",
-      metadata: { stage: "chunking" },
-    });
-
-    const chunkingResult = chunkContent(extracted.chunkingInput);
-
-    await context.updateProgress({
-      percentage: 35,
-      message: `Document split into ${chunkingResult.chunks.length} chunks`,
-      metadata: {
-        stage: "chunking",
-        chunkCount: chunkingResult.chunks.length,
-        strategy: chunkingResult.strategy,
-      },
-    });
-
-    context.logger.info("Chunking complete", {
-      documentId,
-      chunkCount: chunkingResult.chunks.length,
-      strategy: chunkingResult.strategy,
-      totalTokens: chunkingResult.totalTokens,
-    });
-
-    // ---- Stage 3: Generate embeddings (35 → 85%) ----
-    if (context.signal.aborted) throw new Error("Job cancelled");
-
-    await context.updateProgress({
-      percentage: 35,
-      message: "Generating embeddings",
-      metadata: { stage: "embedding" },
-    });
-
-    const chunkTexts = chunkingResult.chunks.map((c) => c.content);
-    const embeddings = await embedChunks(
-      chunkTexts,
-      context.signal,
-      async (completed, total) => {
-        // Map embedding progress to 35–85% range
-        const pct = 35 + Math.round((completed / total) * 50);
-        await context.updateProgress({
-          percentage: pct,
-          message: `Generated embeddings for ${completed}/${total} chunks`,
-          metadata: { stage: "embedding", completed, total },
-        });
-      },
-    );
-
-    context.logger.info("Embedding generation complete", {
-      documentId,
-      embeddingCount: embeddings.length,
-    });
-
-    // ---- Stage 4: Store chunks (85 → 95%) ----
-    if (context.signal.aborted) throw new Error("Job cancelled");
-
-    await context.updateProgress({
-      percentage: 85,
-      message: "Storing chunks in database",
-      metadata: { stage: "storage" },
-    });
-
-    const chunkRows = chunkingResult.chunks.map((c, i) => {
-      const row: {
-        content: string;
-        chunkIndex: number;
-        tokenCount: number;
-        pageNumber?: number;
-        section?: string;
-        embedding: number[];
-      } = {
-        content: c.content,
-        chunkIndex: c.chunkIndex,
-        tokenCount: c.tokenCount,
-        embedding: embeddings[i]!,
-      };
-      if (c.pageNumber !== undefined) row.pageNumber = c.pageNumber;
-      if (c.section !== undefined) row.section = c.section;
-      return row;
-    });
-
-    const storedCount = await storeChunks(documentId, campaignId, chunkRows);
-
-    await context.updateProgress({
-      percentage: 95,
-      message: `Stored ${storedCount} chunks`,
-      metadata: { stage: "storage", storedCount },
-    });
-
-    context.logger.info("Chunks stored", { documentId, storedCount });
-
-    // ---- Stage 5: Finalise document status (95 → 100%) ----
-    await db
-      .update(documents)
-      .set({
-        metadata: {
-          ...(document.metadata as Record<string, unknown> | null),
-          ...extracted.metadata,
-          embeddingsGenerated: true,
-        },
-      })
-      .where(eq(documents.id, documentId));
-
-    await updateDocumentChunkCount(documentId, storedCount);
-
-    await context.updateProgress({
-      percentage: 100,
-      message: "Document indexing complete",
-      metadata: { stage: "complete" },
-    });
-
-    context.logger.info("Document indexing complete", {
-      documentId,
-      chunkCount: storedCount,
-    });
-  } catch (error) {
-    // ---- Failure: clean up and mark document as failed ----
-    const errorMessage =
-      error instanceof Error ? error.message : "Unknown error during indexing";
-
-    context.logger.error("Document indexing failed, cleaning up", {
-      documentId,
-      error: errorMessage,
-    });
-
-    // Remove any chunks that were partially inserted
-    try {
-      await deleteDocumentChunks(documentId);
-    } catch (cleanupError) {
-      context.logger.error("Failed to clean up chunks after error", {
-        documentId,
-        cleanupError:
-          cleanupError instanceof Error
-            ? cleanupError.message
-            : String(cleanupError),
-      });
-    }
-
-    // Mark document as failed with the error message
-    await updateDocumentStatus(documentId, "failed", errorMessage);
-
-    // Re-throw so BullMQ records the failure and can retry
-    throw error;
+  if (context.signal.aborted) {
+    await handleFailure(documentId, { code: "CANCELLED", message: "Job cancelled" }, context);
+    throw new Error("Job cancelled");
   }
+
+  const extractionResult = await extractText(
+    campaignId,
+    documentId,
+    document.mimeType,
+  );
+
+  if (!extractionResult.ok) {
+    await handleFailure(documentId, extractionResult.error, context);
+    throw new Error(extractionResult.error.message);
+  }
+
+  const extracted = extractionResult.value;
+
+  // Persist extraction metadata on the document
+  await db
+    .update(documents)
+    .set({
+      metadata: {
+        ...(document.metadata as Record<string, unknown> | null),
+        ...extracted.metadata,
+      },
+    })
+    .where(eq(documents.id, documentId));
+
+  await context.updateProgress({
+    percentage: 20,
+    message: "Text extracted successfully",
+    metadata: { stage: "extraction" },
+  });
+
+  context.logger.info("Text extraction complete", {
+    documentId,
+    contentLength: extracted.content.length,
+  });
+
+  // ---- Stage 2: Chunk content (20 → 35%) ----
+  if (context.signal.aborted) {
+    await handleFailure(documentId, { code: "CANCELLED", message: "Job cancelled" }, context);
+    throw new Error("Job cancelled");
+  }
+
+  await context.updateProgress({
+    percentage: 20,
+    message: "Chunking document content",
+    metadata: { stage: "chunking" },
+  });
+
+  const chunkingResult = chunkContent(extracted.chunkingInput);
+
+  if (!chunkingResult.ok) {
+    await handleFailure(documentId, chunkingResult.error, context);
+    throw new Error(chunkingResult.error.message);
+  }
+
+  const chunked = chunkingResult.value;
+
+  await context.updateProgress({
+    percentage: 35,
+    message: `Document split into ${chunked.chunks.length} chunks`,
+    metadata: {
+      stage: "chunking",
+      chunkCount: chunked.chunks.length,
+      strategy: chunked.strategy,
+    },
+  });
+
+  context.logger.info("Chunking complete", {
+    documentId,
+    chunkCount: chunked.chunks.length,
+    strategy: chunked.strategy,
+    totalTokens: chunked.totalTokens,
+  });
+
+  // ---- Stage 3: Generate embeddings (35 → 85%) ----
+  if (context.signal.aborted) {
+    await handleFailure(documentId, { code: "CANCELLED", message: "Job cancelled" }, context);
+    throw new Error("Job cancelled");
+  }
+
+  await context.updateProgress({
+    percentage: 35,
+    message: "Generating embeddings",
+    metadata: { stage: "embedding" },
+  });
+
+  const chunkTexts = chunked.chunks.map((c) => c.content);
+  const embeddingResult = await embedChunks(
+    chunkTexts,
+    context.signal,
+    async (completed, total) => {
+      // Map embedding progress to 35–85% range
+      const pct = 35 + Math.round((completed / total) * 50);
+      await context.updateProgress({
+        percentage: pct,
+        message: `Generated embeddings for ${completed}/${total} chunks`,
+        metadata: { stage: "embedding", completed, total },
+      });
+    },
+  );
+
+  if (!embeddingResult.ok) {
+    await handleFailure(documentId, embeddingResult.error, context);
+    throw new Error(embeddingResult.error.message);
+  }
+
+  const embeddings = embeddingResult.value;
+
+  context.logger.info("Embedding generation complete", {
+    documentId,
+    embeddingCount: embeddings.length,
+  });
+
+  // ---- Stage 4: Store chunks (85 → 95%) ----
+  if (context.signal.aborted) {
+    await handleFailure(documentId, { code: "CANCELLED", message: "Job cancelled" }, context);
+    throw new Error("Job cancelled");
+  }
+
+  await context.updateProgress({
+    percentage: 85,
+    message: "Storing chunks in database",
+    metadata: { stage: "storage" },
+  });
+
+  const chunkRows = chunked.chunks.map((c, i) => {
+    const row: {
+      content: string;
+      chunkIndex: number;
+      tokenCount: number;
+      pageNumber?: number;
+      section?: string;
+      embedding: number[];
+    } = {
+      content: c.content,
+      chunkIndex: c.chunkIndex,
+      tokenCount: c.tokenCount,
+      embedding: embeddings[i]!,
+    };
+    if (c.pageNumber !== undefined) row.pageNumber = c.pageNumber;
+    if (c.section !== undefined) row.section = c.section;
+    return row;
+  });
+
+  const storeResult = await storeChunks(documentId, campaignId, chunkRows);
+
+  if (!storeResult.ok) {
+    await handleFailure(documentId, storeResult.error, context);
+    throw new Error(storeResult.error.message);
+  }
+
+  const storedCount = storeResult.value;
+
+  await context.updateProgress({
+    percentage: 95,
+    message: `Stored ${storedCount} chunks`,
+    metadata: { stage: "storage", storedCount },
+  });
+
+  context.logger.info("Chunks stored", { documentId, storedCount });
+
+  // ---- Stage 5: Finalise document status (95 → 100%) ----
+  await db
+    .update(documents)
+    .set({
+      metadata: {
+        ...(document.metadata as Record<string, unknown> | null),
+        ...extracted.metadata,
+        embeddingsGenerated: true,
+      },
+    })
+    .where(eq(documents.id, documentId));
+
+  await updateDocumentChunkCount(documentId, storedCount);
+
+  await context.updateProgress({
+    percentage: 100,
+    message: "Document indexing complete",
+    metadata: { stage: "complete" },
+  });
+
+  context.logger.info("Document indexing complete", {
+    documentId,
+    chunkCount: storedCount,
+  });
 }
 
 // ============================================================================
