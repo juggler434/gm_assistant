@@ -14,3 +14,11 @@ export {
   type KeywordSearchOptions,
   type KeywordSearchError,
 } from "./keyword-search.js";
+
+export {
+  searchChunksHybrid,
+  normalizeScores,
+  type HybridSearchResult,
+  type HybridSearchOptions,
+  type HybridSearchError,
+} from "./hybrid-search.js";
