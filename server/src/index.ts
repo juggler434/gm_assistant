@@ -1,5 +1,6 @@
 import { config } from "@/config/index.js";
 import { buildApp } from "./app.js";
+import { shutdownMetrics } from "@/services/metrics/index.js";
 
 async function main(): Promise<void> {
   const app = await buildApp();
@@ -7,6 +8,7 @@ async function main(): Promise<void> {
   // Graceful shutdown handler
   const shutdown = async (signal: string): Promise<void> => {
     app.log.info(`Received ${signal}, shutting down gracefully...`);
+    await shutdownMetrics();
     await app.close();
     process.exit(0);
   };

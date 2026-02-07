@@ -1,5 +1,6 @@
 import type { FastifyInstance } from "fastify";
 import { requireAuth } from "@/modules/auth/index.js";
+import { trackEvent } from "@/services/metrics/index.js";
 import {
   createCampaignSchema,
   updateCampaignSchema,
@@ -44,6 +45,8 @@ export async function campaignRoutes(app: FastifyInstance): Promise<void> {
         message: "Failed to create campaign",
       });
     }
+
+    trackEvent(userId, "campaign_created", { campaign_id: campaign.id });
 
     return reply.status(201).send({ campaign });
   });
@@ -148,6 +151,8 @@ export async function campaignRoutes(app: FastifyInstance): Promise<void> {
         message: "Campaign not found",
       });
     }
+
+    trackEvent(userId, "campaign_deleted", { campaign_id: id });
 
     return reply.status(204).send();
   });

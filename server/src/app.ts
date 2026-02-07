@@ -7,9 +7,11 @@ import {
   registerWebSocket,
   registerAuth,
 } from "@/plugins/index.js";
+import { registerMetrics } from "@/plugins/metrics.js";
 import { authRoutes } from "@/modules/auth/index.js";
 import { campaignRoutes } from "@/modules/campaigns/index.js";
 import { documentRoutes } from "@/modules/documents/index.js";
+import { metricsRoutes } from "@/modules/metrics/routes.js";
 
 export interface AppOptions {
   logger?: boolean;
@@ -26,6 +28,7 @@ export async function buildApp(options: AppOptions = {}): Promise<FastifyInstanc
   await registerMultipart(app);
   await registerWebSocket(app);
   await registerAuth(app);
+  await registerMetrics(app);
 
   // Global error handler
   app.setErrorHandler((error: FastifyError, request, reply) => {
@@ -44,6 +47,7 @@ export async function buildApp(options: AppOptions = {}): Promise<FastifyInstanc
   await app.register(authRoutes, { prefix: "/api/auth" });
   await app.register(campaignRoutes, { prefix: "/api/campaigns" });
   await app.register(documentRoutes, { prefix: "/api/campaigns" });
+  await app.register(metricsRoutes, { prefix: "/api/admin/metrics" });
 
   // Health check endpoint
   app.get("/health", async () => {
