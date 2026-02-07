@@ -4,6 +4,7 @@ import { createSession } from "./session.js";
 import { setSessionCookie } from "./middleware.js";
 import { registerBodySchema, loginBodySchema } from "./schemas.js";
 import { findUserByEmail, createUser } from "./repository.js";
+import { trackEvent, identifyUser } from "@/services/metrics/index.js";
 
 export async function authRoutes(app: FastifyInstance): Promise<void> {
   app.post("/register", async (request, reply) => {
@@ -53,6 +54,10 @@ export async function authRoutes(app: FastifyInstance): Promise<void> {
 
     // 6. Set cookie and return user
     setSessionCookie(reply, sessionResult.value.token);
+
+    identifyUser(newUser.id, { email: newUser.email, name: newUser.name });
+    trackEvent(newUser.id, "user_registered");
+
     return reply.status(201).send({
       user: {
         id: newUser.id,
@@ -106,6 +111,9 @@ export async function authRoutes(app: FastifyInstance): Promise<void> {
 
     // 5. Set cookie and return user
     setSessionCookie(reply, sessionResult.value.token);
+
+    trackEvent(user.id, "user_logged_in");
+
     return reply.status(200).send({
       user: {
         id: user.id,

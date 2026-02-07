@@ -4,6 +4,7 @@ import { requireAuth } from "@/modules/auth/index.js";
 import { findCampaignByIdAndUserId } from "@/modules/campaigns/index.js";
 import { createStorageService } from "@/services/storage/index.js";
 import { createQueue } from "@/jobs/index.js";
+import { trackEvent } from "@/services/metrics/index.js";
 import {
   campaignIdParamSchema,
   documentParamsSchema,
@@ -178,6 +179,14 @@ export async function documentRoutes(app: FastifyInstance): Promise<void> {
       // Worker can pick it up later via status check
     }
 
+    trackEvent(userId, "document_uploaded", {
+      document_id: documentId,
+      campaign_id: campaignId,
+      mime_type: mimeType,
+      file_size: fileSize,
+      document_type: documentType,
+    });
+
     return reply.status(201).send({ document });
   });
 
@@ -347,6 +356,11 @@ export async function documentRoutes(app: FastifyInstance): Promise<void> {
 
     // Delete from storage (ignore errors - file may not exist)
     await storage.delete(campaignId, id);
+
+    trackEvent(userId, "document_deleted", {
+      document_id: id,
+      campaign_id: campaignId,
+    });
 
     return reply.status(204).send();
   });

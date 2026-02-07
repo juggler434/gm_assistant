@@ -30,6 +30,7 @@ import {
   updateDocumentChunkCount,
   findDocumentById,
 } from "@/modules/documents/repository.js";
+import { trackEvent } from "@/services/metrics/index.js";
 import { registerHandler } from "./handlers/index.js";
 import type { BaseJobData, JobContext } from "./types.js";
 import type { ChunkingInput } from "@/modules/knowledge/chunking/types.js";
@@ -355,6 +356,11 @@ async function handleFailure(
 
   // Mark document as failed with the error message
   await updateDocumentStatus(documentId, "failed", error.message);
+
+  trackEvent("system", "document_indexing_failed", {
+    document_id: documentId,
+    error_code: error.code,
+  });
 }
 
 /**
@@ -367,6 +373,7 @@ async function handleDocumentIndexing(
   context: JobContext,
 ): Promise<void> {
   const { documentId, campaignId } = data;
+  const indexingStartTime = Date.now();
 
   context.logger.info("Starting document indexing", { documentId, campaignId });
 
@@ -574,6 +581,16 @@ async function handleDocumentIndexing(
     percentage: 100,
     message: "Document indexing complete",
     metadata: { stage: "complete" },
+  });
+
+  const indexingDurationMs = Date.now() - indexingStartTime;
+
+  trackEvent("system", "document_indexing_completed", {
+    document_id: documentId,
+    campaign_id: campaignId,
+    chunk_count: storedCount,
+    mime_type: document.mimeType,
+    duration_ms: indexingDurationMs,
   });
 
   context.logger.info("Document indexing complete", {
