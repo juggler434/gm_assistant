@@ -1,6 +1,6 @@
 export {
   executeRAGPipeline,
-} from "./rag.service.js";
+} from "./service.js";
 
 export {
   buildContext,
