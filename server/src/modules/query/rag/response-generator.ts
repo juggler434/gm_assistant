@@ -54,6 +54,32 @@ function buildUserMessage(query: string, context: BuiltContext): string {
 }
 
 // ============================================================================
+// Unanswerable Detection
+// ============================================================================
+
+/** Phrases that indicate the LLM could not answer from the provided context */
+const UNANSWERABLE_PATTERNS = [
+  "i don't have enough information",
+  "i do not have enough information",
+  "not mentioned in",
+  "no information about",
+  "not found in the",
+  "cannot find",
+  "no relevant context",
+  "not mentioned in the provided",
+  "cannot answer this question",
+];
+
+/**
+ * Detects whether the answer indicates the question cannot be answered
+ * from the available context.
+ */
+function detectUnanswerable(answerText: string): boolean {
+  const lower = answerText.toLowerCase();
+  return UNANSWERABLE_PATTERNS.some((p) => lower.includes(p));
+}
+
+// ============================================================================
 // Confidence Scoring
 // ============================================================================
 
@@ -74,20 +100,7 @@ export function computeConfidence(
     return 0.1;
   }
 
-  // Check for unanswerable indicators
-  const unanswerablePatterns = [
-    "i don't have enough information",
-    "i do not have enough information",
-    "not mentioned in",
-    "no information about",
-    "not found in the",
-    "cannot find",
-    "no relevant context",
-  ];
-  const lowerAnswer = answerText.toLowerCase();
-  const isUnanswerable = unanswerablePatterns.some((p) => lowerAnswer.includes(p));
-
-  if (isUnanswerable) {
+  if (detectUnanswerable(answerText)) {
     return 0.15;
   }
 
@@ -104,22 +117,6 @@ export function computeConfidence(
 
   // Clamp to [0, 1]
   return Math.min(1, Math.max(0, confidence));
-}
-
-/**
- * Detects whether the answer indicates the question cannot be answered
- * from the available context.
- */
-function detectUnanswerable(answerText: string): boolean {
-  const patterns = [
-    "i don't have enough information",
-    "i do not have enough information",
-    "no relevant context",
-    "not mentioned in the provided",
-    "cannot answer this question",
-  ];
-  const lower = answerText.toLowerCase();
-  return patterns.some((p) => lower.includes(p));
 }
 
 // ============================================================================
