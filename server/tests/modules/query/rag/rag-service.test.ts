@@ -25,7 +25,8 @@ vi.mock("@/config/index.js", () => ({
 // Mock global fetch for embedding calls
 vi.stubGlobal("fetch", mockFetch);
 
-import { executeRAGPipeline, type RAGQuery } from "@/modules/query/rag/rag.service.js";
+import { executeRAGPipeline } from "@/modules/query/rag/rag.service.js";
+import type { RAGQuery } from "@/modules/query/rag/types.js";
 import type { LLMService } from "@/services/llm/service.js";
 import type { HybridSearchResult } from "@/modules/knowledge/retrieval/hybrid-search.js";
 

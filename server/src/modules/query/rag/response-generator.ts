@@ -8,48 +8,13 @@
 
 import { type Result, ok, err } from "@/types/index.js";
 import type { LLMService } from "@/services/llm/service.js";
-import type { BuiltContext, SourceCitation } from "./context-builder.js";
-
-// ============================================================================
-// Types
-// ============================================================================
-
-/** A formatted source reference in the final answer */
-export interface AnswerSource {
-  /** Document name */
-  documentName: string;
-  /** Document ID */
-  documentId: string;
-  /** Document type */
-  documentType: string;
-  /** Page number, if available */
-  pageNumber: number | null;
-  /** Section heading, if available */
-  section: string | null;
-  /** Relevance score (0-1) */
-  relevanceScore: number;
-}
-
-/** The final generated answer */
-export interface GeneratedAnswer {
-  /** The answer text from the LLM */
-  answer: string;
-  /** Confidence score for the answer (0-1) */
-  confidence: number;
-  /** Sources referenced in the answer */
-  sources: AnswerSource[];
-  /** Whether the LLM indicated it could not find relevant information */
-  isUnanswerable: boolean;
-  /** Token usage from the LLM, if available */
-  usage?: { promptTokens: number; completionTokens: number; totalTokens: number } | undefined;
-}
-
-/** Error types for response generation */
-export interface ResponseGeneratorError {
-  code: "LLM_ERROR" | "EMPTY_CONTEXT" | "PARSE_ERROR";
-  message: string;
-  cause?: unknown;
-}
+import type {
+  BuiltContext,
+  SourceCitation,
+  AnswerSource,
+  GeneratedAnswer,
+  ResponseGeneratorError,
+} from "./types.js";
 
 // ============================================================================
 // Prompt Construction

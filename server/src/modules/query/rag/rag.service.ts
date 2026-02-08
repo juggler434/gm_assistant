@@ -14,73 +14,18 @@
 import { type Result, ok, err } from "@/types/index.js";
 import { config } from "@/config/index.js";
 import type { LLMService } from "@/services/llm/service.js";
-import type { DocumentType } from "@/db/schema/index.js";
 import {
   searchChunksHybrid,
   type HybridSearchOptions,
 } from "@/modules/knowledge/retrieval/hybrid-search.js";
-import {
-  buildContext,
-  type ContextBuilderOptions,
-} from "./context-builder.js";
+import { buildContext } from "./context-builder.js";
 import { generateResponse } from "./response-generator.js";
-
-// ============================================================================
-// Types
-// ============================================================================
-
-/** Input for a RAG query */
-export interface RAGQuery {
-  /** The user's question */
-  question: string;
-  /** Campaign ID to scope the search */
-  campaignId: string;
-  /** Optional: filter by specific document IDs */
-  documentIds?: string[];
-  /** Optional: filter by document types */
-  documentTypes?: DocumentType[];
-  /** Maximum number of chunks to retrieve (default: 8) */
-  maxChunks?: number;
-  /** Maximum token budget for context (default: 3000) */
-  maxContextTokens?: number;
-}
-
-/** Full result of a RAG pipeline execution */
-export interface RAGResult {
-  /** The generated answer text */
-  answer: string;
-  /** Confidence score for the answer (0-1) */
-  confidence: number;
-  /** Sources used to generate the answer */
-  sources: Array<{
-    documentName: string;
-    documentId: string;
-    documentType: string;
-    pageNumber: number | null;
-    section: string | null;
-    relevanceScore: number;
-  }>;
-  /** Whether the question could not be answered from available content */
-  isUnanswerable: boolean;
-  /** Number of chunks retrieved from search */
-  chunksRetrieved: number;
-  /** Number of chunks used in the context after filtering */
-  chunksUsed: number;
-  /** Token usage from the LLM, if available */
-  usage?: { promptTokens: number; completionTokens: number; totalTokens: number } | undefined;
-}
-
-/** Error types for the RAG pipeline */
-export interface RAGError {
-  code:
-    | "INVALID_QUERY"
-    | "EMBEDDING_FAILED"
-    | "SEARCH_FAILED"
-    | "CONTEXT_BUILD_FAILED"
-    | "GENERATION_FAILED";
-  message: string;
-  cause?: unknown;
-}
+import type {
+  RAGQuery,
+  RAGResult,
+  RAGError,
+  ContextBuilderOptions,
+} from "./types.js";
 
 /** Ollama embed API response */
 interface OllamaEmbedResponse {

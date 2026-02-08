@@ -1,6 +1,6 @@
 import { describe, it, expect, vi, beforeEach } from "vitest";
 import { computeConfidence } from "@/modules/query/rag/response-generator.js";
-import type { SourceCitation } from "@/modules/query/rag/context-builder.js";
+import type { SourceCitation } from "@/modules/query/rag/types.js";
 
 // Hoist mock functions
 const { mockChat } = vi.hoisted(() => ({
@@ -12,7 +12,7 @@ vi.mock("@/services/llm/service.js", () => ({
 }));
 
 import { generateResponse } from "@/modules/query/rag/response-generator.js";
-import type { BuiltContext } from "@/modules/query/rag/context-builder.js";
+import type { BuiltContext } from "@/modules/query/rag/types.js";
 import type { LLMService } from "@/services/llm/service.js";
 
 function makeMockLLMService(): LLMService {

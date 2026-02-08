@@ -7,48 +7,11 @@
  */
 
 import type { HybridSearchResult } from "@/modules/knowledge/retrieval/hybrid-search.js";
-
-// ============================================================================
-// Types
-// ============================================================================
-
-/** A citation reference for a single source used in the context */
-export interface SourceCitation {
-  /** Index used in the context (e.g. [1], [2]) */
-  index: number;
-  /** Document name */
-  documentName: string;
-  /** Document ID */
-  documentId: string;
-  /** Document type (e.g. "rulebook", "notes") */
-  documentType: string;
-  /** Page number, if available */
-  pageNumber: number | null;
-  /** Section heading, if available */
-  section: string | null;
-  /** Relevance score from hybrid search (0-1) */
-  relevanceScore: number;
-}
-
-/** The assembled context ready to inject into a prompt */
-export interface BuiltContext {
-  /** The formatted context string for the LLM prompt */
-  contextText: string;
-  /** Ordered list of source citations referenced in the context */
-  sources: SourceCitation[];
-  /** Number of chunks included in the context */
-  chunksUsed: number;
-  /** Estimated token count of the context text */
-  estimatedTokens: number;
-}
-
-/** Options for building context */
-export interface ContextBuilderOptions {
-  /** Maximum estimated tokens for the context window (default: 3000) */
-  maxTokens?: number;
-  /** Minimum relevance score to include a chunk (default: 0.1) */
-  minRelevanceScore?: number;
-}
+import type {
+  SourceCitation,
+  BuiltContext,
+  ContextBuilderOptions,
+} from "./types.js";
 
 // ============================================================================
 // Constants
