@@ -1,0 +1,866 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>GM Assistant — UI Mockup</title>
+  <style>
+    /* ===== Reset & Tokens ===== */
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+    :root {
+      /* palette – dark fantasy theme */
+      --bg-900: #0f0f14;
+      --bg-800: #16161d;
+      --bg-700: #1e1e28;
+      --bg-600: #282834;
+      --bg-500: #353544;
+      --border: #3a3a4a;
+      --text-primary: #e8e6e3;
+      --text-secondary: #9d9baf;
+      --text-muted: #6b6980;
+      --accent: #a855f7;
+      --accent-hover: #9333ea;
+      --accent-subtle: rgba(168, 85, 247, 0.12);
+      --success: #22c55e;
+      --warning: #f59e0b;
+      --danger: #ef4444;
+      --radius-sm: 6px;
+      --radius-md: 10px;
+      --radius-lg: 16px;
+      --shadow: 0 4px 24px rgba(0,0,0,0.35);
+    }
+
+    html { font-size: 15px; }
+    body {
+      font-family: 'Segoe UI', system-ui, -apple-system, sans-serif;
+      background: var(--bg-900);
+      color: var(--text-primary);
+      line-height: 1.55;
+      min-height: 100vh;
+    }
+
+    /* ===== Navigation between mockup screens ===== */
+    .screen { display: none; min-height: 100vh; }
+    .screen.active { display: block; }
+
+    .screen-nav {
+      position: fixed; top: 0; left: 0; right: 0; z-index: 1000;
+      background: var(--bg-800); border-bottom: 1px solid var(--border);
+      display: flex; gap: 2px; padding: 6px 12px;
+      font-size: .8rem; flex-wrap: wrap;
+    }
+    .screen-nav button {
+      background: var(--bg-600); color: var(--text-secondary); border: none;
+      padding: 5px 14px; border-radius: var(--radius-sm); cursor: pointer;
+      font-size: .8rem; white-space: nowrap;
+    }
+    .screen-nav button:hover { background: var(--bg-500); color: var(--text-primary); }
+    .screen-nav button.active { background: var(--accent); color: #fff; }
+
+    .screen-content { padding-top: 48px; }
+
+    /* ===== Shared components ===== */
+    .btn {
+      display: inline-flex; align-items: center; gap: 6px;
+      padding: 10px 20px; border: none; border-radius: var(--radius-sm);
+      font-size: .9rem; font-weight: 600; cursor: pointer; transition: all .15s;
+    }
+    .btn-primary { background: var(--accent); color: #fff; }
+    .btn-primary:hover { background: var(--accent-hover); }
+    .btn-secondary { background: var(--bg-600); color: var(--text-primary); border: 1px solid var(--border); }
+    .btn-secondary:hover { background: var(--bg-500); }
+    .btn-danger { background: var(--danger); color: #fff; }
+    .btn-sm { padding: 6px 12px; font-size: .82rem; }
+    .btn-icon {
+      width: 36px; height: 36px; padding: 0; display: inline-flex;
+      align-items: center; justify-content: center; border-radius: var(--radius-sm);
+      background: var(--bg-600); color: var(--text-secondary); border: 1px solid var(--border);
+      cursor: pointer; font-size: 1rem;
+    }
+    .btn-icon:hover { background: var(--bg-500); color: var(--text-primary); }
+
+    .input, .textarea, select {
+      width: 100%; padding: 10px 14px; background: var(--bg-700);
+      border: 1px solid var(--border); border-radius: var(--radius-sm);
+      color: var(--text-primary); font-size: .9rem; font-family: inherit;
+      outline: none; transition: border-color .15s;
+    }
+    .input:focus, .textarea:focus, select:focus { border-color: var(--accent); }
+    .textarea { resize: vertical; min-height: 80px; }
+
+    label { font-size: .85rem; color: var(--text-secondary); margin-bottom: 4px; display: block; }
+
+    .card {
+      background: var(--bg-700); border: 1px solid var(--border);
+      border-radius: var(--radius-md); padding: 20px;
+    }
+
+    .badge {
+      display: inline-block; padding: 3px 10px; border-radius: 999px;
+      font-size: .75rem; font-weight: 600;
+    }
+    .badge-purple { background: var(--accent-subtle); color: var(--accent); }
+    .badge-green { background: rgba(34,197,94,.12); color: var(--success); }
+    .badge-yellow { background: rgba(245,158,11,.12); color: var(--warning); }
+    .badge-red { background: rgba(239,68,68,.12); color: var(--danger); }
+
+    .avatar {
+      width: 36px; height: 36px; border-radius: 50%;
+      background: var(--accent); color: #fff; display: inline-flex;
+      align-items: center; justify-content: center; font-weight: 700;
+      font-size: .85rem;
+    }
+
+    /* ===== Sidebar layout (shared by dashboard screens) ===== */
+    .app-layout { display: flex; min-height: 100vh; }
+    .sidebar {
+      width: 260px; background: var(--bg-800); border-right: 1px solid var(--border);
+      display: flex; flex-direction: column; position: fixed; top: 48px; bottom: 0;
+      overflow-y: auto;
+    }
+    .sidebar-logo {
+      padding: 20px 20px 16px; font-size: 1.15rem; font-weight: 700;
+      display: flex; align-items: center; gap: 10px;
+      border-bottom: 1px solid var(--border);
+    }
+    .sidebar-logo .icon { font-size: 1.4rem; }
+    .sidebar-section { padding: 14px 12px 6px; }
+    .sidebar-label { font-size: .72rem; text-transform: uppercase; letter-spacing: .08em; color: var(--text-muted); padding: 0 8px 6px; }
+    .sidebar-item {
+      display: flex; align-items: center; gap: 10px; padding: 9px 12px;
+      border-radius: var(--radius-sm); color: var(--text-secondary);
+      cursor: pointer; font-size: .88rem; transition: all .1s;
+      text-decoration: none;
+    }
+    .sidebar-item:hover { background: var(--bg-600); color: var(--text-primary); }
+    .sidebar-item.active { background: var(--accent-subtle); color: var(--accent); font-weight: 600; }
+    .sidebar-item .icon { width: 20px; text-align: center; }
+    .sidebar-footer {
+      margin-top: auto; padding: 16px; border-top: 1px solid var(--border);
+      display: flex; align-items: center; gap: 10px;
+    }
+    .sidebar-footer .name { font-size: .88rem; font-weight: 600; }
+    .sidebar-footer .email { font-size: .75rem; color: var(--text-muted); }
+
+    .main-content { margin-left: 260px; flex: 1; padding: 28px 32px; }
+    .page-header {
+      display: flex; align-items: center; justify-content: space-between;
+      margin-bottom: 24px;
+    }
+    .page-header h1 { font-size: 1.45rem; font-weight: 700; }
+    .page-header p { font-size: .88rem; color: var(--text-secondary); margin-top: 2px; }
+
+    /* ===== Screen 1: Login ===== */
+    .auth-wrapper {
+      display: flex; align-items: center; justify-content: center;
+      min-height: 100vh; padding: 20px;
+    }
+    .auth-card {
+      width: 100%; max-width: 420px; background: var(--bg-700);
+      border: 1px solid var(--border); border-radius: var(--radius-lg);
+      padding: 40px 36px; box-shadow: var(--shadow);
+    }
+    .auth-card h1 {
+      font-size: 1.5rem; font-weight: 700; text-align: center; margin-bottom: 4px;
+    }
+    .auth-card .subtitle {
+      text-align: center; color: var(--text-secondary); font-size: .9rem;
+      margin-bottom: 28px;
+    }
+    .auth-card .logo { text-align: center; font-size: 2.2rem; margin-bottom: 16px; }
+    .form-group { margin-bottom: 18px; }
+    .form-row { display: flex; gap: 12px; }
+    .form-row .form-group { flex: 1; }
+    .auth-card .btn { width: 100%; justify-content: center; margin-top: 6px; }
+    .auth-footer { text-align: center; margin-top: 18px; font-size: .85rem; color: var(--text-secondary); }
+    .auth-footer a { color: var(--accent); text-decoration: none; }
+
+    /* ===== Screen 3: Campaigns list ===== */
+    .campaigns-grid {
+      display: grid; grid-template-columns: repeat(auto-fill, minmax(310px, 1fr));
+      gap: 18px;
+    }
+    .campaign-card {
+      background: var(--bg-700); border: 1px solid var(--border);
+      border-radius: var(--radius-md); padding: 22px;
+      cursor: pointer; transition: all .15s;
+    }
+    .campaign-card:hover { border-color: var(--accent); transform: translateY(-2px); box-shadow: var(--shadow); }
+    .campaign-card h3 { font-size: 1.05rem; margin-bottom: 6px; }
+    .campaign-card p { font-size: .85rem; color: var(--text-secondary); margin-bottom: 14px; line-height: 1.5; }
+    .campaign-meta { display: flex; gap: 16px; font-size: .78rem; color: var(--text-muted); }
+    .campaign-meta span { display: flex; align-items: center; gap: 4px; }
+
+    .campaign-card-new {
+      border: 2px dashed var(--border); display: flex; flex-direction: column;
+      align-items: center; justify-content: center; min-height: 170px;
+      color: var(--text-muted); gap: 8px;
+    }
+    .campaign-card-new:hover { border-color: var(--accent); color: var(--accent); }
+    .campaign-card-new .plus { font-size: 2rem; line-height: 1; }
+
+    /* ===== Screen 4: Campaign detail ===== */
+    .campaign-tabs { display: flex; gap: 2px; margin-bottom: 24px; border-bottom: 1px solid var(--border); }
+    .campaign-tabs button {
+      background: none; border: none; color: var(--text-secondary);
+      padding: 10px 18px; font-size: .9rem; cursor: pointer;
+      border-bottom: 2px solid transparent; margin-bottom: -1px;
+    }
+    .campaign-tabs button:hover { color: var(--text-primary); }
+    .campaign-tabs button.active { color: var(--accent); border-bottom-color: var(--accent); font-weight: 600; }
+
+    .docs-table { width: 100%; border-collapse: collapse; }
+    .docs-table th {
+      text-align: left; padding: 10px 14px; font-size: .78rem;
+      text-transform: uppercase; letter-spacing: .06em; color: var(--text-muted);
+      border-bottom: 1px solid var(--border);
+    }
+    .docs-table td {
+      padding: 12px 14px; border-bottom: 1px solid var(--border);
+      font-size: .88rem; vertical-align: middle;
+    }
+    .docs-table tr:hover td { background: var(--bg-600); }
+    .doc-name { display: flex; align-items: center; gap: 10px; }
+    .doc-icon { font-size: 1.2rem; }
+
+    /* ===== Screen 5: AI Query / Chat ===== */
+    .chat-layout { display: flex; height: calc(100vh - 48px); }
+    .chat-sidebar {
+      width: 280px; background: var(--bg-800); border-right: 1px solid var(--border);
+      display: flex; flex-direction: column; overflow-y: auto;
+    }
+    .chat-sidebar-header { padding: 16px; border-bottom: 1px solid var(--border); }
+    .chat-main { flex: 1; display: flex; flex-direction: column; }
+    .chat-header {
+      padding: 16px 24px; border-bottom: 1px solid var(--border);
+      display: flex; align-items: center; justify-content: space-between;
+    }
+    .chat-header h2 { font-size: 1.05rem; }
+    .chat-messages { flex: 1; overflow-y: auto; padding: 24px; display: flex; flex-direction: column; gap: 20px; }
+
+    .chat-msg { display: flex; gap: 12px; max-width: 720px; }
+    .chat-msg.user { align-self: flex-end; flex-direction: row-reverse; }
+    .chat-msg-avatar { flex-shrink: 0; }
+    .chat-msg-bubble {
+      padding: 14px 18px; border-radius: var(--radius-md);
+      font-size: .9rem; line-height: 1.6;
+    }
+    .chat-msg.assistant .chat-msg-bubble {
+      background: var(--bg-700); border: 1px solid var(--border);
+    }
+    .chat-msg.user .chat-msg-bubble {
+      background: var(--accent); color: #fff;
+    }
+    .chat-sources {
+      margin-top: 10px; padding-top: 10px; border-top: 1px solid var(--border);
+      font-size: .8rem; color: var(--text-muted);
+    }
+    .chat-sources strong { color: var(--text-secondary); }
+    .chat-source-tag {
+      display: inline-block; background: var(--bg-600); padding: 2px 8px;
+      border-radius: var(--radius-sm); margin: 3px 3px 0 0; font-size: .75rem;
+      color: var(--text-secondary);
+    }
+
+    .chat-input-area {
+      padding: 16px 24px; border-top: 1px solid var(--border);
+      display: flex; gap: 10px; align-items: flex-end;
+    }
+    .chat-input-area .input {
+      flex: 1; min-height: 44px; max-height: 120px; resize: none;
+      padding: 12px 16px; border-radius: var(--radius-md);
+    }
+
+    .context-panel {
+      width: 300px; background: var(--bg-800); border-left: 1px solid var(--border);
+      overflow-y: auto; padding: 16px;
+    }
+    .context-panel h3 { font-size: .88rem; margin-bottom: 12px; color: var(--text-secondary); }
+    .context-chunk {
+      background: var(--bg-700); border: 1px solid var(--border);
+      border-radius: var(--radius-sm); padding: 12px; margin-bottom: 10px;
+      font-size: .82rem; line-height: 1.5;
+    }
+    .context-chunk .source { font-size: .72rem; color: var(--text-muted); margin-top: 6px; }
+    .context-chunk .score { float: right; font-weight: 600; color: var(--success); font-size: .75rem; }
+
+    /* ===== Screen 6: Upload modal overlay ===== */
+    .modal-overlay {
+      position: fixed; inset: 0; background: rgba(0,0,0,.55);
+      display: flex; align-items: center; justify-content: center;
+      z-index: 900; padding-top: 48px;
+    }
+    .modal {
+      background: var(--bg-700); border: 1px solid var(--border);
+      border-radius: var(--radius-lg); padding: 32px; width: 100%; max-width: 500px;
+      box-shadow: var(--shadow);
+    }
+    .modal h2 { font-size: 1.15rem; margin-bottom: 4px; }
+    .modal .subtitle { color: var(--text-secondary); font-size: .88rem; margin-bottom: 20px; }
+    .upload-zone {
+      border: 2px dashed var(--border); border-radius: var(--radius-md);
+      padding: 36px 20px; text-align: center; color: var(--text-muted);
+      margin-bottom: 18px; transition: border-color .15s;
+    }
+    .upload-zone:hover { border-color: var(--accent); }
+    .upload-zone .icon { font-size: 2rem; margin-bottom: 8px; }
+    .upload-zone p { font-size: .88rem; }
+    .upload-zone .hint { font-size: .78rem; margin-top: 4px; }
+    .modal-actions { display: flex; gap: 10px; justify-content: flex-end; margin-top: 20px; }
+
+    /* ===== Utilities ===== */
+    .flex { display: flex; }
+    .items-center { align-items: center; }
+    .gap-8 { gap: 8px; }
+    .gap-12 { gap: 12px; }
+    .gap-16 { gap: 16px; }
+    .mt-8 { margin-top: 8px; }
+    .mt-16 { margin-top: 16px; }
+    .mb-8 { margin-bottom: 8px; }
+    .text-muted { color: var(--text-muted); }
+    .text-sm { font-size: .85rem; }
+
+    /* ===== Stats row ===== */
+    .stats-row { display: flex; gap: 16px; margin-bottom: 24px; }
+    .stat-card {
+      flex: 1; background: var(--bg-700); border: 1px solid var(--border);
+      border-radius: var(--radius-md); padding: 18px 20px;
+    }
+    .stat-card .label { font-size: .78rem; color: var(--text-muted); text-transform: uppercase; letter-spacing: .06em; }
+    .stat-card .value { font-size: 1.6rem; font-weight: 700; margin-top: 4px; }
+    .stat-card .change { font-size: .78rem; margin-top: 2px; }
+    .stat-card .change.up { color: var(--success); }
+
+    /* ===== Responsive hint ===== */
+    @media (max-width: 900px) {
+      .sidebar, .chat-sidebar, .context-panel { display: none; }
+      .main-content, .chat-main { margin-left: 0; }
+    }
+  </style>
+</head>
+<body>
+
+<!-- Screen navigation toolbar -->
+<nav class="screen-nav" id="screenNav">
+  <button data-screen="login" class="active">Login</button>
+  <button data-screen="register">Register</button>
+  <button data-screen="dashboard">Dashboard</button>
+  <button data-screen="campaign-detail">Campaign Detail</button>
+  <button data-screen="ai-query">AI Query</button>
+  <button data-screen="upload-modal">Upload Modal</button>
+</nav>
+
+<!-- ======================== Screen: Login ======================== -->
+<div class="screen active" id="screen-login">
+  <div class="screen-content">
+    <div class="auth-wrapper">
+      <div class="auth-card">
+        <div class="logo">&#9876;&#65039;</div>
+        <h1>Welcome Back</h1>
+        <p class="subtitle">Sign in to your GM Assistant account</p>
+        <div class="form-group">
+          <label>Email</label>
+          <input class="input" type="email" placeholder="gamemaster@example.com" />
+        </div>
+        <div class="form-group">
+          <label>Password</label>
+          <input class="input" type="password" placeholder="Enter your password" />
+        </div>
+        <button class="btn btn-primary">Sign In</button>
+        <p class="auth-footer">Don&rsquo;t have an account? <a href="#">Create one</a></p>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- ======================== Screen: Register ======================== -->
+<div class="screen" id="screen-register">
+  <div class="screen-content">
+    <div class="auth-wrapper">
+      <div class="auth-card">
+        <div class="logo">&#9876;&#65039;</div>
+        <h1>Create Account</h1>
+        <p class="subtitle">Start managing your campaigns with AI</p>
+        <div class="form-group">
+          <label>Name</label>
+          <input class="input" type="text" placeholder="Your display name" />
+        </div>
+        <div class="form-group">
+          <label>Email</label>
+          <input class="input" type="email" placeholder="gamemaster@example.com" />
+        </div>
+        <div class="form-group">
+          <label>Password</label>
+          <input class="input" type="password" placeholder="Min 8 characters" />
+        </div>
+        <button class="btn btn-primary">Create Account</button>
+        <p class="auth-footer">Already have an account? <a href="#">Sign in</a></p>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- ======================== Screen: Dashboard ======================== -->
+<div class="screen" id="screen-dashboard">
+  <div class="screen-content">
+    <div class="app-layout">
+      <!-- Sidebar -->
+      <aside class="sidebar">
+        <div class="sidebar-logo"><span class="icon">&#9876;&#65039;</span> GM Assistant</div>
+        <div class="sidebar-section">
+          <div class="sidebar-label">Menu</div>
+          <div class="sidebar-item active"><span class="icon">&#127968;</span> Dashboard</div>
+          <div class="sidebar-item"><span class="icon">&#128220;</span> Campaigns</div>
+          <div class="sidebar-item"><span class="icon">&#129302;</span> AI Query</div>
+        </div>
+        <div class="sidebar-section">
+          <div class="sidebar-label">Recent Campaigns</div>
+          <div class="sidebar-item"><span class="icon">&#127752;</span> Curse of Strahd</div>
+          <div class="sidebar-item"><span class="icon">&#9877;&#65039;</span> Lost Mines</div>
+          <div class="sidebar-item"><span class="icon">&#128293;</span> Descent into Avernus</div>
+        </div>
+        <div class="sidebar-footer">
+          <div class="avatar">DM</div>
+          <div>
+            <div class="name">Dungeon Master</div>
+            <div class="email">dm@example.com</div>
+          </div>
+        </div>
+      </aside>
+
+      <!-- Main -->
+      <main class="main-content">
+        <div class="page-header">
+          <div>
+            <h1>Dashboard</h1>
+            <p>Manage your RPG campaigns</p>
+          </div>
+          <button class="btn btn-primary">+ New Campaign</button>
+        </div>
+
+        <div class="stats-row">
+          <div class="stat-card">
+            <div class="label">Campaigns</div>
+            <div class="value">5</div>
+          </div>
+          <div class="stat-card">
+            <div class="label">Documents</div>
+            <div class="value">23</div>
+          </div>
+          <div class="stat-card">
+            <div class="label">AI Queries</div>
+            <div class="value">142</div>
+            <div class="change up">+12 this week</div>
+          </div>
+          <div class="stat-card">
+            <div class="label">Knowledge Chunks</div>
+            <div class="value">1,847</div>
+          </div>
+        </div>
+
+        <h2 style="font-size:1.1rem; margin-bottom:14px;">Your Campaigns</h2>
+        <div class="campaigns-grid">
+          <div class="campaign-card">
+            <div class="flex items-center gap-8 mb-8">
+              <h3>Curse of Strahd</h3>
+              <span class="badge badge-green">Active</span>
+            </div>
+            <p>A gothic horror campaign set in the demiplane of Barovia. The party is currently exploring Castle Ravenloft.</p>
+            <div class="campaign-meta">
+              <span>&#128196; 8 documents</span>
+              <span>&#128172; 47 queries</span>
+              <span>Updated 2h ago</span>
+            </div>
+          </div>
+
+          <div class="campaign-card">
+            <div class="flex items-center gap-8 mb-8">
+              <h3>Lost Mines of Phandelver</h3>
+              <span class="badge badge-green">Active</span>
+            </div>
+            <p>Starter adventure — the party is investigating the Redbrands and searching for Wave Echo Cave.</p>
+            <div class="campaign-meta">
+              <span>&#128196; 5 documents</span>
+              <span>&#128172; 32 queries</span>
+              <span>Updated 1d ago</span>
+            </div>
+          </div>
+
+          <div class="campaign-card">
+            <div class="flex items-center gap-8 mb-8">
+              <h3>Descent into Avernus</h3>
+              <span class="badge badge-yellow">Paused</span>
+            </div>
+            <p>The group navigates the wastelands of Avernus, forging deals with archdevils.</p>
+            <div class="campaign-meta">
+              <span>&#128196; 6 documents</span>
+              <span>&#128172; 38 queries</span>
+              <span>Updated 5d ago</span>
+            </div>
+          </div>
+
+          <div class="campaign-card">
+            <div class="flex items-center gap-8 mb-8">
+              <h3>Tomb of Annihilation</h3>
+              <span class="badge badge-red">Completed</span>
+            </div>
+            <p>Explore the jungles of Chult and delve into the infamous Tomb. Campaign wrapped up last month.</p>
+            <div class="campaign-meta">
+              <span>&#128196; 4 documents</span>
+              <span>&#128172; 25 queries</span>
+              <span>Updated 30d ago</span>
+            </div>
+          </div>
+
+          <div class="campaign-card campaign-card-new">
+            <div class="plus">+</div>
+            <div style="font-size:.9rem">Create New Campaign</div>
+          </div>
+        </div>
+      </main>
+    </div>
+  </div>
+</div>
+
+<!-- ======================== Screen: Campaign Detail ======================== -->
+<div class="screen" id="screen-campaign-detail">
+  <div class="screen-content">
+    <div class="app-layout">
+      <aside class="sidebar">
+        <div class="sidebar-logo"><span class="icon">&#9876;&#65039;</span> GM Assistant</div>
+        <div class="sidebar-section">
+          <div class="sidebar-label">Menu</div>
+          <div class="sidebar-item"><span class="icon">&#127968;</span> Dashboard</div>
+          <div class="sidebar-item active"><span class="icon">&#128220;</span> Campaigns</div>
+          <div class="sidebar-item"><span class="icon">&#129302;</span> AI Query</div>
+        </div>
+        <div class="sidebar-section">
+          <div class="sidebar-label">Campaign</div>
+          <div class="sidebar-item active"><span class="icon">&#127752;</span> Curse of Strahd</div>
+        </div>
+        <div class="sidebar-footer">
+          <div class="avatar">DM</div>
+          <div>
+            <div class="name">Dungeon Master</div>
+            <div class="email">dm@example.com</div>
+          </div>
+        </div>
+      </aside>
+
+      <main class="main-content">
+        <div style="margin-bottom:8px;">
+          <span class="text-muted text-sm" style="cursor:pointer">&larr; Back to Campaigns</span>
+        </div>
+        <div class="page-header">
+          <div>
+            <h1>Curse of Strahd</h1>
+            <p>Gothic horror campaign in Barovia</p>
+          </div>
+          <div class="flex gap-8">
+            <button class="btn btn-secondary btn-sm">&#9998; Edit</button>
+            <button class="btn btn-danger btn-sm">&#128465; Delete</button>
+          </div>
+        </div>
+
+        <div class="campaign-tabs">
+          <button class="active">Documents</button>
+          <button>AI Query</button>
+          <button>Settings</button>
+        </div>
+
+        <div class="flex items-center" style="justify-content:space-between; margin-bottom:16px;">
+          <input class="input" style="max-width:300px" placeholder="Search documents..." />
+          <button class="btn btn-primary btn-sm">&#128194; Upload Document</button>
+        </div>
+
+        <table class="docs-table">
+          <thead>
+            <tr>
+              <th>Name</th>
+              <th>Type</th>
+              <th>Size</th>
+              <th>Status</th>
+              <th>Uploaded</th>
+              <th></th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr>
+              <td><div class="doc-name"><span class="doc-icon">&#128196;</span> curse-of-strahd-module.pdf</div></td>
+              <td><span class="badge badge-purple">rulebook</span></td>
+              <td>14.2 MB</td>
+              <td><span class="badge badge-green">Processed</span></td>
+              <td>Jan 15, 2026</td>
+              <td><button class="btn-icon" title="Download">&#8595;</button></td>
+            </tr>
+            <tr>
+              <td><div class="doc-name"><span class="doc-icon">&#128196;</span> session-notes-1-12.pdf</div></td>
+              <td><span class="badge badge-purple">notes</span></td>
+              <td>2.1 MB</td>
+              <td><span class="badge badge-green">Processed</span></td>
+              <td>Jan 20, 2026</td>
+              <td><button class="btn-icon" title="Download">&#8595;</button></td>
+            </tr>
+            <tr>
+              <td><div class="doc-name"><span class="doc-icon">&#128221;</span> npc-tracker.txt</div></td>
+              <td><span class="badge badge-purple">reference</span></td>
+              <td>48 KB</td>
+              <td><span class="badge badge-green">Processed</span></td>
+              <td>Jan 22, 2026</td>
+              <td><button class="btn-icon" title="Download">&#8595;</button></td>
+            </tr>
+            <tr>
+              <td><div class="doc-name"><span class="doc-icon">&#128196;</span> barovia-map-key.pdf</div></td>
+              <td><span class="badge badge-purple">map</span></td>
+              <td>5.8 MB</td>
+              <td><span class="badge badge-yellow">Processing</span></td>
+              <td>Feb 1, 2026</td>
+              <td><button class="btn-icon" title="Download">&#8595;</button></td>
+            </tr>
+            <tr>
+              <td><div class="doc-name"><span class="doc-icon">&#128221;</span> homebrew-items.txt</div></td>
+              <td><span class="badge badge-purple">homebrew</span></td>
+              <td>12 KB</td>
+              <td><span class="badge badge-green">Processed</span></td>
+              <td>Feb 3, 2026</td>
+              <td><button class="btn-icon" title="Download">&#8595;</button></td>
+            </tr>
+            <tr>
+              <td><div class="doc-name"><span class="doc-icon">&#128196;</span> player-backstories.pdf</div></td>
+              <td><span class="badge badge-purple">notes</span></td>
+              <td>890 KB</td>
+              <td><span class="badge badge-green">Processed</span></td>
+              <td>Feb 5, 2026</td>
+              <td><button class="btn-icon" title="Download">&#8595;</button></td>
+            </tr>
+          </tbody>
+        </table>
+      </main>
+    </div>
+  </div>
+</div>
+
+<!-- ======================== Screen: AI Query ======================== -->
+<div class="screen" id="screen-ai-query">
+  <div class="screen-content">
+    <div class="chat-layout">
+      <!-- Chat history sidebar -->
+      <div class="chat-sidebar">
+        <div class="chat-sidebar-header">
+          <button class="btn btn-primary btn-sm" style="width:100%; justify-content:center">+ New Query</button>
+        </div>
+        <div style="padding:12px">
+          <div class="sidebar-label">Today</div>
+          <div class="sidebar-item active"><span class="icon">&#128172;</span> Strahd's weaknesses</div>
+          <div class="sidebar-item"><span class="icon">&#128172;</span> Ireena's backstory</div>
+          <div class="sidebar-label" style="margin-top:12px">Yesterday</div>
+          <div class="sidebar-item"><span class="icon">&#128172;</span> Vallaki NPCs</div>
+          <div class="sidebar-item"><span class="icon">&#128172;</span> Tarokka card reading</div>
+          <div class="sidebar-label" style="margin-top:12px">Last Week</div>
+          <div class="sidebar-item"><span class="icon">&#128172;</span> Amber Temple layout</div>
+          <div class="sidebar-item"><span class="icon">&#128172;</span> Death House traps</div>
+        </div>
+      </div>
+
+      <!-- Chat main area -->
+      <div class="chat-main">
+        <div class="chat-header">
+          <div>
+            <h2>Strahd's weaknesses</h2>
+            <span class="text-sm text-muted">Campaign: Curse of Strahd</span>
+          </div>
+          <div class="flex gap-8">
+            <select style="width:auto; min-width:180px; padding:6px 10px; font-size:.82rem">
+              <option>Curse of Strahd</option>
+              <option>Lost Mines of Phandelver</option>
+              <option>Descent into Avernus</option>
+            </select>
+          </div>
+        </div>
+
+        <div class="chat-messages">
+          <div class="chat-msg user">
+            <div class="chat-msg-avatar"><div class="avatar">DM</div></div>
+            <div class="chat-msg-bubble">
+              What are Strahd's known weaknesses, and how can the party exploit them in the final confrontation at Castle Ravenloft?
+            </div>
+          </div>
+
+          <div class="chat-msg assistant">
+            <div class="chat-msg-avatar"><div class="avatar" style="background:var(--bg-600);color:var(--accent)">AI</div></div>
+            <div class="chat-msg-bubble">
+              Based on your campaign documents, Strahd has several key weaknesses the party can exploit:
+
+              <br /><br /><strong>1. The Sunsword</strong> — A sentient weapon that radiates sunlight. Strahd takes radiant damage and has disadvantage on attack rolls while in its light. Your notes indicate the party found the blade in the Amber Temple (Session 9).
+
+              <br /><br /><strong>2. The Holy Symbol of Ravenkind</strong> — Can paralyze Strahd for up to 1 minute (DC 15 Charisma save). Per your session notes, Ireena currently holds this item.
+
+              <br /><br /><strong>3. Sunlight Sensitivity</strong> — Strahd has disadvantage on attack rolls and Perception checks in direct sunlight. The Heart of Sorrow protects him from some radiant damage, but destroying it first removes that shield.
+
+              <br /><br /><strong>4. Running Water</strong> — Strahd takes 20 acid damage if he ends his turn in running water. Castle Ravenloft has limited water features, but creative use of spells could exploit this.
+
+              <br /><br /><strong>5. Wooden Stake</strong> — If driven into his heart while incapacitated in his coffin, Strahd is paralyzed until the stake is removed.
+
+              <div class="chat-sources">
+                <strong>Sources:</strong>
+                <div style="margin-top:4px">
+                  <span class="chat-source-tag">curse-of-strahd-module.pdf (p. 234)</span>
+                  <span class="chat-source-tag">session-notes-1-12.pdf (p. 9)</span>
+                  <span class="chat-source-tag">npc-tracker.txt</span>
+                </div>
+                <div style="margin-top:6px; font-size:.75rem">Confidence: <strong style="color:var(--success)">High (0.92)</strong></div>
+              </div>
+            </div>
+          </div>
+
+          <div class="chat-msg user">
+            <div class="chat-msg-avatar"><div class="avatar">DM</div></div>
+            <div class="chat-msg-bubble">
+              Which player characters are best suited to fight Strahd based on their backstories and abilities?
+            </div>
+          </div>
+
+          <div class="chat-msg assistant">
+            <div class="chat-msg-avatar"><div class="avatar" style="background:var(--bg-600);color:var(--accent)">AI</div></div>
+            <div class="chat-msg-bubble">
+              Based on the player backstories and your session notes, here are the best-suited characters:
+
+              <br /><br /><strong>Kael (Paladin of Lathander)</strong> — Has access to Divine Smite (radiant damage) and Aura of Protection. His backstory involves a vendetta against undead, giving strong roleplay motivation. He should wield the Sunsword.
+
+              <br /><br /><strong>Lyra (Light Domain Cleric)</strong> — Her Channel Divinity: Radiance of the Dawn is devastating against Strahd. She can also cast Daylight to create sunlight conditions.
+
+              <br /><br /><strong>Theron (Ranger — Monster Slayer)</strong> — His Slayer's Prey feature adds extra damage, and Supernatural Defense helps resist Strahd's charm abilities.
+
+              <div class="chat-sources">
+                <strong>Sources:</strong>
+                <div style="margin-top:4px">
+                  <span class="chat-source-tag">player-backstories.pdf</span>
+                  <span class="chat-source-tag">session-notes-1-12.pdf (p. 3, 7)</span>
+                </div>
+                <div style="margin-top:6px; font-size:.75rem">Confidence: <strong style="color:var(--success)">High (0.88)</strong></div>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <div class="chat-input-area">
+          <input class="input" placeholder="Ask about your campaign..." />
+          <button class="btn btn-primary">Send</button>
+        </div>
+      </div>
+
+      <!-- Context panel (retrieved chunks) -->
+      <div class="context-panel">
+        <h3>Retrieved Context</h3>
+        <p class="text-sm text-muted mb-8">Chunks used to generate the last response</p>
+
+        <div class="context-chunk">
+          <span class="score">0.94</span>
+          <p>Strahd von Zarovich is a vampire lord with the following weaknesses: sunlight sensitivity, running water (20 acid damage), wooden stake to the heart while in coffin...</p>
+          <div class="source">curse-of-strahd-module.pdf &middot; p.234</div>
+        </div>
+
+        <div class="context-chunk">
+          <span class="score">0.91</span>
+          <p>The party discovered the Sunsword hilt in the Amber Temple. Kael attuned to the blade, which radiates bright sunlight in a 15-foot radius...</p>
+          <div class="source">session-notes-1-12.pdf &middot; p.9</div>
+        </div>
+
+        <div class="context-chunk">
+          <span class="score">0.87</span>
+          <p>Ireena Kolyana is carrying the Holy Symbol of Ravenkind, given to her by the Abbot in Krezk. The symbol can hold vampires at bay...</p>
+          <div class="source">npc-tracker.txt &middot; line 42</div>
+        </div>
+
+        <div class="context-chunk">
+          <span class="score">0.82</span>
+          <p>Kael Brighthammer, Paladin of Lathander. Backstory: Lost his family to a vampire attack in Waterdeep. Swore an Oath of Vengeance against undead...</p>
+          <div class="source">player-backstories.pdf &middot; p.1</div>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- ======================== Screen: Upload Modal ======================== -->
+<div class="screen" id="screen-upload-modal">
+  <div class="screen-content">
+    <div class="app-layout">
+      <aside class="sidebar">
+        <div class="sidebar-logo"><span class="icon">&#9876;&#65039;</span> GM Assistant</div>
+        <div class="sidebar-section">
+          <div class="sidebar-label">Menu</div>
+          <div class="sidebar-item"><span class="icon">&#127968;</span> Dashboard</div>
+          <div class="sidebar-item active"><span class="icon">&#128220;</span> Campaigns</div>
+          <div class="sidebar-item"><span class="icon">&#129302;</span> AI Query</div>
+        </div>
+        <div class="sidebar-footer">
+          <div class="avatar">DM</div>
+          <div>
+            <div class="name">Dungeon Master</div>
+            <div class="email">dm@example.com</div>
+          </div>
+        </div>
+      </aside>
+      <main class="main-content" style="filter:blur(2px);pointer-events:none">
+        <div class="page-header">
+          <div><h1>Curse of Strahd</h1></div>
+        </div>
+      </main>
+    </div>
+    <div class="modal-overlay">
+      <div class="modal">
+        <h2>Upload Document</h2>
+        <p class="subtitle">Add a document to <strong>Curse of Strahd</strong></p>
+
+        <div class="upload-zone">
+          <div class="icon">&#128194;</div>
+          <p>Drag & drop a file here, or click to browse</p>
+          <p class="hint">Supported: PDF, TXT &middot; Max size: 50 MB</p>
+        </div>
+
+        <div class="form-group">
+          <label>Document Type</label>
+          <select>
+            <option>Rulebook</option>
+            <option>Session Notes</option>
+            <option>Reference</option>
+            <option>Map</option>
+            <option>Homebrew</option>
+            <option>Other</option>
+          </select>
+        </div>
+
+        <div class="form-group">
+          <label>Tags (optional)</label>
+          <input class="input" placeholder="e.g. strahd, ravenloft, npcs" />
+        </div>
+
+        <div class="modal-actions">
+          <button class="btn btn-secondary">Cancel</button>
+          <button class="btn btn-primary">Upload</button>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<script>
+  // Simple screen switcher
+  const nav = document.getElementById('screenNav');
+  const buttons = nav.querySelectorAll('button');
+  const screens = document.querySelectorAll('.screen');
+
+  buttons.forEach(btn => {
+    btn.addEventListener('click', () => {
+      const target = btn.dataset.screen;
+      buttons.forEach(b => b.classList.remove('active'));
+      btn.classList.add('active');
+      screens.forEach(s => s.classList.remove('active'));
+      document.getElementById('screen-' + target).classList.add('active');
+    });
+  });
+</script>
+</body>
+</html>
