@@ -1,1 +1,1 @@
-export { generateAdventureHooks } from "./adventure-hook.generator.js";
+export { generateAdventureHooks } from "./adventure-hook.js";
