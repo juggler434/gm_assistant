@@ -1,1 +1,1 @@
-export { buildAdventureHookPrompt } from "./adventure-hooks.prompt.js";
+export { buildAdventureHookPrompt } from "./adventure-hooks.js";

@@ -15,7 +15,7 @@ import {
 } from "@/modules/knowledge/retrieval/hybrid-search.js";
 import { buildContext } from "@/modules/query/rag/context-builder.js";
 import type { AnswerSource } from "@/modules/query/rag/types.js";
-import { buildAdventureHookPrompt } from "../prompts/adventure-hooks.prompt.js";
+import { buildAdventureHookPrompt } from "../prompts/adventure-hooks.js";
 import type {
   AdventureHookRequest,
   AdventureHook,

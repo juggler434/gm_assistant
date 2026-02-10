@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest";
-import { buildAdventureHookPrompt } from "@/modules/generation/prompts/adventure-hooks.prompt.js";
+import { buildAdventureHookPrompt } from "@/modules/generation/prompts/adventure-hooks.js";
 import type { BuiltContext, SourceCitation } from "@/modules/query/rag/types.js";
 import type { HookTone } from "@/modules/generation/types.js";
 
