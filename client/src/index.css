@@ -2,39 +2,64 @@
 
 @custom-variant dark (&:is(.dark *));
 
+/*
+ * GM Assistant — Dark Fantasy Theme
+ *
+ * Derived from mockups/gm-assistant-mockup.html design tokens:
+ *   bg-900: #0f0f14   bg-800: #16161d   bg-700: #1e1e28
+ *   bg-600: #282834   bg-500: #353544   border: #3a3a4a
+ *   accent: #a855f7 (purple-500)   accent-hover: #9333ea (purple-600)
+ *   text-primary: #e8e6e3   text-secondary: #9d9baf   text-muted: #6b6980
+ *   success: #22c55e   warning: #f59e0b   danger: #ef4444
+ */
+
 @theme {
-  --color-background: hsl(0 0% 100%);
-  --color-foreground: hsl(240 10% 3.9%);
-  --color-card: hsl(0 0% 100%);
-  --color-card-foreground: hsl(240 10% 3.9%);
-  --color-popover: hsl(0 0% 100%);
-  --color-popover-foreground: hsl(240 10% 3.9%);
-  --color-primary: hsl(240 5.9% 10%);
-  --color-primary-foreground: hsl(0 0% 98%);
-  --color-secondary: hsl(240 4.8% 95.9%);
-  --color-secondary-foreground: hsl(240 5.9% 10%);
-  --color-muted: hsl(240 4.8% 95.9%);
-  --color-muted-foreground: hsl(240 3.8% 46.1%);
-  --color-accent: hsl(240 4.8% 95.9%);
-  --color-accent-foreground: hsl(240 5.9% 10%);
-  --color-destructive: hsl(0 84.2% 60.2%);
+  /* Always-dark palette — no light mode needed */
+  --color-background: hsl(240 14% 7%);
+  --color-foreground: hsl(36 8% 90%);
+
+  --color-card: hsl(240 14% 14%);
+  --color-card-foreground: hsl(36 8% 90%);
+
+  --color-popover: hsl(240 14% 14%);
+  --color-popover-foreground: hsl(36 8% 90%);
+
+  --color-primary: hsl(271 91% 65%);
+  --color-primary-foreground: hsl(0 0% 100%);
+
+  --color-secondary: hsl(240 13% 18%);
+  --color-secondary-foreground: hsl(36 8% 90%);
+
+  --color-muted: hsl(240 13% 18%);
+  --color-muted-foreground: hsl(246 12% 65%);
+
+  --color-accent: hsl(240 12% 24%);
+  --color-accent-foreground: hsl(36 8% 90%);
+
+  --color-destructive: hsl(0 84% 60%);
   --color-destructive-foreground: hsl(0 0% 98%);
-  --color-border: hsl(240 5.9% 90%);
-  --color-input: hsl(240 5.9% 90%);
-  --color-ring: hsl(240 5.9% 10%);
-  --color-chart-1: hsl(12 76% 61%);
-  --color-chart-2: hsl(173 58% 39%);
-  --color-chart-3: hsl(197 37% 24%);
-  --color-chart-4: hsl(43 74% 66%);
-  --color-chart-5: hsl(27 87% 67%);
-  --color-sidebar: hsl(0 0% 98%);
-  --color-sidebar-foreground: hsl(240 5.3% 26.1%);
-  --color-sidebar-primary: hsl(240 5.9% 10%);
-  --color-sidebar-primary-foreground: hsl(0 0% 98%);
-  --color-sidebar-accent: hsl(240 4.8% 95.9%);
-  --color-sidebar-accent-foreground: hsl(240 5.9% 10%);
-  --color-sidebar-border: hsl(220 13% 91%);
-  --color-sidebar-ring: hsl(217.2 91.2% 59.8%);
+
+  --color-border: hsl(240 12% 26%);
+  --color-input: hsl(240 12% 26%);
+  --color-ring: hsl(271 91% 65%);
+
+  /* Custom semantic colors */
+  --color-success: hsl(142 71% 45%);
+  --color-success-foreground: hsl(0 0% 100%);
+  --color-warning: hsl(38 92% 50%);
+  --color-warning-foreground: hsl(0 0% 100%);
+
+  /* Sidebar */
+  --color-sidebar: hsl(240 14% 10%);
+  --color-sidebar-foreground: hsl(36 8% 90%);
+  --color-sidebar-primary: hsl(271 91% 65%);
+  --color-sidebar-primary-foreground: hsl(0 0% 100%);
+  --color-sidebar-accent: hsl(271 91% 65% / 0.12);
+  --color-sidebar-accent-foreground: hsl(271 91% 65%);
+  --color-sidebar-border: hsl(240 12% 26%);
+  --color-sidebar-ring: hsl(271 91% 65%);
+  --color-sidebar-muted-foreground: hsl(245 10% 46%);
+
   --radius: 0.625rem;
 }
 
@@ -44,40 +69,6 @@
   }
   body {
     @apply bg-background text-foreground;
+    font-family: "Segoe UI", system-ui, -apple-system, sans-serif;
   }
-}
-
-.dark {
-  --color-background: hsl(240 10% 3.9%);
-  --color-foreground: hsl(0 0% 98%);
-  --color-card: hsl(240 10% 3.9%);
-  --color-card-foreground: hsl(0 0% 98%);
-  --color-popover: hsl(240 10% 3.9%);
-  --color-popover-foreground: hsl(0 0% 98%);
-  --color-primary: hsl(0 0% 98%);
-  --color-primary-foreground: hsl(240 5.9% 10%);
-  --color-secondary: hsl(240 3.7% 15.9%);
-  --color-secondary-foreground: hsl(0 0% 98%);
-  --color-muted: hsl(240 3.7% 15.9%);
-  --color-muted-foreground: hsl(240 5% 64.9%);
-  --color-accent: hsl(240 3.7% 15.9%);
-  --color-accent-foreground: hsl(0 0% 98%);
-  --color-destructive: hsl(0 62.8% 30.6%);
-  --color-destructive-foreground: hsl(0 0% 98%);
-  --color-border: hsl(240 3.7% 15.9%);
-  --color-input: hsl(240 3.7% 15.9%);
-  --color-ring: hsl(240 4.9% 83.9%);
-  --color-chart-1: hsl(220 70% 50%);
-  --color-chart-2: hsl(160 60% 45%);
-  --color-chart-3: hsl(30 80% 55%);
-  --color-chart-4: hsl(280 65% 60%);
-  --color-chart-5: hsl(340 75% 55%);
-  --color-sidebar: hsl(240 5.9% 10%);
-  --color-sidebar-foreground: hsl(240 4.8% 95.9%);
-  --color-sidebar-primary: hsl(224.3 76.3% 48%);
-  --color-sidebar-primary-foreground: hsl(0 0% 100%);
-  --color-sidebar-accent: hsl(240 3.7% 15.9%);
-  --color-sidebar-accent-foreground: hsl(240 4.8% 95.9%);
-  --color-sidebar-border: hsl(240 3.7% 15.9%);
-  --color-sidebar-ring: hsl(217.2 91.2% 59.8%);
 }
