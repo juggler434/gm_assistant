@@ -1,9 +1,9 @@
 import type { FastifyInstance } from "fastify";
 import * as argon2 from "argon2";
-import { createSession } from "./session.js";
-import { setSessionCookie } from "./middleware.js";
+import { createSession, invalidateSession } from "./session.js";
+import { setSessionCookie, clearSessionCookie, requireAuth } from "./middleware.js";
 import { registerBodySchema, loginBodySchema } from "./schemas.js";
-import { findUserByEmail, createUser } from "./repository.js";
+import { findUserByEmail, findUserById, createUser } from "./repository.js";
 import { trackEvent, identifyUser } from "@/services/metrics/index.js";
 
 export async function authRoutes(app: FastifyInstance): Promise<void> {
@@ -121,5 +121,33 @@ export async function authRoutes(app: FastifyInstance): Promise<void> {
         name: user.name,
       },
     });
+  });
+
+  app.get("/me", { preHandler: [requireAuth] }, async (request, reply) => {
+    const user = await findUserById(request.userId!);
+    if (!user) {
+      return reply.status(404).send({
+        statusCode: 404,
+        error: "Not Found",
+        message: "User not found",
+      });
+    }
+
+    return reply.status(200).send({
+      user: {
+        id: user.id,
+        email: user.email,
+        name: user.name,
+      },
+    });
+  });
+
+  app.post("/logout", { preHandler: [requireAuth] }, async (request, reply) => {
+    if (request.session) {
+      await invalidateSession(request.session.id);
+    }
+    clearSessionCookie(reply);
+
+    return reply.status(200).send({ message: "Logged out" });
   });
 }
