@@ -15,6 +15,14 @@ vi.mock("@/modules/auth/session.js", () => ({
   validateSessionToken: vi.fn(),
 }));
 
+vi.mock("@/services/metrics/service.js", () => ({
+  trackEvent: vi.fn(),
+  identifyUser: vi.fn(),
+  trackTimed: vi.fn(),
+  isMetricsEnabled: vi.fn(() => false),
+  shutdownMetrics: vi.fn(),
+}));
+
 // Import mocked modules
 import {
   createCampaign,
