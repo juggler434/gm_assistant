@@ -24,11 +24,11 @@ export interface AdventureHookRequest {
   /** Desired tone for the generated hooks */
   tone: HookTone;
   /** Optional theme to focus hooks around (e.g. "undead", "trade war") */
-  theme?: string | undefined;
+  theme?: string;
   /** Optional party level to calibrate challenge appropriateness */
-  partyLevel?: number | undefined;
+  partyLevel?: number;
   /** Maximum number of chunks to use for setting context (default: 6) */
-  maxContextChunks?: number | undefined;
+  maxContextChunks?: number;
 }
 
 /** Result of adventure hook generation */

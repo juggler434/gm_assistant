@@ -54,9 +54,9 @@ export async function generationRoutes(app: FastifyInstance): Promise<void> {
     const hookRequest: AdventureHookRequest = {
       campaignId,
       tone,
-      theme,
-      partyLevel,
-      maxContextChunks: count !== undefined ? Math.max(count, 6) : undefined,
+      ...(theme !== undefined && { theme }),
+      ...(partyLevel !== undefined && { partyLevel }),
+      ...(count !== undefined && { maxContextChunks: Math.max(count, 6) }),
     };
 
     const llmService = createLLMService();
