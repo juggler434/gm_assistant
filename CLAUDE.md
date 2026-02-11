@@ -2,6 +2,10 @@
 
 This file provides guidance to Claude Code (claude.ai/code) when working with code in this repository.
 
+## Git Commits
+
+Do **not** add a `Co-Authored-By` line to commit messages.
+
 ## Project Overview
 
 GM Assistant is an AI-powered RPG Game Master campaign management tool. It is structured as an **npm workspaces monorepo** with three packages:
