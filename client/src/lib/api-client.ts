@@ -80,4 +80,58 @@ export const api = {
       body: formData,
     });
   },
+
+  /**
+   * POST a request that returns an SSE stream.
+   * Yields parsed JSON objects from each `data:` line.
+   */
+  async *stream<T>(url: string, body: unknown): AsyncGenerator<T> {
+    const res = await fetch(url, {
+      method: "POST",
+      credentials: "include",
+      headers: {
+        "Content-Type": "application/json",
+        Accept: "text/event-stream",
+      },
+      body: JSON.stringify(body),
+    });
+
+    if (!res.ok) {
+      const errorBody = await res.json().catch(() => ({
+        statusCode: res.status,
+        error: res.statusText,
+        message: "An unexpected error occurred",
+      }));
+      throw new ApiError(errorBody as ApiErrorResponse);
+    }
+
+    const reader = res.body?.getReader();
+    if (!reader) return;
+
+    const decoder = new TextDecoder();
+    let buffer = "";
+
+    try {
+      while (true) {
+        const { done, value } = await reader.read();
+        if (done) break;
+
+        buffer += decoder.decode(value, { stream: true });
+        const lines = buffer.split("\n");
+        buffer = lines.pop() ?? "";
+
+        for (const line of lines) {
+          const trimmed = line.trim();
+          if (trimmed.startsWith("data:")) {
+            const json = trimmed.slice(5).trim();
+            if (json) {
+              yield JSON.parse(json) as T;
+            }
+          }
+        }
+      }
+    } finally {
+      reader.releaseLock();
+    }
+  },
 };

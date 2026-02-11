@@ -1,6 +1,7 @@
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { api } from "@/lib/api-client";
 import type {
+  Campaign,
   CampaignListResponse,
   CampaignResponse,
   CreateCampaignRequest,
@@ -45,8 +46,23 @@ export function useUpdateCampaign(id: string) {
   return useMutation({
     mutationFn: (data: UpdateCampaignRequest) =>
       api.patch<CampaignResponse>(`/api/campaigns/${id}`, data),
-    onSuccess: (data) => {
-      queryClient.setQueryData(campaignKeys.detail(id), data);
+    onMutate: async (updates) => {
+      await queryClient.cancelQueries({ queryKey: campaignKeys.detail(id) });
+      const previous = queryClient.getQueryData<CampaignResponse>(campaignKeys.detail(id));
+      if (previous) {
+        queryClient.setQueryData<CampaignResponse>(campaignKeys.detail(id), {
+          campaign: { ...previous.campaign, ...updates },
+        });
+      }
+      return { previous };
+    },
+    onError: (_err, _updates, context) => {
+      if (context?.previous) {
+        queryClient.setQueryData(campaignKeys.detail(id), context.previous);
+      }
+    },
+    onSettled: () => {
+      queryClient.invalidateQueries({ queryKey: campaignKeys.detail(id) });
       queryClient.invalidateQueries({ queryKey: campaignKeys.all });
     },
   });
@@ -57,7 +73,22 @@ export function useDeleteCampaign() {
 
   return useMutation({
     mutationFn: (id: string) => api.delete(`/api/campaigns/${id}`),
-    onSuccess: (_data, id) => {
+    onMutate: async (id) => {
+      await queryClient.cancelQueries({ queryKey: campaignKeys.all });
+      const previous = queryClient.getQueryData<CampaignListResponse>(campaignKeys.all);
+      if (previous) {
+        queryClient.setQueryData<CampaignListResponse>(campaignKeys.all, {
+          campaigns: previous.campaigns.filter((c: Campaign) => c.id !== id),
+        });
+      }
+      return { previous };
+    },
+    onError: (_err, _id, context) => {
+      if (context?.previous) {
+        queryClient.setQueryData(campaignKeys.all, context.previous);
+      }
+    },
+    onSettled: (_data, _err, id) => {
       queryClient.removeQueries({ queryKey: campaignKeys.detail(id) });
       queryClient.invalidateQueries({ queryKey: campaignKeys.all });
     },
