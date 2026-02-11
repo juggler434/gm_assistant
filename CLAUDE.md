@@ -323,10 +323,6 @@ Document processing uses **BullMQ** with Redis. When a document is uploaded, a `
 - **Route tests** use `app.inject()` with mocked dependencies
 - **Test factories** in `tests/factories/` for generating test data
 
-### Known Issue: `posthog-node` in Tests
-
-The `posthog-node` module fails to load in some test files (particularly route tests for auth, campaigns, and documents). Tests that mock `@/services/metrics/service.js` before importing the module under test avoid this issue. If you see `posthog-node` import errors in tests, ensure the metrics service is mocked.
-
 ## Configuration
 
 Environment variables are managed through `config/index.ts`. See `.env.example` for required variables:

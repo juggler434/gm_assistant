@@ -39,6 +39,14 @@ vi.mock("@/jobs/factory.js", () => ({
   DEFAULT_JOB_OPTIONS: {},
 }));
 
+vi.mock("@/services/metrics/service.js", () => ({
+  trackEvent: vi.fn(),
+  identifyUser: vi.fn(),
+  trackTimed: vi.fn(),
+  isMetricsEnabled: vi.fn(() => false),
+  shutdownMetrics: vi.fn(),
+}));
+
 // Import mocked modules
 import {
   createDocument,
