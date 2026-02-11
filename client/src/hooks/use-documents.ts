@@ -1,6 +1,7 @@
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { api } from "@/lib/api-client";
 import type {
+  Document,
   DocumentListResponse,
   DocumentResponse,
   DocumentDownloadResponse,
@@ -95,13 +96,31 @@ export function useDeleteDocument() {
   return useMutation({
     mutationFn: ({ campaignId, id }: DeleteDocumentParams) =>
       api.delete(`/api/campaigns/${campaignId}/documents/${id}`),
-    onSuccess: (_data, { campaignId, id }) => {
-      queryClient.removeQueries({
-        queryKey: documentKeys.detail(campaignId, id),
-      });
-      queryClient.invalidateQueries({
-        queryKey: documentKeys.all(campaignId),
-      });
+    onMutate: async ({ campaignId, id }) => {
+      await queryClient.cancelQueries({ queryKey: documentKeys.all(campaignId) });
+      const previousLists: Record<string, unknown> = {};
+      queryClient
+        .getQueriesData<DocumentListResponse>({ queryKey: documentKeys.all(campaignId) })
+        .forEach(([key, data]) => {
+          if (data) {
+            previousLists[JSON.stringify(key)] = data;
+            queryClient.setQueryData<DocumentListResponse>(key, {
+              documents: data.documents.filter((d: Document) => d.id !== id),
+            });
+          }
+        });
+      return { previousLists, campaignId };
+    },
+    onError: (_err, _params, context) => {
+      if (context?.previousLists) {
+        Object.entries(context.previousLists).forEach(([key, data]) => {
+          queryClient.setQueryData(JSON.parse(key), data);
+        });
+      }
+    },
+    onSettled: (_data, _err, { campaignId, id }) => {
+      queryClient.removeQueries({ queryKey: documentKeys.detail(campaignId, id) });
+      queryClient.invalidateQueries({ queryKey: documentKeys.all(campaignId) });
     },
   });
 }
