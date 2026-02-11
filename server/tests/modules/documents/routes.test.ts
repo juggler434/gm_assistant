@@ -3,6 +3,9 @@ import type { Campaign } from "@/db/schema/campaigns.js";
 import type { Document } from "@/db/schema/documents.js";
 import FormData from "form-data";
 
+// Capture queue add mock at module scope so vi.mock factory can close over it
+const mockQueueAdd = vi.fn();
+
 // Mock dependencies before importing routes
 vi.mock("@/modules/documents/repository.js", () => ({
   createDocument: vi.fn(),
@@ -34,7 +37,7 @@ vi.mock("@/services/storage/factory.js", () => ({
 
 vi.mock("@/jobs/factory.js", () => ({
   createQueue: vi.fn(() => ({
-    add: vi.fn().mockResolvedValue({ ok: true, value: "job-123" }),
+    add: mockQueueAdd,
   })),
   DEFAULT_JOB_OPTIONS: {},
 }));
@@ -109,6 +112,9 @@ describe("Document Routes", () => {
 
   beforeEach(() => {
     vi.clearAllMocks();
+
+    // Default queue mock
+    mockQueueAdd.mockResolvedValue({ ok: true, value: "job-123" });
 
     // Default to authenticated user
     vi.mocked(validateSessionToken).mockResolvedValue(mockSessionResult);
@@ -308,6 +314,383 @@ describe("Document Routes", () => {
 
       await app.close();
     });
+
+    it("should accept upload with metadata fields (name, documentType, tags)", async () => {
+      vi.mocked(createDocument).mockResolvedValue({
+        ...mockDocument,
+        name: "My Custom Name",
+        documentType: "rulebook",
+        tags: ["fantasy", "dnd"],
+      });
+
+      const app = await buildTestApp();
+
+      const form = new FormData();
+      form.append("file", Buffer.from("test content"), {
+        filename: "test-document.pdf",
+        contentType: "application/pdf",
+      });
+      form.append("name", "My Custom Name");
+      form.append("documentType", "rulebook");
+      form.append("tags", JSON.stringify(["fantasy", "dnd"]));
+
+      const response = await app.inject({
+        method: "POST",
+        url: `/api/campaigns/${mockCampaignId}/documents`,
+        headers: {
+          cookie: getAuthCookie(),
+          ...form.getHeaders(),
+        },
+        payload: form.getBuffer(),
+      });
+
+      expect(response.statusCode).toBe(201);
+      expect(vi.mocked(createDocument)).toHaveBeenCalledWith(
+        expect.objectContaining({
+          name: "My Custom Name",
+          documentType: "rulebook",
+          tags: ["fantasy", "dnd"],
+        })
+      );
+
+      await app.close();
+    });
+
+    it("should accept comma-separated tags string", async () => {
+      vi.mocked(createDocument).mockResolvedValue({
+        ...mockDocument,
+        tags: ["fantasy", "campaign", "dragons"],
+      });
+
+      const app = await buildTestApp();
+
+      const form = new FormData();
+      form.append("file", Buffer.from("test content"), {
+        filename: "test.pdf",
+        contentType: "application/pdf",
+      });
+      form.append("tags", "fantasy, campaign, dragons");
+
+      const response = await app.inject({
+        method: "POST",
+        url: `/api/campaigns/${mockCampaignId}/documents`,
+        headers: {
+          cookie: getAuthCookie(),
+          ...form.getHeaders(),
+        },
+        payload: form.getBuffer(),
+      });
+
+      expect(response.statusCode).toBe(201);
+      expect(vi.mocked(createDocument)).toHaveBeenCalledWith(
+        expect.objectContaining({
+          tags: ["fantasy", "campaign", "dragons"],
+        })
+      );
+
+      await app.close();
+    });
+
+    it("should call storage.upload with correct params", async () => {
+      vi.mocked(createDocument).mockResolvedValue(mockDocument);
+
+      const app = await buildTestApp();
+
+      const form = new FormData();
+      form.append("file", Buffer.from("test content"), {
+        filename: "my-file.pdf",
+        contentType: "application/pdf",
+      });
+
+      await app.inject({
+        method: "POST",
+        url: `/api/campaigns/${mockCampaignId}/documents`,
+        headers: {
+          cookie: getAuthCookie(),
+          ...form.getHeaders(),
+        },
+        payload: form.getBuffer(),
+      });
+
+      expect(mockStorageService.upload).toHaveBeenCalledWith(
+        mockCampaignId,
+        expect.any(String), // documentId (UUID)
+        expect.any(Buffer),
+        {
+          contentType: "application/pdf",
+          metadata: { originalFilename: "my-file.pdf" },
+        }
+      );
+
+      await app.close();
+    });
+
+    it("should queue document processing job with correct data", async () => {
+      vi.mocked(createDocument).mockResolvedValue(mockDocument);
+
+      const app = await buildTestApp();
+
+      const form = new FormData();
+      form.append("file", Buffer.from("test content"), {
+        filename: "test.pdf",
+        contentType: "application/pdf",
+      });
+
+      await app.inject({
+        method: "POST",
+        url: `/api/campaigns/${mockCampaignId}/documents`,
+        headers: {
+          cookie: getAuthCookie(),
+          ...form.getHeaders(),
+        },
+        payload: form.getBuffer(),
+      });
+
+      expect(mockQueueAdd).toHaveBeenCalledWith("process-document", {
+        documentId: expect.any(String),
+        campaignId: mockCampaignId,
+        storagePath: expect.stringContaining(`campaigns/${mockCampaignId}/documents/`),
+        mimeType: "application/pdf",
+      });
+
+      await app.close();
+    });
+
+    it("should call createDocument with all correct fields", async () => {
+      vi.mocked(createDocument).mockResolvedValue(mockDocument);
+
+      const app = await buildTestApp();
+
+      const fileContent = Buffer.from("test content for size");
+      const form = new FormData();
+      form.append("file", fileContent, {
+        filename: "original-file.pdf",
+        contentType: "application/pdf",
+      });
+
+      await app.inject({
+        method: "POST",
+        url: `/api/campaigns/${mockCampaignId}/documents`,
+        headers: {
+          cookie: getAuthCookie(),
+          ...form.getHeaders(),
+        },
+        payload: form.getBuffer(),
+      });
+
+      expect(vi.mocked(createDocument)).toHaveBeenCalledWith({
+        id: expect.any(String),
+        campaignId: mockCampaignId,
+        uploadedBy: mockUserId,
+        name: "original-file.pdf", // defaults to filename when no name field
+        originalFilename: "original-file.pdf",
+        mimeType: "application/pdf",
+        fileSize: fileContent.length,
+        storagePath: expect.stringMatching(
+          new RegExp(`^campaigns/${mockCampaignId}/documents/[0-9a-f-]+$`)
+        ),
+        documentType: "notes", // default for PDFs
+        tags: [],
+        status: "pending",
+      });
+
+      await app.close();
+    });
+
+    it("should return 500 when storage upload fails", async () => {
+      mockStorageService.upload.mockResolvedValue({
+        ok: false,
+        error: { code: "STORAGE_ERROR", message: "Upload failed" },
+      });
+
+      const app = await buildTestApp();
+
+      const form = new FormData();
+      form.append("file", Buffer.from("test content"), {
+        filename: "test.pdf",
+        contentType: "application/pdf",
+      });
+
+      const response = await app.inject({
+        method: "POST",
+        url: `/api/campaigns/${mockCampaignId}/documents`,
+        headers: {
+          cookie: getAuthCookie(),
+          ...form.getHeaders(),
+        },
+        payload: form.getBuffer(),
+      });
+
+      expect(response.statusCode).toBe(500);
+      const body = JSON.parse(response.body);
+      expect(body.message).toBe("Failed to upload file");
+      expect(vi.mocked(createDocument)).not.toHaveBeenCalled();
+
+      await app.close();
+    });
+
+    it("should return 500 and clean up storage when document creation fails", async () => {
+      vi.mocked(createDocument).mockResolvedValue(null as unknown as ReturnType<typeof createDocument> extends Promise<infer T> ? T : never);
+
+      const app = await buildTestApp();
+
+      const form = new FormData();
+      form.append("file", Buffer.from("test content"), {
+        filename: "test.pdf",
+        contentType: "application/pdf",
+      });
+
+      const response = await app.inject({
+        method: "POST",
+        url: `/api/campaigns/${mockCampaignId}/documents`,
+        headers: {
+          cookie: getAuthCookie(),
+          ...form.getHeaders(),
+        },
+        payload: form.getBuffer(),
+      });
+
+      expect(response.statusCode).toBe(500);
+      const body = JSON.parse(response.body);
+      expect(body.message).toBe("Failed to create document record");
+      expect(mockStorageService.delete).toHaveBeenCalledWith(
+        mockCampaignId,
+        expect.any(String)
+      );
+
+      await app.close();
+    });
+
+    it("should accept text/plain file uploads", async () => {
+      vi.mocked(createDocument).mockResolvedValue({
+        ...mockDocument,
+        mimeType: "text/plain",
+        name: "notes.txt",
+      });
+
+      const app = await buildTestApp();
+
+      const form = new FormData();
+      form.append("file", Buffer.from("plain text content"), {
+        filename: "notes.txt",
+        contentType: "text/plain",
+      });
+
+      const response = await app.inject({
+        method: "POST",
+        url: `/api/campaigns/${mockCampaignId}/documents`,
+        headers: {
+          cookie: getAuthCookie(),
+          ...form.getHeaders(),
+        },
+        payload: form.getBuffer(),
+      });
+
+      expect(response.statusCode).toBe(201);
+      expect(vi.mocked(createDocument)).toHaveBeenCalledWith(
+        expect.objectContaining({ mimeType: "text/plain" })
+      );
+
+      await app.close();
+    });
+
+    it("should accept text/markdown file uploads", async () => {
+      vi.mocked(createDocument).mockResolvedValue({
+        ...mockDocument,
+        mimeType: "text/markdown",
+        name: "readme.md",
+      });
+
+      const app = await buildTestApp();
+
+      const form = new FormData();
+      form.append("file", Buffer.from("# Markdown content"), {
+        filename: "readme.md",
+        contentType: "text/markdown",
+      });
+
+      const response = await app.inject({
+        method: "POST",
+        url: `/api/campaigns/${mockCampaignId}/documents`,
+        headers: {
+          cookie: getAuthCookie(),
+          ...form.getHeaders(),
+        },
+        payload: form.getBuffer(),
+      });
+
+      expect(response.statusCode).toBe(201);
+      expect(vi.mocked(createDocument)).toHaveBeenCalledWith(
+        expect.objectContaining({ mimeType: "text/markdown" })
+      );
+
+      await app.close();
+    });
+
+    it("should infer 'image' document type for image MIME types", async () => {
+      vi.mocked(createDocument).mockResolvedValue({
+        ...mockDocument,
+        mimeType: "image/png",
+        documentType: "image",
+      });
+
+      const app = await buildTestApp();
+
+      const form = new FormData();
+      form.append("file", Buffer.from("fake png data"), {
+        filename: "map.png",
+        contentType: "image/png",
+      });
+
+      const response = await app.inject({
+        method: "POST",
+        url: `/api/campaigns/${mockCampaignId}/documents`,
+        headers: {
+          cookie: getAuthCookie(),
+          ...form.getHeaders(),
+        },
+        payload: form.getBuffer(),
+      });
+
+      expect(response.statusCode).toBe(201);
+      expect(vi.mocked(createDocument)).toHaveBeenCalledWith(
+        expect.objectContaining({ documentType: "image" })
+      );
+
+      await app.close();
+    });
+
+    it("should default document name to filename when name field not provided", async () => {
+      vi.mocked(createDocument).mockResolvedValue(mockDocument);
+
+      const app = await buildTestApp();
+
+      const form = new FormData();
+      form.append("file", Buffer.from("test content"), {
+        filename: "my-campaign-notes.pdf",
+        contentType: "application/pdf",
+      });
+      // no "name" field in form
+
+      await app.inject({
+        method: "POST",
+        url: `/api/campaigns/${mockCampaignId}/documents`,
+        headers: {
+          cookie: getAuthCookie(),
+          ...form.getHeaders(),
+        },
+        payload: form.getBuffer(),
+      });
+
+      expect(vi.mocked(createDocument)).toHaveBeenCalledWith(
+        expect.objectContaining({
+          name: "my-campaign-notes.pdf",
+          originalFilename: "my-campaign-notes.pdf",
+        })
+      );
+
+      await app.close();
+    });
   });
 
   describe("GET /api/campaigns/:campaignId/documents", () => {
@@ -383,6 +766,63 @@ describe("Document Routes", () => {
       });
 
       expect(response.statusCode).toBe(401);
+
+      await app.close();
+    });
+
+    it("should pass status filter to repository", async () => {
+      vi.mocked(findDocumentsByCampaignId).mockResolvedValue([]);
+
+      const app = await buildTestApp();
+
+      await app.inject({
+        method: "GET",
+        url: `/api/campaigns/${mockCampaignId}/documents?status=ready`,
+        headers: { cookie: getAuthCookie() },
+      });
+
+      expect(vi.mocked(findDocumentsByCampaignId)).toHaveBeenCalledWith(
+        mockCampaignId,
+        expect.objectContaining({ status: "ready" })
+      );
+
+      await app.close();
+    });
+
+    it("should pass documentType filter to repository", async () => {
+      vi.mocked(findDocumentsByCampaignId).mockResolvedValue([]);
+
+      const app = await buildTestApp();
+
+      await app.inject({
+        method: "GET",
+        url: `/api/campaigns/${mockCampaignId}/documents?documentType=rulebook`,
+        headers: { cookie: getAuthCookie() },
+      });
+
+      expect(vi.mocked(findDocumentsByCampaignId)).toHaveBeenCalledWith(
+        mockCampaignId,
+        expect.objectContaining({ documentType: "rulebook" })
+      );
+
+      await app.close();
+    });
+
+    it("should pass limit and offset to repository", async () => {
+      vi.mocked(findDocumentsByCampaignId).mockResolvedValue([]);
+
+      const app = await buildTestApp();
+
+      await app.inject({
+        method: "GET",
+        url: `/api/campaigns/${mockCampaignId}/documents?limit=10&offset=20`,
+        headers: { cookie: getAuthCookie() },
+      });
+
+      expect(vi.mocked(findDocumentsByCampaignId)).toHaveBeenCalledWith(
+        mockCampaignId,
+        expect.objectContaining({ limit: 10, offset: 20 })
+      );
 
       await app.close();
     });
@@ -480,6 +920,28 @@ describe("Document Routes", () => {
       });
 
       expect(response.statusCode).toBe(404);
+
+      await app.close();
+    });
+
+    it("should return 500 when signed URL generation fails", async () => {
+      vi.mocked(findDocumentByIdAndCampaignId).mockResolvedValue(mockDocument);
+      mockStorageService.getSignedUrl.mockResolvedValue({
+        ok: false,
+        error: { code: "STORAGE_ERROR", message: "URL generation failed" },
+      });
+
+      const app = await buildTestApp();
+
+      const response = await app.inject({
+        method: "GET",
+        url: `/api/campaigns/${mockCampaignId}/documents/${mockDocumentId}/download`,
+        headers: { cookie: getAuthCookie() },
+      });
+
+      expect(response.statusCode).toBe(500);
+      const body = JSON.parse(response.body);
+      expect(body.message).toBe("Failed to generate download URL");
 
       await app.close();
     });
