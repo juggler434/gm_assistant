@@ -29,4 +29,4 @@ export { authRoutes } from "./routes.js";
 export { registerBodySchema, type RegisterBody } from "./schemas.js";
 
 // Repository
-export { findUserByEmail, createUser } from "./repository.js";
+export { findUserByEmail, findUserById, createUser } from "./repository.js";
