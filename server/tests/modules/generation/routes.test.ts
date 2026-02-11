@@ -37,6 +37,14 @@ vi.mock("@/services/llm/factory.js", () => ({
   })),
 }));
 
+vi.mock("@/services/metrics/service.js", () => ({
+  trackEvent: vi.fn(),
+  identifyUser: vi.fn(),
+  trackTimed: vi.fn(),
+  isMetricsEnabled: vi.fn(() => false),
+  shutdownMetrics: vi.fn(),
+}));
+
 import { validateSessionToken } from "@/modules/auth/session.js";
 
 describe("Generation Routes", () => {

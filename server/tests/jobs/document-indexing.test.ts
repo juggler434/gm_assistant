@@ -94,6 +94,14 @@ vi.mock("@/config/index.js", () => ({
   },
 }));
 
+vi.mock("@/services/metrics/service.js", () => ({
+  trackEvent: vi.fn(),
+  identifyUser: vi.fn(),
+  trackTimed: vi.fn(),
+  isMetricsEnabled: vi.fn(() => false),
+  shutdownMetrics: vi.fn(),
+}));
+
 // -- Handler registry (prevent side-effect registration) ----------------------
 vi.mock("../../src/jobs/handlers/index.js", () => ({
   registerHandler: vi.fn(),
