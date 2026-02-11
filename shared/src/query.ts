@@ -3,7 +3,35 @@
  * Matches server/src/modules/query/rag/types.ts and query route responses.
  */
 
-import type { DocumentType } from "./entities.ts";
+import type { DocumentType } from "./entities.js";
+
+// ============================================================================
+// Token Usage
+// ============================================================================
+
+/** Token usage statistics from LLM calls */
+export interface TokenUsage {
+  promptTokens: number;
+  completionTokens: number;
+  totalTokens: number;
+}
+
+// ============================================================================
+// Source Citations
+// ============================================================================
+
+/** A source document referenced in an answer */
+export interface AnswerSource {
+  documentName: string;
+  documentId: string;
+  documentType: string;
+  pageNumber: number | null;
+  section: string | null;
+  relevanceScore: number;
+}
+
+/** Alias for AnswerSource — used in query response contexts */
+export type QuerySource = AnswerSource;
 
 // ============================================================================
 // Query Request
@@ -29,39 +57,22 @@ export interface QueryRequest {
 /** Confidence level for a query answer */
 export type ConfidenceLevel = "high" | "medium" | "low";
 
-/** A source document referenced in a query answer */
-export interface QuerySource {
-  documentName: string;
-  documentId: string;
-  documentType: string;
-  pageNumber: number | null;
-  section: string | null;
-  relevanceScore: number;
-}
-
 /** Response from POST /api/campaigns/:campaignId/query */
 export interface QueryResponse {
   answer: string;
-  sources: QuerySource[];
+  sources: AnswerSource[];
   confidence: ConfidenceLevel;
 }
 
 // ============================================================================
-// RAG Internal Types (for advanced usage)
+// RAG Result (full pipeline output)
 // ============================================================================
-
-/** Token usage statistics from LLM calls */
-export interface TokenUsage {
-  promptTokens: number;
-  completionTokens: number;
-  totalTokens: number;
-}
 
 /** Full RAG pipeline result (superset of QueryResponse) */
 export interface RAGResult {
   answer: string;
   confidence: number;
-  sources: QuerySource[];
+  sources: AnswerSource[];
   isUnanswerable: boolean;
   chunksRetrieved: number;
   chunksUsed: number;

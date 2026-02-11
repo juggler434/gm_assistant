@@ -3,7 +3,7 @@
  * Matches server/src/modules/generation/types.ts and generation route responses.
  */
 
-import type { QuerySource, TokenUsage } from "./query.ts";
+import type { AnswerSource, TokenUsage } from "./query.js";
 
 // ============================================================================
 // Adventure Hook Generation
@@ -39,7 +39,7 @@ export interface AdventureHook {
 /** Response from POST /api/campaigns/:campaignId/generate/hooks */
 export interface GenerateHooksResponse {
   hooks: AdventureHook[];
-  sources: QuerySource[];
+  sources: AnswerSource[];
   chunksUsed: number;
   usage?: TokenUsage;
 }
@@ -63,7 +63,7 @@ export interface GenerationHookEvent {
 /** SSE event: generation complete with metadata */
 export interface GenerationCompleteEvent {
   type: "complete";
-  sources: QuerySource[];
+  sources: AnswerSource[];
   chunksUsed: number;
   usage?: TokenUsage;
 }

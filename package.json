@@ -1,0 +1,5 @@
+{
+  "name": "gm-assistant",
+  "private": true,
+  "workspaces": ["shared", "client", "server"]
+}

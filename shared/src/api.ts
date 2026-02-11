@@ -3,7 +3,13 @@
  * Matches the actual shapes sent and received over the wire.
  */
 
-import type { AuthUser, Campaign, Document, DocumentType, DocumentStatus } from "./entities.ts";
+import type {
+  AuthUser,
+  Campaign,
+  Document,
+  DocumentType,
+  DocumentStatus,
+} from "./entities.js";
 
 // ============================================================================
 // Shared API Error Response
@@ -111,7 +117,8 @@ export const SUPPORTED_MIME_TYPES: Record<SupportedMimeType, string> = {
   "application/pdf": "pdf",
   "text/plain": "txt",
   "text/markdown": "md",
-  "application/vnd.openxmlformats-officedocument.wordprocessingml.document": "docx",
+  "application/vnd.openxmlformats-officedocument.wordprocessingml.document":
+    "docx",
   "image/png": "png",
   "image/jpeg": "jpg",
   "image/webp": "webp",

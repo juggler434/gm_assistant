@@ -5,7 +5,7 @@
  * database row types (e.g. passwordHash is excluded from User).
  */
 
-import type { Id, ISOTimestamp, BaseEntity } from "./common.ts";
+import type { Id, ISOTimestamp, BaseEntity } from "./common.js";
 
 // ============================================================================
 // User
@@ -128,7 +128,11 @@ export interface Chunk {
 // ============================================================================
 
 /** Status of a game session */
-export type GameSessionStatus = "scheduled" | "active" | "completed" | "cancelled";
+export type GameSessionStatus =
+  | "scheduled"
+  | "active"
+  | "completed"
+  | "cancelled";
 
 /** A game session within a campaign */
 export interface GameSession extends BaseEntity {
