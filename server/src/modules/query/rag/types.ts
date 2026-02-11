@@ -6,6 +6,9 @@
  */
 
 import type { DocumentType } from "@/db/schema/index.js";
+import type { AnswerSource, TokenUsage } from "@gm-assistant/shared";
+
+export type { AnswerSource };
 
 // ============================================================================
 // Context Builder Types
@@ -53,22 +56,6 @@ export interface ContextBuilderOptions {
 // Response Generator Types
 // ============================================================================
 
-/** A formatted source reference in the final answer */
-export interface AnswerSource {
-  /** Document name */
-  documentName: string;
-  /** Document ID */
-  documentId: string;
-  /** Document type */
-  documentType: string;
-  /** Page number, if available */
-  pageNumber: number | null;
-  /** Section heading, if available */
-  section: string | null;
-  /** Relevance score (0-1) */
-  relevanceScore: number;
-}
-
 /** The final generated answer */
 export interface GeneratedAnswer {
   /** The answer text from the LLM */
@@ -80,7 +67,7 @@ export interface GeneratedAnswer {
   /** Whether the LLM indicated it could not find relevant information */
   isUnanswerable: boolean;
   /** Token usage from the LLM, if available */
-  usage?: { promptTokens: number; completionTokens: number; totalTokens: number } | undefined;
+  usage?: TokenUsage | undefined;
 }
 
 /** Error types for response generation */
@@ -117,14 +104,7 @@ export interface RAGResult {
   /** Confidence score for the answer (0-1) */
   confidence: number;
   /** Sources used to generate the answer */
-  sources: Array<{
-    documentName: string;
-    documentId: string;
-    documentType: string;
-    pageNumber: number | null;
-    section: string | null;
-    relevanceScore: number;
-  }>;
+  sources: AnswerSource[];
   /** Whether the question could not be answered from available content */
   isUnanswerable: boolean;
   /** Number of chunks retrieved from search */
@@ -132,7 +112,7 @@ export interface RAGResult {
   /** Number of chunks used in the context after filtering */
   chunksUsed: number;
   /** Token usage from the LLM, if available */
-  usage?: { promptTokens: number; completionTokens: number; totalTokens: number } | undefined;
+  usage?: TokenUsage | undefined;
 }
 
 /** Error types for the RAG pipeline */
