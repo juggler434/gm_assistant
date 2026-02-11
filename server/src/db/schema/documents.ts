@@ -11,6 +11,9 @@ import {
 } from "drizzle-orm/pg-core";
 import { users } from "./users.js";
 import { campaigns } from "./campaigns.js";
+import type { DocumentMetadata } from "@gm-assistant/shared";
+
+export type { DocumentMetadata };
 
 // Enum for document types
 export const documentTypeEnum = pgEnum("document_type", [
@@ -28,35 +31,6 @@ export const documentStatusEnum = pgEnum("document_status", [
   "ready",
   "failed",
 ]);
-
-// TypeScript interfaces for metadata
-export interface DocumentMetadata {
-  // Common metadata
-  description?: string;
-  author?: string;
-  version?: string;
-  pageCount?: number;
-
-  // Image-specific metadata
-  width?: number;
-  height?: number;
-  format?: string;
-
-  // Map-specific metadata
-  gridSize?: number;
-  scale?: string;
-
-  // Rulebook/setting metadata
-  system?: string;
-  edition?: string;
-
-  // Processing metadata
-  extractedText?: boolean;
-  embeddingsGenerated?: boolean;
-
-  // Allow additional custom metadata
-  [key: string]: unknown;
-}
 
 export const documents = pgTable(
   "documents",

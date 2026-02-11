@@ -2,6 +2,10 @@
  * LLM Service Types
  */
 
+import type { TokenUsage } from "@gm-assistant/shared";
+
+export type { TokenUsage };
+
 /** Role for chat messages */
 export type MessageRole = "system" | "user" | "assistant";
 
@@ -9,13 +13,6 @@ export type MessageRole = "system" | "user" | "assistant";
 export interface ChatMessage {
   role: MessageRole;
   content: string;
-}
-
-/** Token usage statistics */
-export interface TokenUsage {
-  promptTokens: number;
-  completionTokens: number;
-  totalTokens: number;
 }
 
 /** Options that can be passed to generation requests */

@@ -2,18 +2,8 @@
  * Common types used across the application
  */
 
-/** Represents a unique identifier */
-export type Id = string;
-
-/** Represents a timestamp in ISO 8601 format */
-export type ISOTimestamp = string;
-
-/** Base entity with common fields */
-export interface BaseEntity {
-  id: Id;
-  createdAt: ISOTimestamp;
-  updatedAt: ISOTimestamp;
-}
+// Re-export shared types so existing server imports from "@/types" keep working
+export type { Id, ISOTimestamp, BaseEntity } from "@gm-assistant/shared";
 
 /** Result type for operations that can fail */
 export type Result<T, E = Error> = { ok: true; value: T } | { ok: false; error: E };

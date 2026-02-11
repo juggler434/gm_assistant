@@ -4,23 +4,20 @@
  * Shared type definitions for content generators used by the GM assistant.
  */
 
-import type { AnswerSource } from "@/modules/query/rag/types.js";
+import type {
+  AnswerSource,
+  AdventureHook,
+  HookTone,
+  TokenUsage,
+} from "@gm-assistant/shared";
+
+export type { AnswerSource, AdventureHook, HookTone };
 
 // ============================================================================
 // Adventure Hook Types
 // ============================================================================
 
-/** Supported tone options for adventure hook generation */
-export type HookTone =
-  | "dark"
-  | "comedic"
-  | "political"
-  | "mysterious"
-  | "heroic"
-  | "horror"
-  | "intrigue";
-
-/** Parameters for generating adventure hooks */
+/** Parameters for generating adventure hooks (server-internal) */
 export interface AdventureHookRequest {
   /** Campaign ID to retrieve setting context from */
   campaignId: string;
@@ -34,20 +31,6 @@ export interface AdventureHookRequest {
   maxContextChunks?: number;
 }
 
-/** A single generated adventure hook */
-export interface AdventureHook {
-  /** Short title for the hook */
-  title: string;
-  /** The hook description (2-4 sentences) */
-  description: string;
-  /** NPCs involved or mentioned */
-  npcs: string[];
-  /** Locations referenced */
-  locations: string[];
-  /** Factions involved */
-  factions: string[];
-}
-
 /** Result of adventure hook generation */
 export interface AdventureHookResult {
   /** The generated adventure hooks (3-5) */
@@ -57,7 +40,7 @@ export interface AdventureHookResult {
   /** Number of setting chunks used */
   chunksUsed: number;
   /** Token usage from the LLM, if available */
-  usage?: { promptTokens: number; completionTokens: number; totalTokens: number };
+  usage?: TokenUsage;
 }
 
 /** Error types for adventure hook generation */
