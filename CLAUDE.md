@@ -4,11 +4,41 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ## Project Overview
 
-GM Assistant is an AI-powered RPG Game Master campaign management tool. It's a Node.js/TypeScript backend server with a Fastify-based API. Features include user authentication (session cookies), campaign CRUD, document upload/processing, a RAG pipeline for answering questions from campaign documents, and analytics via PostHog.
+GM Assistant is an AI-powered RPG Game Master campaign management tool. It is structured as an **npm workspaces monorepo** with three packages:
+
+- **`shared/`** — Common TypeScript types and constants shared between client and server
+- **`server/`** — Node.js/TypeScript backend (Fastify API, PostgreSQL, Redis, S3)
+- **`client/`** — React/TypeScript frontend (Vite, Tailwind CSS v4, shadcn/ui)
+
+Features include user authentication (session cookies), campaign CRUD, document upload/processing, a RAG pipeline for answering questions from campaign documents, and analytics via PostHog.
+
+## Monorepo Structure
+
+```
+gm_assistant/
+├── package.json              # Workspace root (npm workspaces)
+├── CLAUDE.md
+├── docker-compose.yml
+├── mockups/
+│   └── gm-assistant-mockup.html   # Interactive HTML/CSS design reference
+├── shared/                   # @gm-assistant/shared package
+│   ├── src/
+│   │   ├── index.ts          # Barrel exports
+│   │   ├── entities.ts       # User, Campaign, Document types
+│   │   ├── api.ts            # API request/response types
+│   │   ├── query.ts          # Query-related types
+│   │   ├── generation.ts     # LLM generation types
+│   │   └── common.ts         # Shared constants (SUPPORTED_MIME_TYPES, etc.)
+│   └── tsconfig.json
+├── client/                   # React frontend
+│   └── (see Client section below)
+└── server/                   # Fastify backend
+    └── (see Server section below)
+```
 
 ## Development Commands
 
-All commands run from the `server/` directory:
+### Server (from `server/` directory)
 
 ```bash
 npm run dev          # Start dev server with hot reload
@@ -22,7 +52,146 @@ npm run format       # Format with Prettier
 npm run typecheck    # Type check without building
 ```
 
-## Architecture
+### Client (from `client/` directory)
+
+```bash
+npm run dev          # Start Vite dev server (port 5173)
+npm run build        # Type-check + Vite production build
+npm run lint         # Run ESLint
+npm run format       # Format with Prettier
+npm run preview      # Preview production build
+```
+
+### Shared (from `shared/` directory)
+
+```bash
+npm run build        # Compile TypeScript (outputs to dist/)
+npm run typecheck    # Type-check without emitting
+```
+
+### Root
+
+```bash
+npm install          # Install all workspace dependencies (run from root)
+```
+
+**Important:** The shared package must be built (`cd shared && npm run build`) before the client can type-check or build, since the client imports from `@gm-assistant/shared` via its compiled `dist/` output.
+
+## Client Architecture
+
+### Tech Stack
+
+- **React 19** with **TypeScript** (strict mode)
+- **Vite 7** for bundling and dev server
+- **Tailwind CSS v4** via `@tailwindcss/vite` plugin
+- **shadcn/ui** (new-york style) with Radix UI primitives
+- **TanStack React Query** for server state management
+- **React Router v7** for client-side routing
+- **Lucide React** for icons
+
+### Client Directory Structure
+
+```
+client/src/
+├── main.tsx                    # Entry point (renders App into DOM)
+├── App.tsx                     # Root component (providers, router, Toaster)
+├── index.css                   # Tailwind imports + dark fantasy theme tokens
+├── vite-env.d.ts
+├── components/
+│   └── ui/                     # Reusable UI component library
+│       ├── button.tsx          # Button (6 variants, 4 sizes)
+│       ├── input.tsx           # Text input
+│       ├── textarea.tsx        # Multi-line text input
+│       ├── label.tsx           # Form label (Radix-based)
+│       ├── select.tsx          # Dropdown select (Radix-based)
+│       ├── dialog.tsx          # Modal dialog (Radix-based)
+│       ├── card.tsx            # Card with header/title/description/content/footer
+│       ├── badge.tsx           # Badge/tag (6 variants)
+│       ├── spinner.tsx         # Loading spinner (animated SVG)
+│       ├── skeleton.tsx        # Skeleton loaders (base + card + table row)
+│       ├── sonner.tsx          # Toast notification provider (Sonner)
+│       ├── empty-state.tsx     # Empty state placeholder
+│       └── error-state.tsx     # Error state with retry
+├── pages/
+│   └── home.tsx                # Landing page
+├── lib/
+│   └── utils.ts                # cn() helper (clsx + tailwind-merge)
+└── types/
+    └── index.ts                # Re-exports from @gm-assistant/shared
+```
+
+### UI Component Library
+
+All components live in `client/src/components/ui/` and follow the [shadcn/ui](https://ui.shadcn.com/) pattern: unstyled Radix primitives + Tailwind classes + `class-variance-authority` for variants.
+
+#### Component Reference
+
+| Component | File | Variants / Notes |
+|-----------|------|-----------------|
+| **Button** | `button.tsx` | Variants: `default`, `destructive`, `outline`, `secondary`, `ghost`, `link`. Sizes: `default`, `sm`, `lg`, `icon`. Supports `asChild` via Radix Slot. |
+| **Input** | `input.tsx` | Standard text input. Styled with focus ring on primary color. |
+| **Textarea** | `textarea.tsx` | Multi-line input, resizable, 80px min-height. |
+| **Label** | `label.tsx` | Radix Label for accessible form fields. |
+| **Select** | `select.tsx` | Full Radix Select: `Select`, `SelectTrigger`, `SelectValue`, `SelectContent`, `SelectItem`, `SelectGroup`, `SelectLabel`, `SelectSeparator`. Keyboard-navigable. |
+| **Dialog** | `dialog.tsx` | Radix Dialog: `Dialog`, `DialogTrigger`, `DialogContent`, `DialogHeader`, `DialogFooter`, `DialogTitle`, `DialogDescription`, `DialogClose`. Focus-trapped with overlay. |
+| **Card** | `card.tsx` | Composable: `Card`, `CardHeader`, `CardTitle`, `CardDescription`, `CardContent`, `CardFooter`. |
+| **Badge** | `badge.tsx` | Variants: `default` (purple), `secondary`, `destructive`, `success`, `warning`, `outline`. Pill-shaped. |
+| **Spinner** | `spinner.tsx` | Animated SVG arc. Props: `label` (screen reader text). Uses `role="status"`. |
+| **Skeleton** | `skeleton.tsx` | `Skeleton` (base pulse), `CardSkeleton` (campaign card shape), `TableRowSkeleton` (document row shape). All `aria-hidden`. |
+| **Toaster** | `sonner.tsx` | Sonner-based toast provider. Already wired into `App.tsx`. Use `import { toast } from "sonner"` to trigger. |
+| **EmptyState** | `empty-state.tsx` | Props: `icon`, `heading`, `description`, `action`. Uses `role="status"`, dashed border. |
+| **ErrorState** | `error-state.tsx` | Props: `heading`, `description`, `onRetry`, `icon`. Uses `role="alert"`, destructive border. |
+
+#### Adding New shadcn/ui Components
+
+The project uses shadcn/ui's `components.json` configuration (new-york style, Lucide icons, CSS variables). To add a new component manually:
+
+1. Create the file in `client/src/components/ui/`
+2. Use `cn()` from `@/lib/utils` for className merging
+3. Use `cva()` from `class-variance-authority` for variants
+4. Install any required Radix primitive (e.g. `npm install @radix-ui/react-tooltip` from root)
+
+### Design Theme
+
+The client uses an **always-dark fantasy theme** defined in `client/src/index.css`. Color tokens are mapped from the mockup's CSS custom properties:
+
+| Role | CSS Variable | Hex Equivalent | Usage |
+|------|-------------|----------------|-------|
+| Background | `--color-background` | `#0f0f14` | Page background (darkest) |
+| Card | `--color-card` | `#1e1e28` | Cards, inputs, popovers |
+| Secondary | `--color-secondary` | `#282834` | Secondary buttons, muted areas |
+| Accent | `--color-accent` | `#353544` | Hover backgrounds |
+| Border | `--color-border` | `#3a3a4a` | All borders and dividers |
+| Primary | `--color-primary` | `#a855f7` | Purple accent (buttons, links, focus rings) |
+| Foreground | `--color-foreground` | `#e8e6e3` | Primary text |
+| Muted fg | `--color-muted-foreground` | `#9d9baf` | Secondary text |
+| Destructive | `--color-destructive` | `#ef4444` | Error states, delete actions |
+| Success | `--color-success` | `#22c55e` | Success badges, positive indicators |
+| Warning | `--color-warning` | `#f59e0b` | Warning badges, caution states |
+| Sidebar | `--color-sidebar` | `#16161d` | Sidebar background |
+
+### Client Path Aliases
+
+- `@/*` → `./src/*` (configured in both `tsconfig.app.json` and `vite.config.ts`)
+
+### Client Proxy
+
+The Vite dev server proxies `/api` requests to `http://localhost:3000` (the Fastify server).
+
+## Mockups
+
+The `mockups/gm-assistant-mockup.html` file is an interactive HTML/CSS reference for the frontend design. Open it in a browser to view six screens:
+
+1. **Login** — Centered auth card with email/password form
+2. **Register** — Similar to login with name field
+3. **Dashboard** — Sidebar layout, stats row, campaign card grid
+4. **Campaign Detail** — Document table with tabs, search, upload button
+5. **AI Query** — Three-panel chat layout (history sidebar, chat, context panel)
+6. **Upload Modal** — Overlay dialog with drag-and-drop zone, document type select, tags input
+
+Use this mockup as the source of truth for component styling, spacing, and color palette.
+
+## Server Architecture
 
 ### Directory Structure
 
@@ -90,9 +259,8 @@ Each module under `modules/` follows a consistent structure:
 
 Protected routes use `app.addHook("preHandler", requireAuth)` to require authentication.
 
-### Path Aliases
+### Server Path Aliases
 
-The project uses TypeScript path aliases for clean imports:
 - `@/*` → `./src/*`
 - `@/config/*`, `@/services/*`, `@/modules/*`, `@/db/*`, `@/jobs/*`, `@/plugins/*`, `@/types/*`
 
@@ -196,6 +364,8 @@ docker-compose down -v
 | MinIO      | 9000  | S3-compatible API              |
 | MinIO      | 9001  | Web console                    |
 | Ollama     | 11434 | LLM API (optional profile)     |
+| Vite       | 5173  | Frontend dev server            |
+| Fastify    | 3000  | Backend API server             |
 
 ### Default Credentials
 
