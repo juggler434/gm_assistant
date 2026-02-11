@@ -1,20 +1,10 @@
-import {
-  createContext,
-  useContext,
-  useState,
-  useEffect,
-  useCallback,
-  type ReactNode,
-} from "react";
-
-interface User {
-  id: string;
-  email: string;
-  name: string;
-}
+import { createContext, useContext, useState, useEffect, useCallback, type ReactNode } from "react";
+import { useQueryClient } from "@tanstack/react-query";
+import { api, ApiError } from "@/lib/api-client";
+import type { AuthResponse, AuthUser } from "@/types";
 
 interface AuthContextValue {
-  user: User | null;
+  user: AuthUser | null;
   isAuthenticated: boolean;
   isLoading: boolean;
   login: (email: string, password: string) => Promise<void>;
@@ -25,19 +15,17 @@ interface AuthContextValue {
 const AuthContext = createContext<AuthContextValue | null>(null);
 
 export function AuthProvider({ children }: { children: ReactNode }) {
-  const [user, setUser] = useState<User | null>(null);
+  const [user, setUser] = useState<AuthUser | null>(null);
   const [isLoading, setIsLoading] = useState(true);
+  const queryClient = useQueryClient();
 
   useEffect(() => {
     let cancelled = false;
 
     async function checkAuth() {
       try {
-        const res = await fetch("/api/auth/me", { credentials: "include" });
-        if (res.ok) {
-          const data = await res.json();
-          if (!cancelled) setUser(data.user);
-        }
+        const data = await api.get<AuthResponse>("/api/auth/me");
+        if (!cancelled) setUser(data.user);
       } catch {
         // Not authenticated
       } finally {
@@ -52,49 +40,35 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   }, []);
 
   const login = useCallback(async (email: string, password: string) => {
-    const res = await fetch("/api/auth/login", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      credentials: "include",
-      body: JSON.stringify({ email, password }),
+    const data = await api.post<AuthResponse>("/api/auth/login", {
+      email,
+      password,
     });
-
-    if (!res.ok) {
-      const data = await res.json().catch(() => ({}));
-      throw new Error(data.message || "Login failed");
-    }
-
-    const data = await res.json();
     setUser(data.user);
   }, []);
 
-  const register = useCallback(
-    async (name: string, email: string, password: string) => {
-      const res = await fetch("/api/auth/register", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        credentials: "include",
-        body: JSON.stringify({ name, email, password }),
-      });
-
-      if (!res.ok) {
-        const data = await res.json().catch(() => ({}));
-        throw new Error(data.message || "Registration failed");
-      }
-
-      const data = await res.json();
-      setUser(data.user);
-    },
-    [],
-  );
+  const register = useCallback(async (name: string, email: string, password: string) => {
+    const data = await api.post<AuthResponse>("/api/auth/register", {
+      name,
+      email,
+      password,
+    });
+    setUser(data.user);
+  }, []);
 
   const logout = useCallback(async () => {
-    await fetch("/api/auth/logout", {
-      method: "POST",
-      credentials: "include",
-    });
+    try {
+      await api.post("/api/auth/logout");
+    } catch (e) {
+      // Ignore errors on logout — even if the server call fails,
+      // we still want to clear local state
+      if (e instanceof ApiError && e.statusCode === 401) {
+        // Already logged out, that's fine
+      }
+    }
     setUser(null);
-  }, []);
+    queryClient.clear();
+  }, [queryClient]);
 
   return (
     <AuthContext.Provider
