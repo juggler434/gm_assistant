@@ -1,10 +1,12 @@
+import { Sparkles } from "lucide-react";
+import { EmptyState } from "@/components/ui/empty-state";
+
 export function GeneratePage() {
   return (
-    <div>
-      <h2 className="text-xl font-semibold text-foreground">Content Generation</h2>
-      <p className="mt-2 text-muted-foreground">
-        Content generation coming soon.
-      </p>
-    </div>
+    <EmptyState
+      icon={<Sparkles />}
+      heading="Content Generation"
+      description="Generate NPCs, encounters, lore, and more for your campaign. Coming soon."
+    />
   );
 }

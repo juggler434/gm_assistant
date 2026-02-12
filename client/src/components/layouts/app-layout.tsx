@@ -3,9 +3,7 @@ import { LayoutDashboard, BookOpen, LogOut } from "lucide-react";
 import { useAuth } from "@/hooks/use-auth";
 import { cn } from "@/lib/utils";
 
-const navItems = [
-  { to: "/campaigns", label: "Campaigns", icon: BookOpen },
-];
+const navItems = [{ to: "/campaigns", label: "Campaigns", icon: BookOpen }];
 
 export function AppLayout() {
   const { user, logout } = useAuth();
@@ -17,9 +15,7 @@ export function AppLayout() {
         {/* Logo */}
         <div className="flex h-14 items-center gap-2 border-b border-border px-4">
           <LayoutDashboard className="h-5 w-5 text-primary" />
-          <span className="text-lg font-semibold text-foreground">
-            GM Assistant
-          </span>
+          <span className="text-lg font-semibold text-foreground">GM Assistant</span>
         </div>
 
         {/* Navigation */}
@@ -33,7 +29,7 @@ export function AppLayout() {
                   "flex items-center gap-3 rounded-md px-3 py-2 text-sm font-medium transition-colors",
                   isActive
                     ? "bg-sidebar-accent text-sidebar-accent-foreground"
-                    : "text-sidebar-muted-foreground hover:bg-sidebar-accent/50 hover:text-sidebar-foreground",
+                    : "text-sidebar-muted-foreground hover:bg-sidebar-accent/50 hover:text-sidebar-foreground"
                 )
               }
             >
@@ -47,12 +43,8 @@ export function AppLayout() {
         <div className="border-t border-border p-3">
           <div className="flex items-center justify-between">
             <div className="min-w-0">
-              <p className="truncate text-sm font-medium text-foreground">
-                {user?.name}
-              </p>
-              <p className="truncate text-xs text-muted-foreground">
-                {user?.email}
-              </p>
+              <p className="truncate text-sm font-medium text-foreground">{user?.name}</p>
+              <p className="truncate text-xs text-muted-foreground">{user?.email}</p>
             </div>
             <button
               onClick={logout}

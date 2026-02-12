@@ -6,14 +6,10 @@ export function LoginPage() {
     <Card>
       <CardHeader className="text-center">
         <CardTitle className="text-2xl">Sign In</CardTitle>
-        <CardDescription>
-          Welcome back to GM Assistant
-        </CardDescription>
+        <CardDescription>Welcome back to GM Assistant</CardDescription>
       </CardHeader>
       <CardContent>
-        <p className="text-center text-sm text-muted-foreground">
-          Login form coming soon.
-        </p>
+        <p className="text-center text-sm text-muted-foreground">Login form coming soon.</p>
         <p className="mt-4 text-center text-sm text-muted-foreground">
           Don't have an account?{" "}
           <Link to="/register" className="text-primary hover:underline">
