@@ -1,3 +1,4 @@
+import { useState } from "react";
 import { useParams } from "react-router-dom";
 import { FileText, Plus, Download } from "lucide-react";
 import { useDocuments } from "@/hooks/use-documents";
@@ -6,6 +7,7 @@ import { EmptyState } from "@/components/ui/empty-state";
 import { ErrorState } from "@/components/ui/error-state";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
+import { UploadDialog } from "@/components/upload-dialog";
 import type { DocumentStatus, Document } from "@/types";
 
 const statusVariant: Record<DocumentStatus, "success" | "warning" | "default" | "destructive"> = {
@@ -51,12 +53,13 @@ function DocumentRow({ doc }: { doc: Document }) {
 export function DocumentsPage() {
   const { id: campaignId } = useParams<{ id: string }>();
   const { data: documents, isLoading, isError, refetch } = useDocuments(campaignId!);
+  const [uploadOpen, setUploadOpen] = useState(false);
 
   return (
     <div>
       <div className="mb-6 flex items-center justify-between">
         <h2 className="text-xl font-semibold text-foreground">Documents</h2>
-        <Button size="sm">
+        <Button size="sm" onClick={() => setUploadOpen(true)}>
           <Plus className="h-4 w-4" />
           Upload Document
         </Button>
@@ -83,7 +86,7 @@ export function DocumentsPage() {
           heading="No documents yet"
           description="Upload documents to build your campaign's knowledge base."
           action={
-            <Button size="sm">
+            <Button size="sm" onClick={() => setUploadOpen(true)}>
               <Plus className="h-4 w-4" />
               Upload Document
             </Button>
@@ -112,6 +115,8 @@ export function DocumentsPage() {
           </table>
         </div>
       )}
+
+      <UploadDialog campaignId={campaignId!} open={uploadOpen} onOpenChange={setUploadOpen} />
     </div>
   );
 }
