@@ -1,4 +1,4 @@
-import type { MouseEvent } from "react";
+import { type MouseEvent, useState } from "react";
 import { Link } from "react-router-dom";
 import { Calendar, MoreHorizontal, Pencil, Trash2 } from "lucide-react";
 import { Card, CardHeader, CardTitle, CardDescription, CardFooter } from "@/components/ui/card";
@@ -31,13 +31,15 @@ interface CampaignCardProps {
 }
 
 export function CampaignCard({ campaign, onEdit, onDelete }: CampaignCardProps) {
+  const [menuOpen, setMenuOpen] = useState(false);
+
   return (
     <Link to={`/campaigns/${campaign.id}`} className="group block">
       <Card className="transition-all hover:border-primary/50 hover:-translate-y-0.5 hover:shadow-lg hover:shadow-primary/5">
         <CardHeader>
           <div className="flex items-start justify-between gap-2">
             <CardTitle className="line-clamp-1">{campaign.name}</CardTitle>
-            <DropdownMenu>
+            <DropdownMenu open={menuOpen} onOpenChange={setMenuOpen}>
               <DropdownMenuTrigger asChild>
                 <Button
                   variant="ghost"
@@ -53,6 +55,7 @@ export function CampaignCard({ campaign, onEdit, onDelete }: CampaignCardProps) 
                 <DropdownMenuItem
                   onClick={(e: MouseEvent) => {
                     stopNav(e);
+                    setMenuOpen(false);
                     onEdit(campaign);
                   }}
                 >
@@ -63,6 +66,7 @@ export function CampaignCard({ campaign, onEdit, onDelete }: CampaignCardProps) 
                   className="text-destructive focus:text-destructive"
                   onClick={(e: MouseEvent) => {
                     stopNav(e);
+                    setMenuOpen(false);
                     onDelete(campaign);
                   }}
                 >
