@@ -36,7 +36,7 @@ const envSchema = z
     S3_SECRET_KEY: z.string().optional(),
 
     // LLM
-    LLM_MODEL: z.string().default("llama3"),
+    LLM_MODEL: z.string().default("phi3:mini"),
     LLM_BASE_URL: z.string().url().default("http://localhost:11434"),
     LLM_TIMEOUT: z.coerce.number().int().positive().default(60000),
     LLM_MAX_TOKENS: z.coerce.number().int().positive().default(2048),

@@ -1,19 +1,12 @@
 import { describe, it, expect, vi, beforeEach } from "vitest";
 
 // Mock state
-let mockExecuteResult: unknown[] = [];
+let mockUnsafeResult: unknown[] = [];
 
-// Mock the db module - keyword search uses db.execute() for raw SQL
+// Mock the db module - keyword search uses queryClient.unsafe() for raw parameterized SQL
 vi.mock("@/db/index.js", () => ({
-  db: {
-    execute: vi.fn(() => Promise.resolve(mockExecuteResult)),
-  },
-}));
-
-// Mock drizzle-orm sql.raw used for building raw queries
-vi.mock("drizzle-orm", () => ({
-  sql: {
-    raw: vi.fn((queryText: string) => ({ queryText })),
+  queryClient: {
+    unsafe: vi.fn(() => Promise.resolve(mockUnsafeResult)),
   },
 }));
 
@@ -22,8 +15,7 @@ import {
   searchChunksByKeyword,
   findMostRelevantChunk,
 } from "@/modules/knowledge/retrieval/keyword-search.js";
-import { db } from "@/db/index.js";
-import { sql } from "drizzle-orm";
+import { queryClient } from "@/db/index.js";
 
 describe("Keyword Search", () => {
   const campaignId = "123e4567-e89b-12d3-a456-426614174000";
@@ -45,7 +37,7 @@ describe("Keyword Search", () => {
 
   beforeEach(() => {
     vi.clearAllMocks();
-    mockExecuteResult = [];
+    mockUnsafeResult = [];
   });
 
   describe("searchChunksByKeyword", () => {
@@ -56,7 +48,7 @@ describe("Keyword Search", () => {
         content: "The dragon's lair is hidden in the mountains.",
         rank: 0.05,
       };
-      mockExecuteResult = [mockRow, secondRow];
+      mockUnsafeResult = [mockRow, secondRow];
 
       const result = await searchChunksByKeyword("dragon", campaignId);
 
@@ -68,7 +60,7 @@ describe("Keyword Search", () => {
     });
 
     it("should transform raw rows into KeywordSearchResult format", async () => {
-      mockExecuteResult = [mockRow];
+      mockUnsafeResult = [mockRow];
 
       const result = await searchChunksByKeyword("dragon", campaignId);
 
@@ -96,7 +88,7 @@ describe("Keyword Search", () => {
     });
 
     it("should return empty array when no matches found", async () => {
-      mockExecuteResult = [];
+      mockUnsafeResult = [];
 
       const result = await searchChunksByKeyword("unicorn", campaignId);
 
@@ -106,115 +98,137 @@ describe("Keyword Search", () => {
       }
     });
 
-    it("should use default limit of 10", async () => {
-      mockExecuteResult = [];
+    it("should pass campaignId and query as SQL parameters", async () => {
+      mockUnsafeResult = [];
 
       await searchChunksByKeyword("dragon", campaignId);
 
-      expect(sql.raw).toHaveBeenCalledWith(
-        expect.stringContaining("LIMIT 10")
+      expect(queryClient.unsafe).toHaveBeenCalledWith(
+        expect.any(String),
+        expect.arrayContaining([campaignId, "dragon", "english"])
+      );
+    });
+
+    it("should use default limit of 10", async () => {
+      mockUnsafeResult = [];
+
+      await searchChunksByKeyword("dragon", campaignId);
+
+      expect(queryClient.unsafe).toHaveBeenCalledWith(
+        expect.stringContaining("LIMIT 10"),
+        expect.any(Array)
       );
     });
 
     it("should apply custom limit", async () => {
-      mockExecuteResult = [];
+      mockUnsafeResult = [];
 
       await searchChunksByKeyword("dragon", campaignId, { limit: 5 });
 
-      expect(sql.raw).toHaveBeenCalledWith(
-        expect.stringContaining("LIMIT 5")
+      expect(queryClient.unsafe).toHaveBeenCalledWith(
+        expect.stringContaining("LIMIT 5"),
+        expect.any(Array)
       );
     });
 
     it("should build query with to_tsvector and plainto_tsquery", async () => {
-      mockExecuteResult = [];
+      mockUnsafeResult = [];
 
       await searchChunksByKeyword("dragon", campaignId);
 
-      expect(sql.raw).toHaveBeenCalledWith(
-        expect.stringContaining("to_tsvector")
+      expect(queryClient.unsafe).toHaveBeenCalledWith(
+        expect.stringContaining("to_tsvector"),
+        expect.any(Array)
       );
-      expect(sql.raw).toHaveBeenCalledWith(
-        expect.stringContaining("plainto_tsquery")
+      expect(queryClient.unsafe).toHaveBeenCalledWith(
+        expect.stringContaining("plainto_tsquery"),
+        expect.any(Array)
       );
     });
 
     it("should include ts_rank for relevance scoring", async () => {
-      mockExecuteResult = [];
+      mockUnsafeResult = [];
 
       await searchChunksByKeyword("dragon", campaignId);
 
-      expect(sql.raw).toHaveBeenCalledWith(
-        expect.stringContaining("ts_rank")
+      expect(queryClient.unsafe).toHaveBeenCalledWith(
+        expect.stringContaining("ts_rank"),
+        expect.any(Array)
       );
     });
 
     it("should order results by rank descending", async () => {
-      mockExecuteResult = [];
+      mockUnsafeResult = [];
 
       await searchChunksByKeyword("dragon", campaignId);
 
-      expect(sql.raw).toHaveBeenCalledWith(
-        expect.stringContaining("ORDER BY rank DESC")
+      expect(queryClient.unsafe).toHaveBeenCalledWith(
+        expect.stringContaining("ORDER BY rank DESC"),
+        expect.any(Array)
       );
     });
 
     it("should filter by campaignId", async () => {
-      mockExecuteResult = [];
+      mockUnsafeResult = [];
 
       await searchChunksByKeyword("dragon", campaignId);
 
-      expect(sql.raw).toHaveBeenCalledWith(
-        expect.stringContaining("c.campaign_id = $1")
+      expect(queryClient.unsafe).toHaveBeenCalledWith(
+        expect.stringContaining("c.campaign_id = $1"),
+        expect.any(Array)
       );
     });
 
     it("should filter by documentIds when provided", async () => {
-      mockExecuteResult = [];
+      mockUnsafeResult = [];
 
       await searchChunksByKeyword("dragon", campaignId, {
         documentIds: ["doc-001", "doc-002"],
       });
 
-      expect(sql.raw).toHaveBeenCalledWith(
-        expect.stringContaining("c.document_id IN")
+      expect(queryClient.unsafe).toHaveBeenCalledWith(
+        expect.stringContaining("c.document_id IN"),
+        expect.arrayContaining(["doc-001", "doc-002"])
       );
     });
 
     it("should filter by documentTypes when provided", async () => {
-      mockExecuteResult = [];
+      mockUnsafeResult = [];
 
       await searchChunksByKeyword("dragon", campaignId, {
         documentTypes: ["rulebook", "notes"],
       });
 
-      expect(sql.raw).toHaveBeenCalledWith(
-        expect.stringContaining("d.document_type IN")
+      expect(queryClient.unsafe).toHaveBeenCalledWith(
+        expect.stringContaining("d.document_type IN"),
+        expect.arrayContaining(["rulebook", "notes"])
       );
     });
 
     it("should use english language config by default", async () => {
-      mockExecuteResult = [];
+      mockUnsafeResult = [];
 
       await searchChunksByKeyword("dragon", campaignId);
 
-      expect(sql.raw).toHaveBeenCalledWith(
-        expect.stringContaining("$3::regconfig")
+      expect(queryClient.unsafe).toHaveBeenCalledWith(
+        expect.stringContaining("$3::regconfig"),
+        expect.arrayContaining(["english"])
       );
     });
 
     it("should join chunks with documents table", async () => {
-      mockExecuteResult = [];
+      mockUnsafeResult = [];
 
       await searchChunksByKeyword("dragon", campaignId);
 
-      expect(sql.raw).toHaveBeenCalledWith(
-        expect.stringContaining("INNER JOIN documents d ON c.document_id = d.id")
+      expect(queryClient.unsafe).toHaveBeenCalledWith(
+        expect.stringContaining("INNER JOIN documents d ON c.document_id = d.id"),
+        expect.any(Array)
       );
     });
 
     it("should handle null metadata gracefully", async () => {
-      mockExecuteResult = [{ ...mockRow, metadata: null }];
+      mockUnsafeResult = [{ ...mockRow, metadata: null }];
 
       const result = await searchChunksByKeyword("dragon", campaignId);
 
@@ -225,7 +239,7 @@ describe("Keyword Search", () => {
     });
 
     it("should handle null page_number and section", async () => {
-      mockExecuteResult = [
+      mockUnsafeResult = [
         { ...mockRow, page_number: null, section: null },
       ];
 
@@ -240,7 +254,7 @@ describe("Keyword Search", () => {
 
     it("should convert rank to number", async () => {
       // PostgreSQL may return rank as string
-      mockExecuteResult = [{ ...mockRow, rank: "0.075" }];
+      mockUnsafeResult = [{ ...mockRow, rank: "0.075" }];
 
       const result = await searchChunksByKeyword("dragon", campaignId);
 
@@ -273,7 +287,7 @@ describe("Keyword Search", () => {
 
     describe("error handling", () => {
       it("should return DATABASE_ERROR when query fails", async () => {
-        vi.mocked(db.execute).mockRejectedValueOnce(
+        vi.mocked(queryClient.unsafe).mockRejectedValueOnce(
           new Error("connection refused")
         );
 
@@ -291,7 +305,7 @@ describe("Keyword Search", () => {
 
   describe("findMostRelevantChunk", () => {
     it("should return the top-ranked chunk", async () => {
-      mockExecuteResult = [mockRow];
+      mockUnsafeResult = [mockRow];
 
       const result = await findMostRelevantChunk("dragon", campaignId);
 
@@ -303,7 +317,7 @@ describe("Keyword Search", () => {
     });
 
     it("should return null when no matches found", async () => {
-      mockExecuteResult = [];
+      mockUnsafeResult = [];
 
       const result = await findMostRelevantChunk("unicorn", campaignId);
 
@@ -314,28 +328,31 @@ describe("Keyword Search", () => {
     });
 
     it("should use limit of 1", async () => {
-      mockExecuteResult = [];
+      mockUnsafeResult = [];
 
       await findMostRelevantChunk("dragon", campaignId);
 
-      expect(sql.raw).toHaveBeenCalledWith(
-        expect.stringContaining("LIMIT 1")
+      expect(queryClient.unsafe).toHaveBeenCalledWith(
+        expect.stringContaining("LIMIT 1"),
+        expect.any(Array)
       );
     });
 
     it("should pass through filter options", async () => {
-      mockExecuteResult = [];
+      mockUnsafeResult = [];
 
       await findMostRelevantChunk("dragon", campaignId, {
         documentIds: ["doc-001"],
         documentTypes: ["notes"],
       });
 
-      expect(sql.raw).toHaveBeenCalledWith(
-        expect.stringContaining("c.document_id IN")
+      expect(queryClient.unsafe).toHaveBeenCalledWith(
+        expect.stringContaining("c.document_id IN"),
+        expect.any(Array)
       );
-      expect(sql.raw).toHaveBeenCalledWith(
-        expect.stringContaining("d.document_type IN")
+      expect(queryClient.unsafe).toHaveBeenCalledWith(
+        expect.stringContaining("d.document_type IN"),
+        expect.any(Array)
       );
     });
 
@@ -349,7 +366,7 @@ describe("Keyword Search", () => {
     });
 
     it("should propagate database errors", async () => {
-      vi.mocked(db.execute).mockRejectedValueOnce(new Error("timeout"));
+      vi.mocked(queryClient.unsafe).mockRejectedValueOnce(new Error("timeout"));
 
       const result = await findMostRelevantChunk("dragon", campaignId);
 

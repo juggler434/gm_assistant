@@ -27,6 +27,8 @@ export interface AdventureHookRequest {
   theme?: string;
   /** Optional party level to calibrate challenge appropriateness */
   partyLevel?: number;
+  /** Number of hooks to generate (1-10, default: 3-5 range) */
+  count?: number;
   /** Maximum number of chunks to use for setting context (default: 6) */
   maxContextChunks?: number;
   /** Comma-separated NPCs/locations to specifically include in hooks */
