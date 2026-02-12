@@ -62,58 +62,7 @@ export async function generationRoutes(app: FastifyInstance): Promise<void> {
 
     const llmService = createLLMService();
 
-    if (wantsStream) {
-      // SSE streaming response
-      reply.raw.writeHead(200, {
-        "Content-Type": "text/event-stream",
-        "Cache-Control": "no-cache",
-        Connection: "keep-alive",
-      });
-
-      // Send a status event to indicate generation started
-      reply.raw.write(`data: ${JSON.stringify({ type: "status", message: "Generating adventure hooks..." })}\n\n`);
-
-      const result = await generateAdventureHooks(hookRequest, llmService);
-
-      if (result.ok) {
-        // Stream each hook individually
-        for (const hook of result.value.hooks) {
-          reply.raw.write(`data: ${JSON.stringify({ type: "hook", hook })}\n\n`);
-        }
-
-        // Send sources and metadata
-        reply.raw.write(`data: ${JSON.stringify({
-          type: "complete",
-          sources: result.value.sources,
-          chunksUsed: result.value.chunksUsed,
-          usage: result.value.usage,
-        })}\n\n`);
-
-        trackEvent(userId, "hooks_generated", {
-          campaign_id: campaignId,
-          tone,
-          theme: theme ?? null,
-          hook_count: result.value.hooks.length,
-        });
-      } else {
-        request.log.error(
-          { error: result.error, campaignId },
-          "Adventure hook generation failed (SSE)"
-        );
-        const statusCode = errorCodeToStatus(result.error.code);
-        reply.raw.write(`data: ${JSON.stringify({
-          type: "error",
-          statusCode,
-          error: result.error.code,
-          message: result.error.message,
-        })}\n\n`);
-      }
-
-      reply.raw.end();
-      return reply;
-    }
-
-    // Standard JSON response
+    // Run generation (used by both SSE and JSON paths)
     const result = await generateAdventureHooks(hookRequest, llmService);
 
     if (!result.ok) {
@@ -135,6 +84,29 @@ export async function generationRoutes(app: FastifyInstance): Promise<void> {
       theme: theme ?? null,
       hook_count: result.value.hooks.length,
     });
+
+    if (wantsStream) {
+      // SSE streaming response
+      reply.raw.writeHead(200, {
+        "Content-Type": "text/event-stream",
+        "Cache-Control": "no-cache",
+        Connection: "keep-alive",
+      });
+
+      for (const hook of result.value.hooks) {
+        reply.raw.write(`data: ${JSON.stringify({ type: "hook", hook })}\n\n`);
+      }
+
+      reply.raw.write(`data: ${JSON.stringify({
+        type: "complete",
+        sources: result.value.sources,
+        chunksUsed: result.value.chunksUsed,
+        usage: result.value.usage,
+      })}\n\n`);
+
+      reply.raw.end();
+      return reply;
+    }
 
     return reply.status(200).send({
       hooks: result.value.hooks,
