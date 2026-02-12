@@ -450,11 +450,7 @@ describe("Generation Routes", () => {
           .filter((e) => e.startsWith("data: "))
           .map((e) => JSON.parse(e.replace("data: ", "")));
 
-        // First event: status message
-        expect(events[0].type).toBe("status");
-        expect(events[0].message).toContain("Generating");
-
-        // Next events: individual hooks
+        // First events: individual hooks
         const hookEvents = events.filter((e) => e.type === "hook");
         expect(hookEvents).toHaveLength(3);
         expect(hookEvents[0].hook.title).toBe("The Shadow Conspiracy");
@@ -468,7 +464,7 @@ describe("Generation Routes", () => {
         await app.close();
       });
 
-      it("should stream error event when generation fails", async () => {
+      it("should return error status code when generation fails even with SSE accept header", async () => {
         mockGenerateAdventureHooks.mockResolvedValue({
           ok: false,
           error: {
@@ -489,16 +485,10 @@ describe("Generation Routes", () => {
           payload: { tone: "dark" },
         });
 
-        expect(response.statusCode).toBe(200);
+        expect(response.statusCode).toBe(502);
 
-        const events = response.body
-          .split("\n\n")
-          .filter((e) => e.startsWith("data: "))
-          .map((e) => JSON.parse(e.replace("data: ", "")));
-
-        const errorEvent = events.find((e) => e.type === "error");
-        expect(errorEvent).toBeDefined();
-        expect(errorEvent.error).toBe("GENERATION_FAILED");
+        const body = JSON.parse(response.body);
+        expect(body.error).toBe("GENERATION_FAILED");
 
         await app.close();
       });
