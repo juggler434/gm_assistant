@@ -34,7 +34,7 @@ export async function generationRoutes(app: FastifyInstance): Promise<void> {
     }
 
     const { campaignId } = paramResult.data;
-    const { tone, theme, count, partyLevel } = bodyResult.data;
+    const { tone, theme, count, partyLevel, includeNpcsLocations } = bodyResult.data;
     const userId = request.userId!;
 
     // Verify user owns the campaign
@@ -57,6 +57,7 @@ export async function generationRoutes(app: FastifyInstance): Promise<void> {
       ...(theme !== undefined && { theme }),
       ...(partyLevel !== undefined && { partyLevel }),
       ...(count !== undefined && { maxContextChunks: Math.max(count, 6) }),
+      ...(includeNpcsLocations !== undefined && { includeNpcsLocations }),
     };
 
     const llmService = createLLMService();

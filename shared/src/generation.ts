@@ -25,6 +25,8 @@ export interface GenerateHooksRequest {
   theme?: string;
   count?: number;
   partyLevel?: number;
+  /** Comma-separated NPCs/locations to include in generated hooks */
+  includeNpcsLocations?: string;
 }
 
 /** A single generated adventure hook */

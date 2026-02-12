@@ -113,7 +113,7 @@ async function generateQueryEmbedding(
 /**
  * Builds a search query to retrieve setting-relevant context for hook generation.
  */
-function buildSettingQuery(tone: string, theme?: string): string {
+function buildSettingQuery(tone: string, theme?: string, includeNpcsLocations?: string): string {
   const parts = [
     "important NPCs characters factions locations places organizations",
     "setting world lore history conflicts",
@@ -121,6 +121,10 @@ function buildSettingQuery(tone: string, theme?: string): string {
 
   if (theme) {
     parts.push(theme);
+  }
+
+  if (includeNpcsLocations) {
+    parts.push(includeNpcsLocations);
   }
 
   parts.push(`${tone} themes and events`);
@@ -229,6 +233,7 @@ export async function generateAdventureHooks(
     theme,
     partyLevel,
     maxContextChunks = DEFAULT_MAX_CONTEXT_CHUNKS,
+    includeNpcsLocations,
   } = request;
 
   // ---- Validate input ----
@@ -240,7 +245,7 @@ export async function generateAdventureHooks(
   }
 
   // ---- Step 1: Build setting-focused search query ----
-  const settingQuery = buildSettingQuery(tone, theme);
+  const settingQuery = buildSettingQuery(tone, theme, includeNpcsLocations);
 
   // ---- Step 2: Generate query embedding ----
   const embeddingResult = await generateQueryEmbedding(settingQuery);
@@ -275,9 +280,10 @@ export async function generateAdventureHooks(
   });
 
   // ---- Step 5: Build prompt ----
-  const promptOptions: { theme?: string; partyLevel?: number } = {};
+  const promptOptions: { theme?: string; partyLevel?: number; includeNpcsLocations?: string } = {};
   if (theme !== undefined) promptOptions.theme = theme;
   if (partyLevel !== undefined) promptOptions.partyLevel = partyLevel;
+  if (includeNpcsLocations !== undefined) promptOptions.includeNpcsLocations = includeNpcsLocations;
 
   const { system, user } = buildAdventureHookPrompt(context, tone, promptOptions);
 
