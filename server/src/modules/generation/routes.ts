@@ -96,6 +96,10 @@ export async function generationRoutes(app: FastifyInstance): Promise<void> {
           hook_count: result.value.hooks.length,
         });
       } else {
+        request.log.error(
+          { error: result.error, campaignId },
+          "Adventure hook generation failed (SSE)"
+        );
         const statusCode = errorCodeToStatus(result.error.code);
         reply.raw.write(`data: ${JSON.stringify({
           type: "error",
@@ -113,6 +117,10 @@ export async function generationRoutes(app: FastifyInstance): Promise<void> {
     const result = await generateAdventureHooks(hookRequest, llmService);
 
     if (!result.ok) {
+      request.log.error(
+        { error: result.error, campaignId },
+        "Adventure hook generation failed"
+      );
       const statusCode = errorCodeToStatus(result.error.code);
       return reply.status(statusCode).send({
         statusCode,

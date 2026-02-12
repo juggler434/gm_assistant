@@ -151,6 +151,7 @@ export async function documentRoutes(app: FastifyInstance): Promise<void> {
 
     if (!document) {
       // Clean up uploaded file if document creation fails
+      request.log.error({ campaignId, documentId }, "Failed to create document record");
       await storage.delete(campaignId, documentId);
       return reply.status(500).send({
         statusCode: 500,
@@ -307,6 +308,10 @@ export async function documentRoutes(app: FastifyInstance): Promise<void> {
     // Generate signed URL (valid for 1 hour)
     const urlResult = await storage.getSignedUrl(campaignId, id, 3600);
     if (!urlResult.ok) {
+      request.log.error(
+        { error: urlResult.error, campaignId, documentId: id },
+        "Failed to generate download URL"
+      );
       return reply.status(500).send({
         statusCode: 500,
         error: "Internal Server Error",

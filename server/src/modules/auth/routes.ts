@@ -35,6 +35,7 @@ export async function authRoutes(app: FastifyInstance): Promise<void> {
     // 4. Insert user
     const newUser = await createUser({ email, passwordHash, name });
     if (!newUser) {
+      request.log.error({ email }, "Failed to create user");
       return reply.status(500).send({
         statusCode: 500,
         error: "Internal Server Error",
@@ -45,6 +46,7 @@ export async function authRoutes(app: FastifyInstance): Promise<void> {
     // 5. Create session
     const sessionResult = await createSession(newUser.id);
     if (!sessionResult.ok) {
+      request.log.error({ error: sessionResult.error }, "Failed to create session during registration");
       return reply.status(500).send({
         statusCode: 500,
         error: "Internal Server Error",
@@ -102,6 +104,7 @@ export async function authRoutes(app: FastifyInstance): Promise<void> {
     // 4. Create new session
     const sessionResult = await createSession(user.id);
     if (!sessionResult.ok) {
+      request.log.error({ error: sessionResult.error }, "Failed to create session during login");
       return reply.status(500).send({
         statusCode: 500,
         error: "Internal Server Error",

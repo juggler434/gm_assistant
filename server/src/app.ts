@@ -21,7 +21,22 @@ export interface AppOptions {
 
 export async function buildApp(options: AppOptions = {}): Promise<FastifyInstance> {
   const app = Fastify({
-    logger: options.logger ?? config.env !== "test",
+    logger:
+      options.logger !== undefined
+        ? options.logger
+        : config.env === "test"
+          ? false
+          : config.env === "development"
+            ? {
+                transport: {
+                  target: "pino-pretty",
+                  options: {
+                    translateTime: "HH:MM:ss",
+                    ignore: "pid,hostname",
+                  },
+                },
+              }
+            : true,
   });
 
   // Register plugins
@@ -31,6 +46,7 @@ export async function buildApp(options: AppOptions = {}): Promise<FastifyInstanc
   await registerWebSocket(app);
   await registerAuth(app);
   await registerMetrics(app);
+  app.log.info("Plugins registered");
 
   // Global error handler
   app.setErrorHandler((error: FastifyError, request, reply) => {
@@ -57,6 +73,8 @@ export async function buildApp(options: AppOptions = {}): Promise<FastifyInstanc
   app.get("/health", async () => {
     return { status: "ok", timestamp: new Date().toISOString() };
   });
+
+  app.log.info("Routes registered");
 
   return app;
 }
