@@ -1,10 +1,12 @@
+import { Clock } from "lucide-react";
+import { EmptyState } from "@/components/ui/empty-state";
+
 export function SessionsPage() {
   return (
-    <div>
-      <h2 className="text-xl font-semibold text-foreground">Session History</h2>
-      <p className="mt-2 text-muted-foreground">
-        Session history coming soon.
-      </p>
-    </div>
+    <EmptyState
+      icon={<Clock />}
+      heading="Session History"
+      description="Track your game sessions and keep notes from each adventure. Coming soon."
+    />
   );
 }

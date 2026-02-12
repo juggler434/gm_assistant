@@ -1,10 +1,12 @@
+import { Settings } from "lucide-react";
+import { EmptyState } from "@/components/ui/empty-state";
+
 export function SettingsPage() {
   return (
-    <div>
-      <h2 className="text-xl font-semibold text-foreground">Campaign Settings</h2>
-      <p className="mt-2 text-muted-foreground">
-        Campaign settings coming soon.
-      </p>
-    </div>
+    <EmptyState
+      icon={<Settings />}
+      heading="Campaign Settings"
+      description="Configure your campaign details, sharing, and preferences. Coming soon."
+    />
   );
 }
