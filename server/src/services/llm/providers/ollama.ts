@@ -265,7 +265,15 @@ export class OllamaProvider implements LLMProvider {
         for (const line of lines) {
           if (!line.trim()) continue;
 
-          const data = JSON.parse(line) as OllamaGenerateResponse;
+          let data: OllamaGenerateResponse;
+          try {
+            data = JSON.parse(line) as OllamaGenerateResponse;
+          } catch {
+            throw LLMError.invalidResponse(
+              this.name,
+              `Failed to parse stream chunk: ${line.slice(0, 200)}`
+            );
+          }
           yield {
             text: data.response,
             done: data.done,
@@ -276,7 +284,15 @@ export class OllamaProvider implements LLMProvider {
 
       // Process any remaining data in buffer
       if (buffer.trim()) {
-        const data = JSON.parse(buffer) as OllamaGenerateResponse;
+        let data: OllamaGenerateResponse;
+        try {
+          data = JSON.parse(buffer) as OllamaGenerateResponse;
+        } catch {
+          throw LLMError.invalidResponse(
+            this.name,
+            `Failed to parse final stream chunk: ${buffer.slice(0, 200)}`
+          );
+        }
         yield {
           text: data.response,
           done: data.done,
@@ -307,7 +323,15 @@ export class OllamaProvider implements LLMProvider {
         for (const line of lines) {
           if (!line.trim()) continue;
 
-          const data = JSON.parse(line) as OllamaChatResponse;
+          let data: OllamaChatResponse;
+          try {
+            data = JSON.parse(line) as OllamaChatResponse;
+          } catch {
+            throw LLMError.invalidResponse(
+              this.name,
+              `Failed to parse chat stream chunk: ${line.slice(0, 200)}`
+            );
+          }
           yield {
             text: data.message?.content ?? "",
             done: data.done,
@@ -318,7 +342,15 @@ export class OllamaProvider implements LLMProvider {
 
       // Process any remaining data in buffer
       if (buffer.trim()) {
-        const data = JSON.parse(buffer) as OllamaChatResponse;
+        let data: OllamaChatResponse;
+        try {
+          data = JSON.parse(buffer) as OllamaChatResponse;
+        } catch {
+          throw LLMError.invalidResponse(
+            this.name,
+            `Failed to parse final chat stream chunk: ${buffer.slice(0, 200)}`
+          );
+        }
         yield {
           text: data.message?.content ?? "",
           done: data.done,

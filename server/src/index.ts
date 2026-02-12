@@ -20,6 +20,9 @@ async function main(): Promise<void> {
     await app.listen({ port: config.port, host: "0.0.0.0" });
     app.log.info(`${config.appName} v${config.version} started`);
     app.log.info(`Environment: ${config.env}`);
+    app.log.info(`Database: ${config.database.url.replace(/\/\/.*@/, "//***@")}`);
+    app.log.info(`Redis: ${config.redis.url}`);
+    app.log.info(`LLM: ${config.llm.model} at ${config.llm.baseUrl}`);
   } catch (err) {
     app.log.error(err);
     process.exit(1);
