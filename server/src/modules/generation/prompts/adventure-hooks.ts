@@ -12,10 +12,15 @@ import type { HookTone } from "../types.js";
 // System Prompt
 // ============================================================================
 
-const SYSTEM_PROMPT = `You are a creative tabletop RPG game master assistant specializing in crafting adventure hooks. You generate hooks that are grounded in the campaign's established setting, incorporating its NPCs, locations, and factions.
+function buildSystemPrompt(count?: number): string {
+  const countInstruction = count !== undefined
+    ? `Generate exactly ${count} adventure hooks.`
+    : "Generate between 3 and 5 adventure hooks.";
+
+  return `You are a creative tabletop RPG game master assistant specializing in crafting adventure hooks. You generate hooks that are grounded in the campaign's established setting, incorporating its NPCs, locations, and factions.
 
 Rules:
-- Generate between 3 and 5 adventure hooks.
+- ${countInstruction}
 - Each hook MUST reference specific NPCs, locations, or factions from the provided setting context when available.
 - Do not invent major setting elements (cities, rulers, pantheons) not present in the context. You may invent minor details (a tavern patron's name, a rumor) to flesh out hooks.
 - Match the requested tone precisely.
@@ -36,6 +41,7 @@ You MUST respond with valid JSON matching this exact schema:
 }
 
 Respond ONLY with the JSON object. No markdown fencing, no commentary.`;
+}
 
 // ============================================================================
 // User Message Builder
@@ -47,7 +53,7 @@ Respond ONLY with the JSON object. No markdown fencing, no commentary.`;
 export function buildAdventureHookPrompt(
   context: BuiltContext,
   tone: HookTone,
-  options: { theme?: string; partyLevel?: number; includeNpcsLocations?: string } = {},
+  options: { theme?: string; partyLevel?: number; count?: number; includeNpcsLocations?: string } = {},
 ): { system: string; user: string } {
   const parts: string[] = [];
 
@@ -92,7 +98,7 @@ export function buildAdventureHookPrompt(
   parts.push("Generate adventure hooks based on the setting context above.");
 
   return {
-    system: SYSTEM_PROMPT,
+    system: buildSystemPrompt(options.count),
     user: parts.join("\n"),
   };
 }

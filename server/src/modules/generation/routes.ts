@@ -56,6 +56,7 @@ export async function generationRoutes(app: FastifyInstance): Promise<void> {
       tone,
       ...(theme !== undefined && { theme }),
       ...(partyLevel !== undefined && { partyLevel }),
+      ...(count !== undefined && { count }),
       ...(count !== undefined && { maxContextChunks: Math.max(count, 6) }),
       ...(includeNpcsLocations !== undefined && { includeNpcsLocations }),
     };

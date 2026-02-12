@@ -143,6 +143,22 @@ describe("Adventure Hooks Prompt", () => {
       expect(user).toContain("Party level: 10");
     });
 
+    it("should include exact count in system prompt when provided", () => {
+      const context = makeContext();
+      const { system } = buildAdventureHookPrompt(context, "dark", { count: 7 });
+
+      expect(system).toContain("Generate exactly 7 adventure hooks.");
+      expect(system).not.toContain("between 3 and 5");
+    });
+
+    it("should use default 3-5 range in system prompt when count is not provided", () => {
+      const context = makeContext();
+      const { system } = buildAdventureHookPrompt(context, "dark");
+
+      expect(system).toContain("Generate between 3 and 5 adventure hooks.");
+      expect(system).not.toContain("exactly");
+    });
+
     it("should include generation instruction at the end", () => {
       const context = makeContext();
       const { user } = buildAdventureHookPrompt(context, "dark");

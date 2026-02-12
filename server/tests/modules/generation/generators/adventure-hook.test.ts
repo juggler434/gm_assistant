@@ -436,6 +436,30 @@ describe("Adventure Hook Generator", () => {
       expect(callArgs.messages[1].content).toContain("Theme: vampire conspiracy");
     });
 
+    it("should include requested count in system prompt when provided", async () => {
+      const llm = makeMockLLMService();
+      const request: AdventureHookRequest = {
+        campaignId,
+        tone: "dark",
+        count: 8,
+      };
+
+      mockEmbeddingResponse();
+      mockSearchChunksHybrid.mockResolvedValue({ ok: true, value: [] });
+      mockChat.mockResolvedValue({
+        ok: true,
+        value: {
+          message: { role: "assistant", content: makeValidHooksJSON(3) },
+          model: "llama3",
+        },
+      });
+
+      await generateAdventureHooks(request, llm);
+
+      const callArgs = mockChat.mock.calls[0]![0]!;
+      expect(callArgs.messages[0].content).toContain("Generate exactly 8 adventure hooks.");
+    });
+
     it("should include party level in prompt when provided", async () => {
       const llm = makeMockLLMService();
       const request: AdventureHookRequest = {
