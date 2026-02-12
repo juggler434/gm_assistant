@@ -1,10 +1,12 @@
+import { MessageSquare } from "lucide-react";
+import { EmptyState } from "@/components/ui/empty-state";
+
 export function QueryPage() {
   return (
-    <div>
-      <h2 className="text-xl font-semibold text-foreground">AI Query</h2>
-      <p className="mt-2 text-muted-foreground">
-        AI query interface coming soon.
-      </p>
-    </div>
+    <EmptyState
+      icon={<MessageSquare />}
+      heading="AI Query"
+      description="Ask questions about your campaign documents using AI-powered search. Coming soon."
+    />
   );
 }
