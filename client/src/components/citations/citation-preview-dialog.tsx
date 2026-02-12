@@ -62,9 +62,7 @@ export function CitationPreviewDialog({
       <DialogContent className="max-w-md">
         <DialogHeader>
           <div className="flex items-center gap-3">
-            <span className="text-muted-foreground">
-              {getDocumentIcon(source.documentType)}
-            </span>
+            <span className="text-muted-foreground">{getDocumentIcon(source.documentType)}</span>
             <div className="min-w-0 flex-1">
               <DialogTitle className="truncate">{source.documentName}</DialogTitle>
               <DialogDescription className="flex items-center gap-2 mt-1">
@@ -94,7 +92,7 @@ export function CitationPreviewDialog({
                     ? "bg-success"
                     : source.relevanceScore >= 0.5
                       ? "bg-warning"
-                      : "bg-muted-foreground",
+                      : "bg-muted-foreground"
                 )}
                 style={{ width: `${source.relevanceScore * 100}%` }}
               />

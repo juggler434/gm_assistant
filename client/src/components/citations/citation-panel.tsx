@@ -33,7 +33,7 @@ export function CitationPanel({ sources, excerpts, confidence, className }: Cita
         navigate(`/campaigns/${campaignId}/documents#doc-${documentId}`);
       }
     },
-    [campaignId, navigate],
+    [campaignId, navigate]
   );
 
   return (
