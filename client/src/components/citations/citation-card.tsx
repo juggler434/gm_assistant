@@ -78,7 +78,7 @@ export function CitationCard({
       className={cn(
         "group rounded-lg border border-border bg-card p-3 transition-colors",
         (onClick || excerpt) && "cursor-pointer hover:border-primary/40 hover:bg-accent/30",
-        className,
+        className
       )}
       onClick={handleCardClick}
     >
@@ -106,16 +106,14 @@ export function CitationCard({
             </Badge>
           </div>
 
-          {locationText && (
-            <p className="mt-0.5 text-xs text-muted-foreground">{locationText}</p>
-          )}
+          {locationText && <p className="mt-0.5 text-xs text-muted-foreground">{locationText}</p>}
 
           {/* Excerpt preview (collapsed = 2 lines, expanded = full) */}
           {excerpt && (
             <p
               className={cn(
                 "mt-1.5 text-xs leading-relaxed text-muted-foreground",
-                !expanded && "line-clamp-2",
+                !expanded && "line-clamp-2"
               )}
             >
               {excerpt}

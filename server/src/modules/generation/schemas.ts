@@ -19,6 +19,7 @@ export const generateHooksBodySchema = z.object({
   theme: z.string().max(200).optional(),
   count: z.number().int().min(1).max(10).optional(),
   partyLevel: z.number().int().min(1).max(20).optional(),
+  includeNpcsLocations: z.string().max(500).optional(),
 });
 
 export type GenerateHooksBody = z.infer<typeof generateHooksBodySchema>;
