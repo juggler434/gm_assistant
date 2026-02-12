@@ -232,6 +232,7 @@ export async function generateAdventureHooks(
     tone,
     theme,
     partyLevel,
+    count,
     maxContextChunks = DEFAULT_MAX_CONTEXT_CHUNKS,
     includeNpcsLocations,
   } = request;
@@ -280,9 +281,10 @@ export async function generateAdventureHooks(
   });
 
   // ---- Step 5: Build prompt ----
-  const promptOptions: { theme?: string; partyLevel?: number; includeNpcsLocations?: string } = {};
+  const promptOptions: { theme?: string; partyLevel?: number; count?: number; includeNpcsLocations?: string } = {};
   if (theme !== undefined) promptOptions.theme = theme;
   if (partyLevel !== undefined) promptOptions.partyLevel = partyLevel;
+  if (count !== undefined) promptOptions.count = count;
   if (includeNpcsLocations !== undefined) promptOptions.includeNpcsLocations = includeNpcsLocations;
 
   const { system, user } = buildAdventureHookPrompt(context, tone, promptOptions);

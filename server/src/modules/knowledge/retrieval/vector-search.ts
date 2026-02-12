@@ -1,5 +1,4 @@
-import { sql } from "drizzle-orm";
-import { db } from "@/db/index.js";
+import { queryClient } from "@/db/index.js";
 import { type Result, ok, err } from "@/types/index.js";
 import {
   type DocumentType,
@@ -156,7 +155,7 @@ export async function searchChunksByVector(
 
     // Execute the vector similarity search query
     // Using raw SQL because Drizzle doesn't natively support pgvector operators
-    const query = sql.raw(`
+    const queryText = `
       SELECT
         c.id as chunk_id,
         c.content,
@@ -175,9 +174,12 @@ export async function searchChunksByVector(
       WHERE ${whereClause}
       ORDER BY c.embedding <=> '${embeddingStr}'::vector ASC
       LIMIT ${limit}
-    `);
+    `;
 
-    const rows = (await db.execute(query)) as unknown as Array<{
+    const rows = (await queryClient.unsafe(
+      queryText,
+      params as (string | number)[]
+    )) as unknown as Array<{
       chunk_id: string;
       content: string;
       chunk_index: number;

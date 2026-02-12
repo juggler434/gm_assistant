@@ -6,7 +6,7 @@ import * as schema from "./schema/index.js";
 const connectionString = config.database.url;
 
 // Connection for queries (pooled)
-const queryClient = postgres(connectionString, {
+export const queryClient = postgres(connectionString, {
   max: 10,
   idle_timeout: 20,
   connect_timeout: 10,
