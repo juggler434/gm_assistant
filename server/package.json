@@ -18,10 +18,10 @@
     "test": "vitest run",
     "test:watch": "vitest",
     "test:coverage": "vitest run --coverage",
-    "db:generate": "tsx node_modules/drizzle-kit/bin.cjs generate",
-    "db:migrate": "tsx node_modules/drizzle-kit/bin.cjs migrate",
-    "db:push": "tsx node_modules/drizzle-kit/bin.cjs push",
-    "db:studio": "tsx node_modules/drizzle-kit/bin.cjs studio",
+    "db:generate": "tsx ../node_modules/drizzle-kit/bin.cjs generate",
+    "db:migrate": "tsx ../node_modules/drizzle-kit/bin.cjs migrate",
+    "db:push": "tsx ../node_modules/drizzle-kit/bin.cjs push",
+    "db:studio": "tsx ../node_modules/drizzle-kit/bin.cjs studio",
     "db:setup": "tsx src/db/setup.ts"
   },
   "keywords": [
