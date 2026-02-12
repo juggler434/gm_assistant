@@ -80,6 +80,9 @@ async function authPlugin(app: FastifyInstance): Promise<void> {
       request.session = result.value;
       request.userId = result.value.userId;
     } else {
+      if (result.error.code === "DATABASE_ERROR") {
+        request.log.error({ error: result.error }, "Session validation failed due to database error");
+      }
       request.session = null;
       request.userId = null;
     }

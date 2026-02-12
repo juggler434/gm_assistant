@@ -39,6 +39,7 @@ export async function campaignRoutes(app: FastifyInstance): Promise<void> {
     });
 
     if (!campaign) {
+      request.log.error({ userId }, "Failed to create campaign");
       return reply.status(500).send({
         statusCode: 500,
         error: "Internal Server Error",
