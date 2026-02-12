@@ -47,6 +47,7 @@ export function useGenerateHooks() {
 /**
  * Streaming hook for adventure hook generation via SSE.
  * Yields hooks incrementally as they are generated.
+ * Supports regenerating individual hooks at a specific index.
  */
 export function useGenerateHooksStream() {
   const [hooks, setHooks] = useState<AdventureHook[]>([]);
@@ -97,9 +98,51 @@ export function useGenerateHooksStream() {
     }
   }, []);
 
+  const regenerateOne = useCallback(async (index: number, params: GenerateHooksParams) => {
+    setIsStreaming(true);
+    setError(null);
+    setStatus(null);
+    abortRef.current = false;
+
+    try {
+      const stream = api.stream<GenerationSSEEvent>(
+        `/api/campaigns/${params.campaignId}/generate/hooks`,
+        { ...params, count: 1 }
+      );
+
+      for await (const event of stream) {
+        if (abortRef.current) break;
+
+        switch (event.type) {
+          case "status":
+            setStatus(event.message);
+            break;
+          case "hook":
+            setHooks((prev) => {
+              const updated = [...prev];
+              updated[index] = event.hook;
+              return updated;
+            });
+            break;
+          case "complete":
+            break;
+          case "error":
+            setError(new Error(event.message));
+            break;
+        }
+      }
+    } catch (e) {
+      const err = e instanceof Error ? e : new Error("Regeneration failed");
+      setError(err);
+    } finally {
+      setIsStreaming(false);
+      setStatus(null);
+    }
+  }, []);
+
   const abort = useCallback(() => {
     abortRef.current = true;
   }, []);
 
-  return { generate, abort, hooks, sources, status, error, isStreaming };
+  return { generate, regenerateOne, abort, hooks, sources, status, error, isStreaming };
 }

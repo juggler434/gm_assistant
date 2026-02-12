@@ -47,7 +47,7 @@ Respond ONLY with the JSON object. No markdown fencing, no commentary.`;
 export function buildAdventureHookPrompt(
   context: BuiltContext,
   tone: HookTone,
-  options: { theme?: string; partyLevel?: number } = {},
+  options: { theme?: string; partyLevel?: number; includeNpcsLocations?: string } = {},
 ): { system: string; user: string } {
   const parts: string[] = [];
 
@@ -82,6 +82,10 @@ export function buildAdventureHookPrompt(
 
   if (options.partyLevel !== undefined) {
     parts.push(`Party level: ${options.partyLevel}`);
+  }
+
+  if (options.includeNpcsLocations) {
+    parts.push(`Include these specific NPCs/locations: ${options.includeNpcsLocations}`);
   }
 
   parts.push("");

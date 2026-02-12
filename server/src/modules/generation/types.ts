@@ -29,6 +29,8 @@ export interface AdventureHookRequest {
   partyLevel?: number;
   /** Maximum number of chunks to use for setting context (default: 6) */
   maxContextChunks?: number;
+  /** Comma-separated NPCs/locations to specifically include in hooks */
+  includeNpcsLocations?: string;
 }
 
 /** Result of adventure hook generation */

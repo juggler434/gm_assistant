@@ -3,6 +3,7 @@ import { Sparkles } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import { Textarea } from "@/components/ui/textarea";
 import {
   Select,
   SelectContent,
@@ -23,11 +24,14 @@ const TONE_OPTIONS: { value: HookTone; label: string }[] = [
   { value: "intrigue", label: "Intrigue" },
 ];
 
+const COUNT_OPTIONS = [3, 4, 5];
+
 export interface AdventureHookFormValues {
   tone: HookTone;
   theme?: string;
   count: number;
   partyLevel?: number;
+  includeNpcsLocations?: string;
 }
 
 interface AdventureHookFormProps {
@@ -40,6 +44,7 @@ export function AdventureHookForm({ onSubmit, isLoading }: AdventureHookFormProp
   const [theme, setTheme] = useState("");
   const [count, setCount] = useState("3");
   const [partyLevel, setPartyLevel] = useState("");
+  const [includeNpcsLocations, setIncludeNpcsLocations] = useState("");
 
   function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
@@ -48,6 +53,7 @@ export function AdventureHookForm({ onSubmit, isLoading }: AdventureHookFormProp
       theme: theme.trim() || undefined,
       count: parseInt(count, 10),
       partyLevel: partyLevel ? parseInt(partyLevel, 10) : undefined,
+      includeNpcsLocations: includeNpcsLocations.trim() || undefined,
     });
   }
 
@@ -89,7 +95,7 @@ export function AdventureHookForm({ onSubmit, isLoading }: AdventureHookFormProp
               <SelectValue />
             </SelectTrigger>
             <SelectContent>
-              {Array.from({ length: 10 }, (_, i) => i + 1).map((n) => (
+              {COUNT_OPTIONS.map((n) => (
                 <SelectItem key={n} value={String(n)}>
                   {n}
                 </SelectItem>
@@ -111,6 +117,19 @@ export function AdventureHookForm({ onSubmit, isLoading }: AdventureHookFormProp
             disabled={isLoading}
           />
         </div>
+      </div>
+
+      <div className="space-y-2">
+        <Label htmlFor="includeNpcsLocations">Include specific NPCs/locations (optional)</Label>
+        <Textarea
+          id="includeNpcsLocations"
+          placeholder="e.g. Lord Varen, the Sunken Temple, Blackthorn Guild"
+          value={includeNpcsLocations}
+          onChange={(e) => setIncludeNpcsLocations(e.target.value)}
+          maxLength={500}
+          disabled={isLoading}
+          className="min-h-[60px]"
+        />
       </div>
 
       <Button type="submit" disabled={isLoading} className="gap-2">
