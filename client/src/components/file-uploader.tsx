@@ -5,8 +5,6 @@ import { cn } from "@/lib/utils";
 import { SUPPORTED_MIME_TYPES } from "@/types";
 import type { SupportedMimeType } from "@/types";
 
-const MAX_FILE_SIZE = 10 * 1024 * 1024; // 10 MB
-
 const acceptedMimeTypes: Accept = Object.keys(SUPPORTED_MIME_TYPES).reduce((acc, mime) => {
   const ext = SUPPORTED_MIME_TYPES[mime as SupportedMimeType];
   acc[mime] = [`.${ext}`];
@@ -28,10 +26,7 @@ function getFileIcon(file: File) {
 
 function getErrorMessage(rejection: FileRejection): string {
   const errors = rejection.errors;
-  if (errors.some((e) => e.code === "file-too-large")) {
-    return `File exceeds ${formatFileSize(MAX_FILE_SIZE)} limit`;
-  }
-  if (errors.some((e) => e.code === "file-invalid-type")) {
+if (errors.some((e) => e.code === "file-invalid-type")) {
     return "Unsupported file type";
   }
   return errors[0]?.message ?? "Invalid file";
@@ -70,7 +65,6 @@ export function FileUploader({
   const { getRootProps, getInputProps, isDragActive, fileRejections } = useDropzone({
     onDrop,
     accept: acceptedMimeTypes,
-    maxSize: MAX_FILE_SIZE,
     multiple: true,
     disabled,
     onDragEnter: undefined,
@@ -104,7 +98,7 @@ export function FileUploader({
               Drag & drop files here, or click to browse
             </p>
             <p className="text-xs text-muted-foreground">
-              PDF, TXT, Markdown, DOCX, PNG, JPG, WebP &middot; Max {formatFileSize(MAX_FILE_SIZE)}
+              PDF, TXT, Markdown, DOCX, PNG, JPG, WebP
             </p>
           </>
         )}

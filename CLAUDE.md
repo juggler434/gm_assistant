@@ -312,7 +312,7 @@ The query module implements a Retrieval-Augmented Generation pipeline (not yet w
 
 ## Key Services
 
-- **LLM Service** — Factory pattern with provider interface. Ollama provider implemented (default model: phi3:mini). Used for RAG response generation.
+- **LLM Service** — Factory pattern with provider interface. Ollama provider implemented (default model: gemma3:1b). Used for RAG response generation.
 - **Storage Service** — Factory pattern with provider interface. S3 provider implemented (connects to MinIO locally). Used for document file storage.
 - **Metrics Service** — PostHog integration. Tracks events (user_registered, document_uploaded, etc.). All operations are no-ops when `POSTHOG_API_KEY` is not set, so the app runs without it.
 
@@ -333,7 +333,7 @@ Environment variables are managed through `config/index.ts`. See `.env.example` 
 - PostgreSQL database connection
 - Redis for job queues
 - S3-compatible storage (MinIO)
-- LLM settings (default: Ollama with phi3:mini)
+- LLM settings (default: Ollama with gemma3:1b)
 - Session configuration (cookie name, secret, max age)
 - PostHog analytics (optional)
 

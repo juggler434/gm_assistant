@@ -86,13 +86,15 @@ describe("Adventure Hooks Prompt", () => {
       expect(user).not.toContain("=== SETTING CONTEXT ===");
     });
 
-    it("should include the requested tone", () => {
+    it("should include the requested tone in system and user prompts", () => {
       const context = makeContext();
       const tones: HookTone[] = ["dark", "comedic", "political", "mysterious", "heroic", "horror", "intrigue"];
 
       for (const tone of tones) {
-        const { user } = buildAdventureHookPrompt(context, tone);
-        expect(user).toContain(`Tone: ${tone}`);
+        const { system, user } = buildAdventureHookPrompt(context, tone);
+        expect(system).toContain(tone.toUpperCase());
+        expect(system).toContain(`this ${tone} tone`);
+        expect(user).toContain(`write in a ${tone} tone`);
       }
     });
 
@@ -103,18 +105,20 @@ describe("Adventure Hooks Prompt", () => {
       expect(user).toContain("=== GENERATION PARAMETERS ===");
     });
 
-    it("should include theme when provided", () => {
+    it("should include theme in system and user prompts when provided", () => {
       const context = makeContext();
-      const { user } = buildAdventureHookPrompt(context, "dark", { theme: "undead uprising" });
+      const { system, user } = buildAdventureHookPrompt(context, "dark", { theme: "undead uprising" });
 
-      expect(user).toContain("Theme: undead uprising");
+      expect(system).toContain("undead uprising");
+      expect(user).toContain("undead uprising");
     });
 
     it("should not include theme when not provided", () => {
       const context = makeContext();
-      const { user } = buildAdventureHookPrompt(context, "dark");
+      const { system, user } = buildAdventureHookPrompt(context, "dark");
 
-      expect(user).not.toContain("Theme:");
+      expect(system).not.toContain("theme");
+      expect(user).not.toContain("theme");
     });
 
     it("should include party level when provided", () => {
@@ -133,13 +137,15 @@ describe("Adventure Hooks Prompt", () => {
 
     it("should include all optional parameters together", () => {
       const context = makeContext();
-      const { user } = buildAdventureHookPrompt(context, "political", {
+      const { system, user } = buildAdventureHookPrompt(context, "political", {
         theme: "trade war",
         partyLevel: 10,
       });
 
-      expect(user).toContain("Tone: political");
-      expect(user).toContain("Theme: trade war");
+      expect(system).toContain("POLITICAL");
+      expect(system).toContain("trade war");
+      expect(user).toContain("political tone");
+      expect(user).toContain("trade war");
       expect(user).toContain("Party level: 10");
     });
 
@@ -183,7 +189,7 @@ describe("Adventure Hooks Prompt", () => {
       const context = makeContext();
       const { system } = buildAdventureHookPrompt(context, "dark");
 
-      expect(system).toContain("NPCs, locations, and factions");
+      expect(system).toContain("NPCs, locations, or factions");
       expect(system).toContain("setting context");
     });
 
