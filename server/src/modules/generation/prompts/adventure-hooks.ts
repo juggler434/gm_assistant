@@ -12,20 +12,37 @@ import type { HookTone } from "../types.js";
 // System Prompt
 // ============================================================================
 
-function buildSystemPrompt(count?: number): string {
-  const countInstruction = count !== undefined
-    ? `Generate exactly ${count} adventure hooks.`
+function buildSystemPrompt(
+  tone: HookTone,
+  options: { theme?: string | undefined; count?: number | undefined },
+): string {
+  const countInstruction = options.count !== undefined
+    ? `Generate exactly ${options.count} adventure hooks.`
     : "Generate between 3 and 5 adventure hooks.";
 
-  return `You are a creative tabletop RPG game master assistant specializing in crafting adventure hooks. You generate hooks that are grounded in the campaign's established setting, incorporating its NPCs, locations, and factions.
+  const toneDescriptions: Record<HookTone, string> = {
+    dark: "grim, bleak, and ominous — emphasize dread, moral decay, and hopelessness",
+    comedic: "humorous, absurd, and lighthearted — use wordplay, slapstick situations, and ironic twists",
+    political: "scheming, diplomatic, and full of intrigue — focus on power struggles, alliances, and betrayal",
+    mysterious: "enigmatic, suspenseful, and unsettling — leave questions unanswered and clues half-hidden",
+    heroic: "epic, inspiring, and noble — emphasize bravery, sacrifice, and triumph against the odds",
+    horror: "terrifying, disturbing, and visceral — invoke fear, body horror, and the unknown",
+    intrigue: "secretive, layered, and deceptive — weave plots within plots, hidden motives, and double-crosses",
+  };
+
+  const themeInstruction = options.theme
+    ? `\nThe theme "${options.theme}" is CENTRAL to this request. Every hook must directly incorporate this theme as a core element of its premise, not just a passing reference.`
+    : "";
+
+  return `You are a creative tabletop RPG game master assistant. Your writing tone for this request is ${tone.toUpperCase()}: ${toneDescriptions[tone]}.
+
+EVERY hook you write must unmistakably reflect this ${tone} tone in its language, imagery, and narrative framing.${themeInstruction}
 
 Rules:
 - ${countInstruction}
 - Each hook MUST reference specific NPCs, locations, or factions from the provided setting context when available.
 - Do not invent major setting elements (cities, rulers, pantheons) not present in the context. You may invent minor details (a tavern patron's name, a rumor) to flesh out hooks.
-- Match the requested tone precisely.
 - If a party level is provided, ensure hooks are appropriate for that level of experience.
-- If a theme is provided, weave it into every hook.
 
 You MUST respond with valid JSON matching this exact schema:
 {
@@ -80,11 +97,6 @@ export function buildAdventureHookPrompt(
 
   // Generation parameters
   parts.push("=== GENERATION PARAMETERS ===");
-  parts.push(`Tone: ${tone}`);
-
-  if (options.theme) {
-    parts.push(`Theme: ${options.theme}`);
-  }
 
   if (options.partyLevel !== undefined) {
     parts.push(`Party level: ${options.partyLevel}`);
@@ -94,11 +106,16 @@ export function buildAdventureHookPrompt(
     parts.push(`Include these specific NPCs/locations: ${options.includeNpcsLocations}`);
   }
 
+  // Reinforce tone and theme at the end where the model pays most attention
+  const reminders = [`Remember: write in a ${tone} tone`];
+  if (options.theme) {
+    reminders.push(`centered on the theme "${options.theme}"`);
+  }
   parts.push("");
-  parts.push("Generate adventure hooks based on the setting context above.");
+  parts.push(`Generate adventure hooks based on the setting context above. ${reminders.join(", ")}.`);
 
   return {
-    system: buildSystemPrompt(options.count),
+    system: buildSystemPrompt(tone, { theme: options.theme, count: options.count }),
     user: parts.join("\n"),
   };
 }

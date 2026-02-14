@@ -21,8 +21,9 @@ import {
   deleteDocument,
 } from "./repository.js";
 
-// Initialize storage service
+// Initialize storage service and ensure bucket exists
 const storage = createStorageService();
+storage.ensureBucket();
 
 // Job queue for document processing (will be processed by worker)
 interface DocumentProcessingJobData {
@@ -34,7 +35,7 @@ interface DocumentProcessingJobData {
 }
 
 const documentProcessingQueue = createQueue<DocumentProcessingJobData>(
-  "document-processing"
+  "document-indexing"
 );
 
 export async function documentRoutes(app: FastifyInstance): Promise<void> {

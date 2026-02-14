@@ -409,7 +409,8 @@ describe("Adventure Hook Generator", () => {
       expect(callArgs.messages).toHaveLength(2);
       expect(callArgs.messages[0].role).toBe("system");
       expect(callArgs.messages[1].role).toBe("user");
-      expect(callArgs.messages[1].content).toContain("Tone: political");
+      expect(callArgs.messages[0].content).toContain("POLITICAL");
+      expect(callArgs.messages[1].content).toContain("political tone");
     });
 
     it("should include theme in prompt when provided", async () => {
@@ -433,7 +434,8 @@ describe("Adventure Hook Generator", () => {
       await generateAdventureHooks(request, llm);
 
       const callArgs = mockChat.mock.calls[0]![0]!;
-      expect(callArgs.messages[1].content).toContain("Theme: vampire conspiracy");
+      expect(callArgs.messages[0].content).toContain("vampire conspiracy");
+      expect(callArgs.messages[1].content).toContain("vampire conspiracy");
     });
 
     it("should include requested count in system prompt when provided", async () => {

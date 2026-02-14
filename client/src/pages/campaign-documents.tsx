@@ -7,6 +7,15 @@ import { TableRowSkeleton, CardSkeleton } from "@/components/ui/skeleton";
 import { EmptyState } from "@/components/ui/empty-state";
 import { ErrorState } from "@/components/ui/error-state";
 import { Button } from "@/components/ui/button";
+import { Spinner } from "@/components/ui/spinner";
+import {
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+  DialogDescription,
+  DialogFooter,
+} from "@/components/ui/dialog";
 import { UploadDialog } from "@/components/upload-dialog";
 import { DocumentCard } from "@/components/documents/document-card";
 import { DocumentList } from "@/components/documents/document-list";
