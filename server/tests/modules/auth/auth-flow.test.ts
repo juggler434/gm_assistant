@@ -28,6 +28,22 @@ vi.mock("@/services/metrics/service.js", () => ({
   shutdownMetrics: vi.fn(),
 }));
 
+vi.mock("@/services/storage/factory.js", () => ({
+  createStorageService: vi.fn(() => ({
+    upload: vi.fn(),
+    delete: vi.fn(),
+    getSignedUrl: vi.fn(),
+    ensureBucket: vi.fn(),
+  })),
+}));
+
+vi.mock("@/jobs/factory.js", () => ({
+  createQueue: vi.fn(() => ({
+    add: vi.fn().mockResolvedValue({ ok: true, value: "job-123" }),
+  })),
+  DEFAULT_JOB_OPTIONS: {},
+}));
+
 // Import mocked modules
 import { findUserByEmail, createUser } from "@/modules/auth/repository.js";
 import {
