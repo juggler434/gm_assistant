@@ -1,0 +1,182 @@
+# GM Assistant
+
+An AI-powered RPG Game Master campaign management tool. Features include user authentication, campaign CRUD, document upload/processing, and a RAG pipeline for answering questions from campaign documents.
+
+## Prerequisites
+
+- [Node.js](https://nodejs.org/) v20.0.0 or higher
+- [Docker](https://www.docker.com/) and Docker Compose
+
+## Project Structure
+
+```
+gm_assistant/
+├── package.json                # Workspace root (npm workspaces)
+├── docker-compose.yml          # Local infrastructure services
+├── shared/                     # @gm-assistant/shared — common types and constants
+│   ├── src/
+│   │   ├── index.ts            # Barrel exports
+│   │   ├── entities.ts         # User, Campaign, Document types
+│   │   ├── api.ts              # API request/response types
+│   │   ├── query.ts            # Query-related types
+│   │   ├── generation.ts       # LLM generation types
+│   │   └── common.ts           # Shared constants
+│   └── tsconfig.json
+├── server/                     # Node.js/TypeScript backend (Fastify, PostgreSQL, Redis, S3)
+│   ├── src/
+│   │   ├── index.ts            # Entry point
+│   │   ├── app.ts              # Fastify app builder
+│   │   ├── config/             # Environment configuration
+│   │   ├── db/                 # Drizzle ORM client, schema, migrations
+│   │   ├── modules/
+│   │   │   ├── auth/           # Authentication (register, login, sessions)
+│   │   │   ├── campaigns/      # Campaign CRUD
+│   │   │   ├── documents/      # Document upload & management
+│   │   │   ├── knowledge/      # Knowledge base & retrieval
+│   │   │   ├── query/          # RAG pipeline
+│   │   │   └── metrics/        # Admin metrics endpoint
+│   │   ├── services/
+│   │   │   ├── llm/            # LLM service (Ollama provider)
+│   │   │   ├── storage/        # S3-compatible storage (MinIO)
+│   │   │   └── metrics/        # PostHog analytics
+│   │   ├── jobs/               # BullMQ background job system
+│   │   ├── plugins/            # Fastify plugins (CORS, rate-limit, etc.)
+│   │   └── types/              # Shared TypeScript types
+│   └── tests/
+├── client/                     # React/TypeScript frontend (Vite, Tailwind CSS v4, shadcn/ui)
+│   └── src/
+│       ├── main.tsx            # Entry point
+│       ├── App.tsx             # Root component (providers, router)
+│       ├── index.css           # Tailwind imports + theme tokens
+│       ├── components/ui/      # Reusable UI component library (shadcn/ui)
+│       ├── pages/              # Route pages
+│       ├── lib/                # Utilities
+│       └── types/              # Type re-exports
+└── mockups/
+    └── gm-assistant-mockup.html  # Interactive HTML/CSS design reference
+```
+
+## Getting Started
+
+### 1. Install dependencies
+
+From the project root:
+
+```bash
+npm install
+```
+
+This installs dependencies for all three workspace packages (shared, client, server).
+
+### 2. Build the shared package
+
+The shared package must be built before the client or server can use it:
+
+```bash
+cd shared && npm run build
+```
+
+### 3. Start infrastructure services
+
+From the project root, start PostgreSQL, Redis, and MinIO with Docker Compose:
+
+```bash
+docker-compose up -d
+```
+
+To also start Ollama for local LLM inference:
+
+```bash
+docker-compose --profile with-ollama up -d
+```
+
+#### Service ports
+
+| Service    | Port  | Description                 |
+|------------|-------|-----------------------------|
+| PostgreSQL | 5432  | Database (pgvector enabled) |
+| Redis      | 6379  | Job queue and caching       |
+| MinIO      | 9000  | S3-compatible storage API   |
+| MinIO      | 9001  | MinIO web console           |
+| Ollama     | 11434 | LLM API (optional)          |
+
+### 4. Configure environment variables
+
+Copy the example env file and adjust values as needed:
+
+```bash
+cp .env.example server/.env
+```
+
+The defaults in `.env.example` match the Docker Compose service credentials, so no changes are required for local development.
+
+### 5. Set up the database
+
+```bash
+cd server && npm run db:push
+```
+
+### 6. Run the app
+
+Start the backend and frontend dev servers in separate terminals:
+
+```bash
+# Terminal 1 — Server (runs on port 3000)
+cd server
+npm run dev
+
+# Terminal 2 — Client (runs on port 5173)
+cd client
+npm run dev
+```
+
+The Vite dev server proxies `/api` requests to the Fastify backend at `http://localhost:3000`.
+
+Open [http://localhost:5173](http://localhost:5173) in your browser.
+
+## Available Scripts
+
+### Server (`server/`)
+
+| Command              | Description                      |
+|----------------------|----------------------------------|
+| `npm run dev`        | Start dev server with hot reload |
+| `npm run build`      | Compile TypeScript               |
+| `npm start`          | Run compiled app                 |
+| `npm test`           | Run tests                        |
+| `npm run test:watch` | Run tests in watch mode          |
+| `npm run lint`       | Run ESLint                       |
+| `npm run lint:fix`   | Auto-fix lint issues             |
+| `npm run format`     | Format with Prettier             |
+| `npm run typecheck`  | Type-check without building      |
+| `npm run db:push`    | Push schema to database          |
+| `npm run db:generate`| Generate migrations              |
+| `npm run db:migrate` | Run migrations                   |
+| `npm run db:studio`  | Open Drizzle Studio              |
+
+### Client (`client/`)
+
+| Command              | Description                          |
+|----------------------|--------------------------------------|
+| `npm run dev`        | Start Vite dev server (port 5173)    |
+| `npm run build`      | Type-check + Vite production build   |
+| `npm run lint`       | Run ESLint                           |
+| `npm run format`     | Format with Prettier                 |
+| `npm run preview`    | Preview production build             |
+
+### Shared (`shared/`)
+
+| Command              | Description                       |
+|----------------------|-----------------------------------|
+| `npm run build`      | Compile TypeScript (outputs to dist/) |
+| `npm run typecheck`  | Type-check without emitting       |
+
+## Stopping Services
+
+```bash
+# Stop Docker services
+docker-compose down
+
+# Stop and remove all data volumes
+docker-compose down -v
+```
