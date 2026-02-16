@@ -36,6 +36,22 @@ vi.mock("@/services/metrics/service.js", () => ({
   shutdownMetrics: vi.fn(),
 }));
 
+vi.mock("@/services/storage/factory.js", () => ({
+  createStorageService: vi.fn(() => ({
+    upload: vi.fn(),
+    delete: vi.fn(),
+    getSignedUrl: vi.fn(),
+    ensureBucket: vi.fn(),
+  })),
+}));
+
+vi.mock("@/jobs/factory.js", () => ({
+  createQueue: vi.fn(() => ({
+    add: vi.fn().mockResolvedValue({ ok: true, value: "job-123" }),
+  })),
+  DEFAULT_JOB_OPTIONS: {},
+}));
+
 import { validateSessionToken } from "@/modules/auth/session.js";
 import { findCampaignByIdAndUserId } from "@/modules/campaigns/repository.js";
 import { findDocumentIdsByTags } from "@/modules/query/repository.js";
