@@ -32,6 +32,7 @@ vi.mock("@/services/storage/factory.js", () => ({
     upload: vi.fn(),
     delete: vi.fn(),
     getSignedUrl: vi.fn(),
+    ensureBucket: vi.fn(),
   })),
 }));
 
@@ -108,6 +109,7 @@ describe("Document Routes", () => {
     upload: ReturnType<typeof vi.fn>;
     delete: ReturnType<typeof vi.fn>;
     getSignedUrl: ReturnType<typeof vi.fn>;
+    ensureBucket: ReturnType<typeof vi.fn>;
   };
 
   beforeEach(() => {
@@ -136,6 +138,7 @@ describe("Document Routes", () => {
           expiresAt: new Date(Date.now() + 3600000),
         },
       }),
+      ensureBucket: vi.fn().mockResolvedValue({ ok: true }),
     };
     vi.mocked(createStorageService).mockReturnValue(
       mockStorageService as unknown as ReturnType<typeof createStorageService>
