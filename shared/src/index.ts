@@ -22,6 +22,10 @@ export type {
   GameSessionStatus,
   GameSession,
   Transcript,
+  Conversation,
+  MessageRole,
+  ConversationMessage,
+  ConversationWithMessages,
 } from "./entities.js";
 
 // Query / RAG types
@@ -63,6 +67,10 @@ export type {
   DocumentResponse,
   DocumentListResponse,
   DocumentDownloadResponse,
+  ConversationListResponse,
+  ConversationDetailResponse,
+  CreateConversationRequest,
+  CreateConversationResponse,
   SupportedMimeType,
 } from "./api.js";
 

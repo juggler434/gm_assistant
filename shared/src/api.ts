@@ -6,6 +6,8 @@
 import type {
   AuthUser,
   Campaign,
+  Conversation,
+  ConversationWithMessages,
   Document,
   DocumentType,
   DocumentStatus,
@@ -96,6 +98,30 @@ export interface DocumentListResponse {
 export interface DocumentDownloadResponse {
   url: string;
   expiresAt: string;
+}
+
+// ============================================================================
+// Conversation API
+// ============================================================================
+
+/** Response wrapping a list of conversations */
+export interface ConversationListResponse {
+  conversations: Conversation[];
+}
+
+/** Response wrapping a single conversation with messages */
+export interface ConversationDetailResponse {
+  conversation: ConversationWithMessages;
+}
+
+/** POST /api/campaigns/:campaignId/conversations - request body */
+export interface CreateConversationRequest {
+  title: string;
+}
+
+/** Response wrapping a newly created conversation */
+export interface CreateConversationResponse {
+  conversation: Conversation;
 }
 
 // ============================================================================
