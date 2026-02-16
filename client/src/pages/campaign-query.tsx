@@ -9,15 +9,10 @@ import { ResponseDisplay, type QueryMessage } from "@/components/query/response-
 import { QueryHistory, type QueryHistoryEntry } from "@/components/query/query-history";
 import { ContextPanel } from "@/components/query/context-panel";
 import { useCampaignQuery } from "@/hooks/use-campaign-query";
+import { useConversations, useCreateConversation, useAddMessages } from "@/hooks/use-conversations";
+import { api } from "@/lib/api-client";
 import { cn } from "@/lib/utils";
-import type { AnswerSource, ConfidenceLevel } from "@/types";
-
-interface Conversation {
-  id: string;
-  messages: QueryMessage[];
-  sources: AnswerSource[];
-  confidence?: ConfidenceLevel;
-}
+import type { AnswerSource, ConfidenceLevel, ConversationDetailResponse } from "@/types";
 
 function createId(): string {
   return crypto.randomUUID();
@@ -26,11 +21,18 @@ function createId(): string {
 export function QueryPage() {
   const { id: campaignId } = useParams<{ id: string }>();
   const navigate = useNavigate();
-  const { mutateAsync, isPending } = useCampaignQuery();
+  const { mutateAsync: queryAsync, isPending } = useCampaignQuery();
+  const { mutateAsync: createConvAsync } = useCreateConversation();
+  const { mutateAsync: addMsgsAsync } = useAddMessages();
 
-  // Conversations state
-  const [conversations, setConversations] = useState<Conversation[]>([]);
+  // Server-backed conversation list for sidebar
+  const { data: serverConversations = [] } = useConversations(campaignId);
+
+  // Active conversation
   const [activeConvId, setActiveConvId] = useState<string | null>(null);
+  const [localMessages, setLocalMessages] = useState<QueryMessage[]>([]);
+  const [activeSources, setActiveSources] = useState<AnswerSource[]>([]);
+  const [activeConfidence, setActiveConfidence] = useState<ConfidenceLevel | undefined>();
 
   // Panel visibility
   const [showHistory, setShowHistory] = useState(true);
@@ -38,29 +40,51 @@ export function QueryPage() {
 
   const pendingQueryRef = useRef(false);
 
-  const activeConv = conversations.find((c) => c.id === activeConvId) ?? null;
+  // Build history entries from server conversations
+  const historyEntries: QueryHistoryEntry[] = serverConversations.map((c) => ({
+    id: c.id,
+    query: c.title,
+    timestamp: new Date(c.updatedAt),
+  }));
 
-  const historyEntries: QueryHistoryEntry[] = conversations
-    .filter((c) => c.messages.length > 0)
-    .map((c) => ({
-      id: c.id,
-      query: c.messages[0].content,
-      timestamp: new Date(parseInt(c.id.split("-")[0] || "0", 16) || Date.now()),
-    }))
-    .reverse();
+  // Select a conversation from the sidebar - load its messages from server
+  const handleSelectConversation = useCallback(
+    async (id: string) => {
+      if (!campaignId) return;
+      setActiveConvId(id);
 
+      try {
+        const detail = await api.get<ConversationDetailResponse>(
+          `/api/campaigns/${campaignId}/conversations/${id}`
+        );
+
+        const msgs: QueryMessage[] = detail.conversation.messages.map((m) => ({
+          id: m.id,
+          role: m.role as "user" | "assistant",
+          content: m.content,
+          sources: m.sources ?? undefined,
+          confidence: m.confidence ?? undefined,
+        }));
+
+        setLocalMessages(msgs);
+
+        // Set context panel from the last assistant message
+        const lastAssistant = [...msgs].reverse().find((m) => m.role === "assistant");
+        setActiveSources(lastAssistant?.sources ?? []);
+        setActiveConfidence(lastAssistant?.confidence);
+      } catch {
+        toast.error("Failed to load conversation");
+      }
+    },
+    [campaignId]
+  );
+
+  // Start a new query (clear active state; server conversation created on first submit)
   const handleNewQuery = useCallback(() => {
-    const conv: Conversation = {
-      id: createId(),
-      messages: [],
-      sources: [],
-    };
-    setConversations((prev) => [...prev, conv]);
-    setActiveConvId(conv.id);
-  }, []);
-
-  const handleSelectConversation = useCallback((id: string) => {
-    setActiveConvId(id);
+    setActiveConvId(null);
+    setLocalMessages([]);
+    setActiveSources([]);
+    setActiveConfidence(undefined);
   }, []);
 
   const handleSubmit = useCallback(
@@ -69,92 +93,88 @@ export function QueryPage() {
 
       let convId = activeConvId;
 
-      // Create a new conversation if none is active
+      // Create a server-side conversation if none is active
       if (!convId) {
-        const conv: Conversation = {
-          id: createId(),
-          messages: [],
-          sources: [],
-        };
-        setConversations((prev) => [...prev, conv]);
-        setActiveConvId(conv.id);
-        convId = conv.id;
+        try {
+          const title = query.length > 100 ? query.slice(0, 100) + "..." : query;
+          const result = await createConvAsync({ campaignId, title });
+          convId = result.conversation.id;
+          setActiveConvId(convId);
+        } catch {
+          toast.error("Failed to create conversation");
+          return;
+        }
       }
 
       const userMsgId = createId();
       const assistantMsgId = createId();
 
-      // Add user message and loading assistant message
-      setConversations((prev) =>
-        prev.map((c) =>
-          c.id === convId
-            ? {
-                ...c,
-                messages: [
-                  ...c.messages,
-                  { id: userMsgId, role: "user" as const, content: query },
-                  { id: assistantMsgId, role: "assistant" as const, content: "", isLoading: true },
-                ],
-              }
-            : c
-        )
-      );
+      // Add user message and loading assistant message locally
+      setLocalMessages((prev) => [
+        ...prev,
+        { id: userMsgId, role: "user" as const, content: query },
+        { id: assistantMsgId, role: "assistant" as const, content: "", isLoading: true },
+      ]);
 
       pendingQueryRef.current = true;
 
       try {
-        const response = await mutateAsync({ campaignId, query });
+        const response = await queryAsync({ campaignId, query });
 
-        setConversations((prev) =>
-          prev.map((c) =>
-            c.id === convId
+        // Update local UI
+        setLocalMessages((prev) =>
+          prev.map((m) =>
+            m.id === assistantMsgId
               ? {
-                  ...c,
+                  ...m,
+                  content: response.answer,
                   sources: response.sources,
                   confidence: response.confidence,
-                  messages: c.messages.map((m) =>
-                    m.id === assistantMsgId
-                      ? {
-                          ...m,
-                          content: response.answer,
-                          sources: response.sources,
-                          confidence: response.confidence,
-                          isLoading: false,
-                        }
-                      : m
-                  ),
+                  isLoading: false,
                 }
-              : c
+              : m
           )
         );
+        setActiveSources(response.sources);
+        setActiveConfidence(response.confidence);
+
+        // Persist messages to server (fire and forget, sidebar refresh handled by mutation)
+        addMsgsAsync({
+          campaignId,
+          conversationId: convId,
+          messages: [
+            { role: "user", content: query },
+            {
+              role: "assistant",
+              content: response.answer,
+              sources: response.sources,
+              confidence: response.confidence,
+            },
+          ],
+        }).catch(() => {
+          // Non-critical: conversation still works locally
+        });
       } catch (e) {
         const errorMsg = e instanceof Error ? e.message : "Failed to get a response";
         toast.error("Query failed", { description: errorMsg });
 
-        setConversations((prev) =>
-          prev.map((c) =>
-            c.id === convId
+        setLocalMessages((prev) =>
+          prev.map((m) =>
+            m.id === assistantMsgId
               ? {
-                  ...c,
-                  messages: c.messages.map((m) =>
-                    m.id === assistantMsgId
-                      ? {
-                          ...m,
-                          content: "",
-                          error: errorMsg,
-                          isLoading: false,
-                        }
-                      : m
-                  ),
+                  ...m,
+                  content: "",
+                  error: errorMsg,
+                  isLoading: false,
                 }
-              : c
+              : m
           )
         );
       } finally {
         pendingQueryRef.current = false;
       }
     },
-    [campaignId, activeConvId, mutateAsync]
+    [campaignId, activeConvId, queryAsync, createConvAsync, addMsgsAsync]
   );
 
   const handleSourceClick = useCallback(
@@ -221,7 +241,7 @@ export function QueryPage() {
         </div>
 
         {/* Messages or empty state */}
-        {!activeConv || activeConv.messages.length === 0 ? (
+        {localMessages.length === 0 ? (
           <div className="flex flex-1 items-center justify-center p-6">
             <EmptyState
               icon={<MessageSquare />}
@@ -231,7 +251,7 @@ export function QueryPage() {
             />
           </div>
         ) : (
-          <ResponseDisplay messages={activeConv.messages} onSourceClick={handleSourceClick} />
+          <ResponseDisplay messages={localMessages} onSourceClick={handleSourceClick} />
         )}
 
         {/* Query input */}
@@ -242,8 +262,8 @@ export function QueryPage() {
       {showContext && (
         <div className="hidden w-[300px] shrink-0 lg:block">
           <ContextPanel
-            sources={activeConv?.sources ?? []}
-            confidence={activeConv?.confidence}
+            sources={activeSources}
+            confidence={activeConfidence}
             onOpenDocument={handleOpenDocument}
           />
         </div>

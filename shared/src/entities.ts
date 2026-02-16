@@ -156,3 +156,36 @@ export interface Transcript {
   timestamp: ISOTimestamp;
   type: "narration" | "dialogue" | "action" | "ooc" | "system";
 }
+
+// ============================================================================
+// Conversation
+// ============================================================================
+
+/** A conversation within a campaign's AI query interface */
+export interface Conversation {
+  id: Id;
+  campaignId: Id;
+  userId: Id;
+  title: string;
+  createdAt: ISOTimestamp;
+  updatedAt: ISOTimestamp;
+}
+
+/** Role of a message in a conversation */
+export type MessageRole = "user" | "assistant";
+
+/** A single message within a conversation */
+export interface ConversationMessage {
+  id: Id;
+  conversationId: Id;
+  role: MessageRole;
+  content: string;
+  sources: import("./query.js").AnswerSource[] | null;
+  confidence: import("./query.js").ConfidenceLevel | null;
+  createdAt: ISOTimestamp;
+}
+
+/** A conversation with its messages included */
+export interface ConversationWithMessages extends Conversation {
+  messages: ConversationMessage[];
+}
