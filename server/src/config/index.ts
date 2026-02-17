@@ -20,11 +20,15 @@ export const config = {
     secretKey: env.S3_SECRET_KEY ?? "minio_password",
   },
   llm: {
+    provider: env.LLM_PROVIDER,
     model: env.LLM_MODEL,
     baseUrl: env.LLM_BASE_URL,
     timeout: env.LLM_TIMEOUT,
     maxTokens: env.LLM_MAX_TOKENS,
     temperature: env.LLM_TEMPERATURE,
+  },
+  googleAi: {
+    apiKey: env.GOOGLE_AI_API_KEY,
   },
   auth: {
     jwtSecret: env.JWT_SECRET ?? "dev-secret-change-in-production",

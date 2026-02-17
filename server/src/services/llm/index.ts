@@ -55,3 +55,4 @@ export { LLMError, type LLMErrorCode } from "./errors.js";
 // Provider types (for advanced usage)
 export type { LLMProvider } from "./providers/index.js";
 export { OllamaProvider } from "./providers/index.js";
+export { GeminiProvider } from "./providers/index.js";

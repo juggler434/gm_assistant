@@ -61,6 +61,7 @@
     "@fastify/rate-limit": "^10.3.0",
     "@fastify/websocket": "^11.2.0",
     "@gm-assistant/shared": "*",
+    "@google/genai": "^1.41.0",
     "argon2": "^0.44.0",
     "bullmq": "^5.67.2",
     "drizzle-orm": "^0.45.1",
