@@ -56,7 +56,7 @@ function UploadProgressItem({ state, onCancel }: UploadProgressItemProps) {
     >
       <div className="flex items-center gap-2 text-sm">
         {getFileIcon(file)}
-        <span className="truncate font-medium text-foreground">{file.name}</span>
+        <span className="min-w-0 truncate font-medium text-foreground">{file.name}</span>
         <span className="shrink-0 text-xs text-muted-foreground">{formatFileSize(file.size)}</span>
         <div className="ml-auto flex items-center gap-2">
           <StatusIcon status={status} />
