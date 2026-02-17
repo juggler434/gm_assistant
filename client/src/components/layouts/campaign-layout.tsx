@@ -1,3 +1,5 @@
+// SPDX-License-Identifier: AGPL-3.0-or-later
+
 import { Outlet, useParams, Link } from "react-router-dom";
 import { ArrowLeft } from "lucide-react";
 import { useCampaign } from "@/hooks/use-campaigns";

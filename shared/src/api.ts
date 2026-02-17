@@ -1,3 +1,5 @@
+// SPDX-License-Identifier: AGPL-3.0-or-later
+
 /**
  * API request/response types for all endpoints.
  * Matches the actual shapes sent and received over the wire.

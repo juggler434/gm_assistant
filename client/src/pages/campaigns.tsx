@@ -1,3 +1,5 @@
+// SPDX-License-Identifier: AGPL-3.0-or-later
+
 import { useState } from "react";
 import { BookOpen, Plus } from "lucide-react";
 import { useCampaigns } from "@/hooks/use-campaigns";

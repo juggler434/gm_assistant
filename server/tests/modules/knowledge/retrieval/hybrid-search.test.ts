@@ -1,3 +1,5 @@
+// SPDX-License-Identifier: AGPL-3.0-or-later
+
 import { describe, it, expect, vi, beforeEach } from "vitest";
 
 // Hoist mock functions so they are available in vi.mock factories

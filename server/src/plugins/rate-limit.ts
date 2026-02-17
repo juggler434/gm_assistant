@@ -1,3 +1,5 @@
+// SPDX-License-Identifier: AGPL-3.0-or-later
+
 import type { FastifyInstance } from "fastify";
 import rateLimit from "@fastify/rate-limit";
 import { config } from "@/config/index.js";

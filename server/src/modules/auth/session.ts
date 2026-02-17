@@ -1,3 +1,5 @@
+// SPDX-License-Identifier: AGPL-3.0-or-later
+
 import { randomBytes, createHash, timingSafeEqual } from "node:crypto";
 import type { Redis as RedisType } from "ioredis";
 import { createRedisConnection } from "@/jobs/connection.js";

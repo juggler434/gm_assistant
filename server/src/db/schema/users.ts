@@ -1,3 +1,5 @@
+// SPDX-License-Identifier: AGPL-3.0-or-later
+
 import { pgTable, uuid, varchar, timestamp, index } from "drizzle-orm/pg-core";
 
 export const users = pgTable(

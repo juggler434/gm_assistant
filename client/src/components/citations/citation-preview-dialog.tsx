@@ -1,3 +1,5 @@
+// SPDX-License-Identifier: AGPL-3.0-or-later
+
 import { FileText, BookOpen, Map, Image, StickyNote, ExternalLink } from "lucide-react";
 import {
   Dialog,

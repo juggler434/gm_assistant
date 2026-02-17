@@ -1,3 +1,5 @@
+// SPDX-License-Identifier: AGPL-3.0-or-later
+
 /** Session token format: <sessionId>.<sessionSecret> */
 export interface SessionToken {
   sessionId: string;

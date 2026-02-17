@@ -1,3 +1,5 @@
+// SPDX-License-Identifier: AGPL-3.0-or-later
+
 import { describe, it, expect, vi, beforeEach } from "vitest";
 import { LLMService, type LLMLogger } from "../../../src/services/llm/service.js";
 import type { LLMProvider } from "../../../src/services/llm/providers/interface.js";

@@ -1,3 +1,5 @@
+// SPDX-License-Identifier: AGPL-3.0-or-later
+
 import { Menu } from "lucide-react";
 import { UserMenu } from "@/components/layouts/user-menu";
 import { Button } from "@/components/ui/button";

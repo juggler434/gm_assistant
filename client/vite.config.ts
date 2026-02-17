@@ -1,3 +1,5 @@
+// SPDX-License-Identifier: AGPL-3.0-or-later
+
 /// <reference types="vitest/config" />
 import path from "path";
 import tailwindcss from "@tailwindcss/vite";

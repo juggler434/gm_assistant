@@ -1,3 +1,5 @@
+// SPDX-License-Identifier: AGPL-3.0-or-later
+
 import { FileText, ImageIcon, CheckCircle2, AlertCircle, X, Loader2 } from "lucide-react";
 import { cn } from "@/lib/utils";
 
