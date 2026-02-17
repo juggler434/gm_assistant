@@ -1,3 +1,5 @@
+// SPDX-License-Identifier: AGPL-3.0-or-later
+
 import { Search, X } from "lucide-react";
 import { Input } from "@/components/ui/input";
 import {

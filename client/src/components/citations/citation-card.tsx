@@ -1,3 +1,5 @@
+// SPDX-License-Identifier: AGPL-3.0-or-later
+
 import * as React from "react";
 import { useState } from "react";
 import { FileText, BookOpen, Map, Image, StickyNote, ChevronDown, ChevronUp } from "lucide-react";

@@ -1,3 +1,5 @@
+// SPDX-License-Identifier: AGPL-3.0-or-later
+
 import type { FastifyInstance } from "fastify";
 import cors from "@fastify/cors";
 import { config } from "@/config/index.js";

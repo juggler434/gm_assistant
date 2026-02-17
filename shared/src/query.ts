@@ -1,3 +1,5 @@
+// SPDX-License-Identifier: AGPL-3.0-or-later
+
 /**
  * Query and RAG pipeline types.
  * Matches server/src/modules/query/rag/types.ts and query route responses.

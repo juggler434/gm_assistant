@@ -1,3 +1,5 @@
+// SPDX-License-Identifier: AGPL-3.0-or-later
+
 import { eq, and, desc } from "drizzle-orm";
 import { db } from "@/db/index.js";
 import { campaigns, type Campaign, type NewCampaign } from "@/db/schema/index.js";

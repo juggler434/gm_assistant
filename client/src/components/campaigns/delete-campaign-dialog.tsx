@@ -1,3 +1,5 @@
+// SPDX-License-Identifier: AGPL-3.0-or-later
+
 import { toast } from "sonner";
 import { useDeleteCampaign } from "@/hooks/use-campaigns";
 import {

@@ -1,3 +1,5 @@
+// SPDX-License-Identifier: AGPL-3.0-or-later
+
 import { Settings } from "lucide-react";
 import { EmptyState } from "@/components/ui/empty-state";
 

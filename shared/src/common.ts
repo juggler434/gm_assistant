@@ -1,3 +1,5 @@
+// SPDX-License-Identifier: AGPL-3.0-or-later
+
 /**
  * Common type aliases and base types shared across the application.
  * Matches server/src/types/index.ts

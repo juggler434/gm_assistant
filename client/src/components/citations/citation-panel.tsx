@@ -1,3 +1,5 @@
+// SPDX-License-Identifier: AGPL-3.0-or-later
+
 import { useState, useCallback } from "react";
 import { useNavigate, useParams } from "react-router-dom";
 import { CitationList } from "./citation-list";

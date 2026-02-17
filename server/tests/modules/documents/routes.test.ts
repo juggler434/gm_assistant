@@ -1,3 +1,5 @@
+// SPDX-License-Identifier: AGPL-3.0-or-later
+
 import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
 import type { Campaign } from "@/db/schema/campaigns.js";
 import type { Document } from "@/db/schema/documents.js";

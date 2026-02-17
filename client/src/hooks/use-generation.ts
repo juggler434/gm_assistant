@@ -1,3 +1,5 @@
+// SPDX-License-Identifier: AGPL-3.0-or-later
+
 import { useCallback, useRef, useState } from "react";
 import { api } from "@/lib/api-client";
 import type {

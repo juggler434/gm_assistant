@@ -1,3 +1,5 @@
+// SPDX-License-Identifier: AGPL-3.0-or-later
+
 import { useEffect, useRef } from "react";
 import { User, Bot } from "lucide-react";
 import { Spinner } from "@/components/ui/spinner";

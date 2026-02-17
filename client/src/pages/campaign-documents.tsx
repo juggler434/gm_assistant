@@ -1,3 +1,5 @@
+// SPDX-License-Identifier: AGPL-3.0-or-later
+
 import { useState, useMemo, useCallback } from "react";
 import { useParams } from "react-router-dom";
 import { FileText, Plus, LayoutGrid, List } from "lucide-react";

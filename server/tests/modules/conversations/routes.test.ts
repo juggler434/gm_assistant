@@ -1,3 +1,5 @@
+// SPDX-License-Identifier: AGPL-3.0-or-later
+
 import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
 import type { ConversationRow, ConversationMessageRow } from "@/db/schema/index.js";
 import type { Campaign } from "@/db/schema/index.js";
