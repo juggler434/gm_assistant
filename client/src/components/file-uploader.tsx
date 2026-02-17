@@ -115,7 +115,7 @@ export function FileUploader({
               role="alert"
             >
               <AlertCircle className="h-4 w-4 shrink-0" />
-              <span className="truncate font-medium">{rejection.file.name}</span>
+              <span className="min-w-0 truncate font-medium">{rejection.file.name}</span>
               <span className="shrink-0">&mdash; {getErrorMessage(rejection)}</span>
               <button
                 type="button"
@@ -140,7 +140,7 @@ export function FileUploader({
               className="flex items-center gap-2 rounded-md border border-border bg-card px-3 py-2 text-sm"
             >
               {getFileIcon(file)}
-              <span className="truncate font-medium text-foreground">{file.name}</span>
+              <span className="min-w-0 truncate font-medium text-foreground">{file.name}</span>
               <span className="shrink-0 text-muted-foreground">{formatFileSize(file.size)}</span>
               <button
                 type="button"
