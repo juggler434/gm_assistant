@@ -1,3 +1,5 @@
+// SPDX-License-Identifier: AGPL-3.0-or-later
+
 import { ApiError } from "@/lib/api-client";
 import type { ApiErrorResponse } from "@/types";
 

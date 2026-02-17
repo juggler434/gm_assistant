@@ -1,3 +1,5 @@
+// SPDX-License-Identifier: AGPL-3.0-or-later
+
 import { cn } from "@/lib/utils";
 
 export interface SpinnerProps extends React.SVGAttributes<SVGSVGElement> {

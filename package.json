@@ -1,5 +1,6 @@
 {
   "name": "gm-assistant",
   "private": true,
+  "license": "AGPL-3.0-or-later",
   "workspaces": ["shared", "client", "server"]
 }

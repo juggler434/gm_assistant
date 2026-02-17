@@ -1,3 +1,5 @@
+// SPDX-License-Identifier: AGPL-3.0-or-later
+
 import { describe, it, expect, vi, beforeEach } from "vitest";
 import { S3Provider } from "../../../../src/services/storage/providers/s3.js";
 import type { StorageConfig } from "../../../../src/services/storage/types.js";

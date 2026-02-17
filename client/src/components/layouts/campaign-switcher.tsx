@@ -1,3 +1,5 @@
+// SPDX-License-Identifier: AGPL-3.0-or-later
+
 import { useNavigate, useParams, useLocation } from "react-router-dom";
 import { ChevronsUpDown, Plus, BookOpen } from "lucide-react";
 import { useCampaigns } from "@/hooks/use-campaigns";

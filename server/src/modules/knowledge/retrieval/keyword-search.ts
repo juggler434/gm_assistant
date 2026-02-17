@@ -1,3 +1,5 @@
+// SPDX-License-Identifier: AGPL-3.0-or-later
+
 import { queryClient } from "@/db/index.js";
 import { type Result, ok, err } from "@/types/index.js";
 import {

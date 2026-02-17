@@ -1,3 +1,5 @@
+// SPDX-License-Identifier: AGPL-3.0-or-later
+
 import type { FastifyInstance } from "fastify";
 import * as argon2 from "argon2";
 import { createSession, invalidateSession } from "./session.js";

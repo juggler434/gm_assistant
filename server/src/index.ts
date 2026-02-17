@@ -1,3 +1,5 @@
+// SPDX-License-Identifier: AGPL-3.0-or-later
+
 import { config } from "@/config/index.js";
 import { buildApp } from "./app.js";
 import { shutdownMetrics } from "@/services/metrics/index.js";

@@ -1,3 +1,5 @@
+// SPDX-License-Identifier: AGPL-3.0-or-later
+
 import { NavLink, useParams } from "react-router-dom";
 import { LayoutDashboard, FileText, MessageSquare, Sparkles, Clock, Settings } from "lucide-react";
 import { cn } from "@/lib/utils";

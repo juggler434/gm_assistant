@@ -1,3 +1,5 @@
+// SPDX-License-Identifier: AGPL-3.0-or-later
+
 import { Clock } from "lucide-react";
 import { EmptyState } from "@/components/ui/empty-state";
 

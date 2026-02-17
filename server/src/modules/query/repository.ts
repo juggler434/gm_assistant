@@ -1,3 +1,5 @@
+// SPDX-License-Identifier: AGPL-3.0-or-later
+
 import { eq, and, sql } from "drizzle-orm";
 import { db } from "@/db/index.js";
 import { documents } from "@/db/schema/index.js";

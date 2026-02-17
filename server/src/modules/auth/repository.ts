@@ -1,3 +1,5 @@
+// SPDX-License-Identifier: AGPL-3.0-or-later
+
 import { eq } from "drizzle-orm";
 import { db } from "@/db/index.js";
 import { users, type User, type NewUser } from "@/db/schema/index.js";

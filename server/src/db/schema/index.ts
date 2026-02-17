@@ -1,3 +1,5 @@
+// SPDX-License-Identifier: AGPL-3.0-or-later
+
 // Schema exports
 export * from "./users.js";
 export * from "./campaigns.js";

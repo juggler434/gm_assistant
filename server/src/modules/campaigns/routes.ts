@@ -1,3 +1,5 @@
+// SPDX-License-Identifier: AGPL-3.0-or-later
+
 import type { FastifyInstance } from "fastify";
 import { requireAuth } from "@/modules/auth/index.js";
 import { trackEvent } from "@/services/metrics/index.js";

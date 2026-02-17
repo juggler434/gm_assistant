@@ -1,3 +1,5 @@
+// SPDX-License-Identifier: AGPL-3.0-or-later
+
 import { type MouseEvent, useState } from "react";
 import { Link } from "react-router-dom";
 import { Calendar, MoreHorizontal, Pencil, Trash2 } from "lucide-react";

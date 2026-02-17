@@ -1,3 +1,5 @@
+// SPDX-License-Identifier: AGPL-3.0-or-later
+
 export { CitationCard } from "./citation-card";
 export type { CitationCardProps } from "./citation-card";
 

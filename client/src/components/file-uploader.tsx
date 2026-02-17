@@ -1,3 +1,5 @@
+// SPDX-License-Identifier: AGPL-3.0-or-later
+
 import { useCallback } from "react";
 import { useDropzone, type Accept, type FileRejection } from "react-dropzone";
 import { Upload, FileText, ImageIcon, AlertCircle } from "lucide-react";

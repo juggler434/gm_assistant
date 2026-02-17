@@ -1,3 +1,5 @@
+// SPDX-License-Identifier: AGPL-3.0-or-later
+
 import { LogOut, User } from "lucide-react";
 import { useAuth } from "@/hooks/use-auth";
 import {

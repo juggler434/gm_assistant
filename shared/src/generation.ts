@@ -1,3 +1,5 @@
+// SPDX-License-Identifier: AGPL-3.0-or-later
+
 /**
  * Content generation types.
  * Matches server/src/modules/generation/types.ts and generation route responses.

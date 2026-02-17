@@ -1,3 +1,5 @@
+// SPDX-License-Identifier: AGPL-3.0-or-later
+
 import { cn } from "@/lib/utils";
 import { CitationCard } from "./citation-card";
 import type { AnswerSource, ConfidenceLevel } from "@/types";
