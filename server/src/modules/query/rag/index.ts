@@ -14,6 +14,10 @@ export {
   computeConfidence,
 } from "./response-generator.js";
 
+export {
+  rerankChunks,
+} from "./reranker.js";
+
 export type {
   RAGQuery,
   RAGResult,
