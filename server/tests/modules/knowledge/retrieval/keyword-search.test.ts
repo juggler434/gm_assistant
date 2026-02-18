@@ -3,12 +3,17 @@
 import { describe, it, expect, vi, beforeEach } from "vitest";
 
 // Mock state
-let mockUnsafeResult: unknown[] = [];
+let mockUnsafeResults: unknown[][] = [];
+let callIndex = 0;
 
 // Mock the db module - keyword search uses queryClient.unsafe() for raw parameterized SQL
 vi.mock("@/db/index.js", () => ({
   queryClient: {
-    unsafe: vi.fn(() => Promise.resolve(mockUnsafeResult)),
+    unsafe: vi.fn(() => {
+      const result = mockUnsafeResults[callIndex] ?? [];
+      callIndex++;
+      return Promise.resolve(result);
+    }),
   },
 }));
 
@@ -18,6 +23,16 @@ import {
   findMostRelevantChunk,
 } from "@/modules/knowledge/retrieval/keyword-search.js";
 import { queryClient } from "@/db/index.js";
+
+/** Helper: set mock to return the same result for all calls */
+function setMockResult(result: unknown[]) {
+  mockUnsafeResults = [result, result];
+}
+
+/** Helper: set mock to return different results for AND (first) and OR (second) calls */
+function setMockResults(andResult: unknown[], orResult: unknown[]) {
+  mockUnsafeResults = [andResult, orResult];
+}
 
 describe("Keyword Search", () => {
   const campaignId = "123e4567-e89b-12d3-a456-426614174000";
@@ -39,7 +54,8 @@ describe("Keyword Search", () => {
 
   beforeEach(() => {
     vi.clearAllMocks();
-    mockUnsafeResult = [];
+    mockUnsafeResults = [];
+    callIndex = 0;
   });
 
   describe("searchChunksByKeyword", () => {
@@ -50,7 +66,7 @@ describe("Keyword Search", () => {
         content: "The dragon's lair is hidden in the mountains.",
         rank: 0.05,
       };
-      mockUnsafeResult = [mockRow, secondRow];
+      setMockResult([mockRow, secondRow]);
 
       const result = await searchChunksByKeyword("dragon", campaignId);
 
@@ -62,7 +78,7 @@ describe("Keyword Search", () => {
     });
 
     it("should transform raw rows into KeywordSearchResult format", async () => {
-      mockUnsafeResult = [mockRow];
+      setMockResult([mockRow]);
 
       const result = await searchChunksByKeyword("dragon", campaignId);
 
@@ -90,7 +106,7 @@ describe("Keyword Search", () => {
     });
 
     it("should return empty array when no matches found", async () => {
-      mockUnsafeResult = [];
+      setMockResult([]);
 
       const result = await searchChunksByKeyword("unicorn", campaignId);
 
@@ -100,22 +116,122 @@ describe("Keyword Search", () => {
       }
     });
 
-    it("should pass campaignId, language, and query words as SQL parameters", async () => {
-      mockUnsafeResult = [];
+    describe("AND-first with OR fallback", () => {
+      it("should use AND search (plainto_tsquery) first", async () => {
+        // Return 3+ results from AND so it doesn't fall back
+        const rows = [mockRow, { ...mockRow, chunk_id: "c2" }, { ...mockRow, chunk_id: "c3" }];
+        setMockResults(rows, []);
 
-      await searchChunksByKeyword("dragon attack", campaignId);
+        await searchChunksByKeyword("dragon attacks village", campaignId);
 
-      expect(queryClient.unsafe).toHaveBeenCalledWith(
-        expect.any(String),
-        expect.arrayContaining([campaignId, "english", "dragon", "attack"])
-      );
+        // Only AND query should be called (3 results >= threshold)
+        expect(queryClient.unsafe).toHaveBeenCalledTimes(1);
+        const sql = vi.mocked(queryClient.unsafe).mock.calls[0][0] as string;
+        // AND search uses a single plainto_tsquery with the full query
+        expect(sql).toContain("plainto_tsquery($2::regconfig, $3)");
+        expect(sql).not.toContain("||");
+      });
+
+      it("should fall back to OR when AND returns fewer than 3 results", async () => {
+        // AND returns 1 result, OR returns 5
+        const orRows = Array.from({ length: 5 }, (_, i) => ({
+          ...mockRow,
+          chunk_id: `chunk-${i}`,
+        }));
+        setMockResults([mockRow], orRows);
+
+        const result = await searchChunksByKeyword("dragon attacks village", campaignId);
+
+        // Both AND and OR queries should be called
+        expect(queryClient.unsafe).toHaveBeenCalledTimes(2);
+        // Second call (OR) should use || syntax
+        const orSql = vi.mocked(queryClient.unsafe).mock.calls[1][0] as string;
+        expect(orSql).toContain("||");
+
+        expect(result.ok).toBe(true);
+        if (result.ok) {
+          expect(result.value).toHaveLength(5);
+        }
+      });
+
+      it("should keep AND results when they outnumber OR results", async () => {
+        // AND returns 2, OR returns 1 — should keep AND
+        setMockResults(
+          [mockRow, { ...mockRow, chunk_id: "c2" }],
+          [mockRow],
+        );
+
+        const result = await searchChunksByKeyword("dragon attacks village", campaignId);
+
+        expect(result.ok).toBe(true);
+        if (result.ok) {
+          expect(result.value).toHaveLength(2);
+        }
+      });
+
+      it("should not fall back to OR when AND returns enough results", async () => {
+        const rows = [
+          mockRow,
+          { ...mockRow, chunk_id: "c2" },
+          { ...mockRow, chunk_id: "c3" },
+        ];
+        setMockResults(rows, []);
+
+        await searchChunksByKeyword("dragon attacks village", campaignId);
+
+        // Only AND query should be called
+        expect(queryClient.unsafe).toHaveBeenCalledTimes(1);
+      });
+    });
+
+    describe("OR fallback tsquery construction", () => {
+      it("should combine multiple words with OR (||) in OR fallback", async () => {
+        setMockResult([]);
+
+        await searchChunksByKeyword("dragon attacks village", campaignId);
+
+        // Second call is OR fallback
+        const orSql = vi.mocked(queryClient.unsafe).mock.calls[1][0] as string;
+        expect(orSql).toContain("||");
+        expect(queryClient.unsafe).toHaveBeenNthCalledWith(
+          2,
+          expect.any(String),
+          expect.arrayContaining(["dragon", "attacks", "village"])
+        );
+      });
+
+      it("should filter out short words (1-2 chars) from OR tsquery", async () => {
+        setMockResult([]);
+
+        await searchChunksByKeyword("a dragon is at the village", campaignId);
+
+        // Second call is OR fallback — "a", "is", "at" should be filtered
+        const params = vi.mocked(queryClient.unsafe).mock.calls[1][1] as string[];
+        expect(params).toContain("dragon");
+        expect(params).toContain("the");
+        expect(params).toContain("village");
+        expect(params).not.toContain("a");
+        expect(params).not.toContain("is");
+        expect(params).not.toContain("at");
+      });
+
+      it("should fall back to full query when all words are short", async () => {
+        setMockResult([]);
+
+        await searchChunksByKeyword("do it", campaignId);
+
+        // Second call is OR fallback — falls back to full query
+        const params = vi.mocked(queryClient.unsafe).mock.calls[1][1] as string[];
+        expect(params).toContain("do it");
+      });
     });
 
     it("should use default limit of 10", async () => {
-      mockUnsafeResult = [];
+      setMockResult([]);
 
       await searchChunksByKeyword("dragon", campaignId);
 
+      // Both AND and OR calls should use the same limit
       expect(queryClient.unsafe).toHaveBeenCalledWith(
         expect.stringContaining("LIMIT 10"),
         expect.any(Array)
@@ -123,7 +239,7 @@ describe("Keyword Search", () => {
     });
 
     it("should apply custom limit", async () => {
-      mockUnsafeResult = [];
+      setMockResult([]);
 
       await searchChunksByKeyword("dragon", campaignId, { limit: 5 });
 
@@ -134,7 +250,7 @@ describe("Keyword Search", () => {
     });
 
     it("should build query with to_tsvector and plainto_tsquery", async () => {
-      mockUnsafeResult = [];
+      setMockResult([]);
 
       await searchChunksByKeyword("dragon", campaignId);
 
@@ -148,48 +264,8 @@ describe("Keyword Search", () => {
       );
     });
 
-    it("should combine multiple words with OR (||) in tsquery", async () => {
-      mockUnsafeResult = [];
-
-      await searchChunksByKeyword("dragon attacks village", campaignId);
-
-      const sql = vi.mocked(queryClient.unsafe).mock.calls[0][0] as string;
-      // Each word gets its own plainto_tsquery, joined with ||
-      expect(sql).toContain("||");
-      // Should have separate parameters for each word
-      expect(queryClient.unsafe).toHaveBeenCalledWith(
-        expect.any(String),
-        expect.arrayContaining(["dragon", "attacks", "village"])
-      );
-    });
-
-    it("should filter out short words (1-2 chars) from tsquery", async () => {
-      mockUnsafeResult = [];
-
-      await searchChunksByKeyword("a dragon is at the village", campaignId);
-
-      // "a", "is", "at" are <= 2 chars and should be filtered out
-      const params = vi.mocked(queryClient.unsafe).mock.calls[0][1] as string[];
-      expect(params).toContain("dragon");
-      expect(params).toContain("the");
-      expect(params).toContain("village");
-      expect(params).not.toContain("a");
-      expect(params).not.toContain("is");
-      expect(params).not.toContain("at");
-    });
-
-    it("should fall back to full query when all words are short", async () => {
-      mockUnsafeResult = [];
-
-      await searchChunksByKeyword("do it", campaignId);
-
-      const params = vi.mocked(queryClient.unsafe).mock.calls[0][1] as string[];
-      // Falls back to full trimmed query
-      expect(params).toContain("do it");
-    });
-
     it("should include ts_rank for relevance scoring", async () => {
-      mockUnsafeResult = [];
+      setMockResult([]);
 
       await searchChunksByKeyword("dragon", campaignId);
 
@@ -200,7 +276,7 @@ describe("Keyword Search", () => {
     });
 
     it("should order results by rank descending", async () => {
-      mockUnsafeResult = [];
+      setMockResult([]);
 
       await searchChunksByKeyword("dragon", campaignId);
 
@@ -211,7 +287,7 @@ describe("Keyword Search", () => {
     });
 
     it("should filter by campaignId", async () => {
-      mockUnsafeResult = [];
+      setMockResult([]);
 
       await searchChunksByKeyword("dragon", campaignId);
 
@@ -222,7 +298,7 @@ describe("Keyword Search", () => {
     });
 
     it("should filter by documentIds when provided", async () => {
-      mockUnsafeResult = [];
+      setMockResult([]);
 
       await searchChunksByKeyword("dragon", campaignId, {
         documentIds: ["doc-001", "doc-002"],
@@ -235,7 +311,7 @@ describe("Keyword Search", () => {
     });
 
     it("should filter by documentTypes when provided", async () => {
-      mockUnsafeResult = [];
+      setMockResult([]);
 
       await searchChunksByKeyword("dragon", campaignId, {
         documentTypes: ["rulebook", "notes"],
@@ -248,7 +324,7 @@ describe("Keyword Search", () => {
     });
 
     it("should use english language config by default", async () => {
-      mockUnsafeResult = [];
+      setMockResult([]);
 
       await searchChunksByKeyword("dragon", campaignId);
 
@@ -259,7 +335,7 @@ describe("Keyword Search", () => {
     });
 
     it("should join chunks with documents table", async () => {
-      mockUnsafeResult = [];
+      setMockResult([]);
 
       await searchChunksByKeyword("dragon", campaignId);
 
@@ -270,7 +346,7 @@ describe("Keyword Search", () => {
     });
 
     it("should handle null metadata gracefully", async () => {
-      mockUnsafeResult = [{ ...mockRow, metadata: null }];
+      setMockResult([{ ...mockRow, metadata: null }]);
 
       const result = await searchChunksByKeyword("dragon", campaignId);
 
@@ -281,9 +357,9 @@ describe("Keyword Search", () => {
     });
 
     it("should handle null page_number and section", async () => {
-      mockUnsafeResult = [
+      setMockResult([
         { ...mockRow, page_number: null, section: null },
-      ];
+      ]);
 
       const result = await searchChunksByKeyword("dragon", campaignId);
 
@@ -296,7 +372,7 @@ describe("Keyword Search", () => {
 
     it("should convert rank to number", async () => {
       // PostgreSQL may return rank as string
-      mockUnsafeResult = [{ ...mockRow, rank: "0.075" }];
+      setMockResult([{ ...mockRow, rank: "0.075" }]);
 
       const result = await searchChunksByKeyword("dragon", campaignId);
 
@@ -347,7 +423,7 @@ describe("Keyword Search", () => {
 
   describe("findMostRelevantChunk", () => {
     it("should return the top-ranked chunk", async () => {
-      mockUnsafeResult = [mockRow];
+      setMockResult([mockRow]);
 
       const result = await findMostRelevantChunk("dragon", campaignId);
 
@@ -359,7 +435,7 @@ describe("Keyword Search", () => {
     });
 
     it("should return null when no matches found", async () => {
-      mockUnsafeResult = [];
+      setMockResult([]);
 
       const result = await findMostRelevantChunk("unicorn", campaignId);
 
@@ -370,7 +446,7 @@ describe("Keyword Search", () => {
     });
 
     it("should use limit of 1", async () => {
-      mockUnsafeResult = [];
+      setMockResult([]);
 
       await findMostRelevantChunk("dragon", campaignId);
 
@@ -381,7 +457,7 @@ describe("Keyword Search", () => {
     });
 
     it("should pass through filter options", async () => {
-      mockUnsafeResult = [];
+      setMockResult([]);
 
       await findMostRelevantChunk("dragon", campaignId, {
         documentIds: ["doc-001"],

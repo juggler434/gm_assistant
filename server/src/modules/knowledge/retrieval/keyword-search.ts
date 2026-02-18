@@ -122,12 +122,115 @@ function buildOrTsquery(
   };
 }
 
+/** Minimum AND results before falling back to OR search */
+const AND_FALLBACK_THRESHOLD = 3;
+
+/**
+ * Execute a keyword search query with a given tsquery expression.
+ * Shared by both AND and OR search strategies.
+ */
+async function executeKeywordSearch(
+  tsquerySql: string,
+  params: unknown[],
+  conditions: string[],
+  limit: number,
+): Promise<KeywordSearchResult[]> {
+  const whereClause = conditions.join(" AND ");
+
+  const queryText = `
+    SELECT
+      c.id as chunk_id,
+      c.content,
+      c.chunk_index,
+      c.token_count,
+      c.page_number,
+      c.section,
+      c.created_at as chunk_created_at,
+      ts_rank(to_tsvector($2::regconfig, c.content), ${tsquerySql}) as rank,
+      d.id as document_id,
+      d.name as document_name,
+      d.document_type,
+      d.metadata
+    FROM chunks c
+    INNER JOIN documents d ON c.document_id = d.id
+    WHERE ${whereClause}
+    ORDER BY rank DESC
+    LIMIT ${limit}
+  `;
+
+  const rows = (await queryClient.unsafe(
+    queryText,
+    params as (string | number)[]
+  )) as unknown as Array<{
+    chunk_id: string;
+    content: string;
+    chunk_index: number;
+    token_count: number;
+    page_number: number | null;
+    section: string | null;
+    chunk_created_at: Date;
+    rank: number;
+    document_id: string;
+    document_name: string;
+    document_type: DocumentType;
+    metadata: DocumentMetadata;
+  }>;
+
+  return rows.map((row) => ({
+    chunk: {
+      id: row.chunk_id,
+      content: row.content,
+      chunkIndex: row.chunk_index,
+      tokenCount: row.token_count,
+      pageNumber: row.page_number,
+      section: row.section,
+      createdAt: row.chunk_created_at,
+    },
+    rank: Number(row.rank),
+    document: {
+      id: row.document_id,
+      name: row.document_name,
+      documentType: row.document_type,
+      metadata: row.metadata ?? {},
+    },
+  }));
+}
+
+/**
+ * Build filter conditions and params for document ID and type filters.
+ * Returns the additional conditions and mutates the params array.
+ */
+function buildFilterConditions(
+  params: unknown[],
+  documentIds?: string[],
+  documentTypes?: DocumentType[],
+): string[] {
+  const conditions: string[] = [];
+
+  if (documentIds && documentIds.length > 0) {
+    const placeholders = documentIds.map(
+      (_, i) => `$${params.length + i + 1}`
+    );
+    conditions.push(`c.document_id IN (${placeholders.join(", ")})`);
+    params.push(...documentIds);
+  }
+
+  if (documentTypes && documentTypes.length > 0) {
+    const placeholders = documentTypes.map(
+      (_, i) => `$${params.length + i + 1}`
+    );
+    conditions.push(`d.document_type IN (${placeholders.join(", ")})`);
+    params.push(...documentTypes);
+  }
+
+  return conditions;
+}
+
 /**
  * Search for chunks by keyword using PostgreSQL full-text search
  *
- * Uses `to_tsvector` and `plainto_tsquery` for full-text matching,
- * with `ts_rank` for relevance scoring. Results are ordered by
- * relevance (highest rank first).
+ * Uses AND logic by default for precision, falling back to OR logic
+ * when AND returns fewer than 3 results (for better recall).
  *
  * @param query - The keyword search query string
  * @param campaignId - The campaign ID to scope the search
@@ -153,99 +256,49 @@ export async function searchChunksByKeyword(
   }
 
   try {
-    // Build the OR-based tsquery
-    // $1 = campaignId, $2 = language config, $3+ = individual query words
-    const params: unknown[] = [campaignId, language];
-    const tsquery = buildOrTsquery(query, 2, params.length + 1);
-    params.push(...tsquery.params);
+    // ---- Try AND search first (precise) ----
+    // $1 = campaignId, $2 = language config, $3 = full query
+    const andParams: unknown[] = [campaignId, language, query.trim()];
+    const andTsquery = `plainto_tsquery($2::regconfig, $3)`;
 
-    const conditions: string[] = [
+    const andConditions: string[] = [
       "c.campaign_id = $1",
-      `to_tsvector($2::regconfig, c.content) @@ ${tsquery.sql}`,
+      `to_tsvector($2::regconfig, c.content) @@ ${andTsquery}`,
+      ...buildFilterConditions(andParams, documentIds, documentTypes),
     ];
 
-    // Add document ID filter if provided
-    if (documentIds && documentIds.length > 0) {
-      const placeholders = documentIds.map(
-        (_, i) => `$${params.length + i + 1}`
-      );
-      conditions.push(`c.document_id IN (${placeholders.join(", ")})`);
-      params.push(...documentIds);
+    const andResults = await executeKeywordSearch(
+      andTsquery,
+      andParams,
+      andConditions,
+      limit,
+    );
+
+    // If AND returned enough results, use them
+    if (andResults.length >= AND_FALLBACK_THRESHOLD) {
+      return ok(andResults);
     }
 
-    // Add document type filter if provided
-    if (documentTypes && documentTypes.length > 0) {
-      const placeholders = documentTypes.map(
-        (_, i) => `$${params.length + i + 1}`
-      );
-      conditions.push(`d.document_type IN (${placeholders.join(", ")})`);
-      params.push(...documentTypes);
-    }
+    // ---- Fall back to OR search (broader recall) ----
+    const orParams: unknown[] = [campaignId, language];
+    const orTsquery = buildOrTsquery(query, 2, orParams.length + 1);
+    orParams.push(...orTsquery.params);
 
-    const whereClause = conditions.join(" AND ");
+    const orConditions: string[] = [
+      "c.campaign_id = $1",
+      `to_tsvector($2::regconfig, c.content) @@ ${orTsquery.sql}`,
+      ...buildFilterConditions(orParams, documentIds, documentTypes),
+    ];
 
-    // Execute the full-text search query
-    // Using raw SQL because Drizzle doesn't natively support PostgreSQL full-text search
-    const queryText = `
-      SELECT
-        c.id as chunk_id,
-        c.content,
-        c.chunk_index,
-        c.token_count,
-        c.page_number,
-        c.section,
-        c.created_at as chunk_created_at,
-        ts_rank(to_tsvector($2::regconfig, c.content), ${tsquery.sql}) as rank,
-        d.id as document_id,
-        d.name as document_name,
-        d.document_type,
-        d.metadata
-      FROM chunks c
-      INNER JOIN documents d ON c.document_id = d.id
-      WHERE ${whereClause}
-      ORDER BY rank DESC
-      LIMIT ${limit}
-    `;
+    const orResults = await executeKeywordSearch(
+      orTsquery.sql,
+      orParams,
+      orConditions,
+      limit,
+    );
 
-    const rows = (await queryClient.unsafe(
-      queryText,
-      params as (string | number)[]
-    )) as unknown as Array<{
-      chunk_id: string;
-      content: string;
-      chunk_index: number;
-      token_count: number;
-      page_number: number | null;
-      section: string | null;
-      chunk_created_at: Date;
-      rank: number;
-      document_id: string;
-      document_name: string;
-      document_type: DocumentType;
-      metadata: DocumentMetadata;
-    }>;
-
-    // Transform results to the expected format
-    const results: KeywordSearchResult[] = rows.map((row) => ({
-      chunk: {
-        id: row.chunk_id,
-        content: row.content,
-        chunkIndex: row.chunk_index,
-        tokenCount: row.token_count,
-        pageNumber: row.page_number,
-        section: row.section,
-        createdAt: row.chunk_created_at,
-      },
-      rank: Number(row.rank),
-      document: {
-        id: row.document_id,
-        name: row.document_name,
-        documentType: row.document_type,
-        metadata: row.metadata ?? {},
-      },
-    }));
-
-    return ok(results);
+    // Return whichever set has more results
+    return ok(orResults.length > andResults.length ? orResults : andResults);
   } catch (error) {
     return err({
       code: "DATABASE_ERROR",
