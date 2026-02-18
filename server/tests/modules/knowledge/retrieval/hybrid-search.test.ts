@@ -19,7 +19,7 @@ vi.mock("@/modules/knowledge/retrieval/keyword-search.js", () => ({
 // Import after mocks are set up
 import {
   searchChunksHybrid,
-  normalizeScores,
+  rrfScore,
 } from "@/modules/knowledge/retrieval/hybrid-search.js";
 import type {
   VectorSearchResult,
@@ -87,37 +87,33 @@ describe("Hybrid Search", () => {
     vi.clearAllMocks();
   });
 
-  describe("normalizeScores", () => {
-    it("should normalize scores to 0-1 range", () => {
-      const result = normalizeScores([0.2, 0.4, 0.8]);
-      expect(result).toEqual([0, 1 / 3, 1]);
+  describe("rrfScore", () => {
+    it("should compute 1/(k+rank) with default k=60", () => {
+      expect(rrfScore(1)).toBeCloseTo(1 / 61);
+      expect(rrfScore(2)).toBeCloseTo(1 / 62);
+      expect(rrfScore(10)).toBeCloseTo(1 / 70);
     });
 
-    it("should return 1.0 for all identical scores", () => {
-      const result = normalizeScores([0.5, 0.5, 0.5]);
-      expect(result).toEqual([1.0, 1.0, 1.0]);
+    it("should support custom k value", () => {
+      expect(rrfScore(1, 10)).toBeCloseTo(1 / 11);
+      expect(rrfScore(5, 10)).toBeCloseTo(1 / 15);
     });
 
-    it("should return 1.0 for a single score", () => {
-      const result = normalizeScores([0.75]);
-      expect(result).toEqual([1.0]);
+    it("should decrease as rank increases", () => {
+      expect(rrfScore(1)).toBeGreaterThan(rrfScore(2));
+      expect(rrfScore(2)).toBeGreaterThan(rrfScore(10));
+      expect(rrfScore(10)).toBeGreaterThan(rrfScore(100));
     });
 
-    it("should return empty array for empty input", () => {
-      const result = normalizeScores([]);
-      expect(result).toEqual([]);
-    });
-
-    it("should handle two scores (min becomes 0, max becomes 1)", () => {
-      const result = normalizeScores([0.3, 0.9]);
-      expect(result[0]).toBeCloseTo(0);
-      expect(result[1]).toBeCloseTo(1);
+    it("should always return a positive value", () => {
+      expect(rrfScore(1)).toBeGreaterThan(0);
+      expect(rrfScore(1000)).toBeGreaterThan(0);
     });
   });
 
   describe("searchChunksHybrid", () => {
-    it("should combine vector and keyword results with weighted scoring", async () => {
-      // Chunk appears in both searches
+    it("should combine vector and keyword results with RRF scoring", async () => {
+      // Chunk appears in both searches at rank 1
       mockSearchChunksByVector.mockResolvedValue({
         ok: true,
         value: [makeVectorResult("chunk-001", 0.9)],
@@ -132,11 +128,10 @@ describe("Hybrid Search", () => {
       expect(result.ok).toBe(true);
       if (result.ok) {
         expect(result.value).toHaveLength(1);
-        // Single result in each search normalizes to 1.0
-        // combined = 0.7 * 1.0 + 0.3 * 1.0 = 1.0
+        // Single result normalizes to 1.0
         expect(result.value[0].score).toBeCloseTo(1.0);
-        expect(result.value[0].vectorScore).toBeCloseTo(1.0);
-        expect(result.value[0].keywordScore).toBeCloseTo(1.0);
+        expect(result.value[0].vectorScore).not.toBeNull();
+        expect(result.value[0].keywordScore).not.toBeNull();
       }
     });
 
@@ -189,10 +184,43 @@ describe("Hybrid Search", () => {
 
       expect(result.ok).toBe(true);
       if (result.ok) {
-        // chunk-both gets high scores from both searches, so should rank highest
+        // chunk-both gets RRF contributions from both searches, so should rank highest
         expect(result.value[0].chunk.id).toBe("chunk-both");
         expect(result.value[0].vectorScore).not.toBeNull();
         expect(result.value[0].keywordScore).not.toBeNull();
+      }
+    });
+
+    it("should rank by position not by raw score magnitude", async () => {
+      // Vector search: chunk-A at rank 1 with low raw score
+      // Keyword search: chunk-B at rank 1 with high raw score
+      // With RRF, both get the same rank-1 RRF contribution from their respective searches
+      mockSearchChunksByVector.mockResolvedValue({
+        ok: true,
+        value: [
+          makeVectorResult("chunk-A", 0.3), // low raw score but rank 1
+          makeVectorResult("chunk-B", 0.2), // rank 2
+        ],
+      });
+      mockSearchChunksByKeyword.mockResolvedValue({
+        ok: true,
+        value: [
+          makeKeywordResult("chunk-B", 0.9), // high raw score but doesn't matter for RRF
+          makeKeywordResult("chunk-A", 0.1), // rank 2
+        ],
+      });
+
+      const result = await searchChunksHybrid("dragon", embedding, campaignId, {
+        vectorWeight: 0.5,
+        keywordWeight: 0.5,
+      });
+
+      expect(result.ok).toBe(true);
+      if (result.ok) {
+        // Both chunks appear in both searches — chunk-A is rank 1 in vector, rank 2 in keyword
+        // chunk-B is rank 2 in vector, rank 1 in keyword. With equal weights, they should
+        // have the same combined score (symmetric)
+        expect(result.value[0].score).toBeCloseTo(result.value[1].score, 5);
       }
     });
 
@@ -311,7 +339,10 @@ describe("Hybrid Search", () => {
       );
     });
 
-    it("should use default weights of 0.7 vector and 0.3 keyword", async () => {
+    it("should weight vector results higher with default 0.7/0.3 weights", async () => {
+      // chunk-v: rank 1 in vector only
+      // chunk-k: rank 1 in keyword only
+      // With 0.7/0.3 weights, vector-only rank-1 should score higher
       mockSearchChunksByVector.mockResolvedValue({
         ok: true,
         value: [makeVectorResult("chunk-v", 0.9)],
@@ -325,16 +356,15 @@ describe("Hybrid Search", () => {
 
       expect(result.ok).toBe(true);
       if (result.ok) {
-        // chunk-v: vectorScore=1.0, keywordScore=null → 0.7 * 1.0 + 0.3 * 0 = 0.7
-        // chunk-k: vectorScore=null, keywordScore=1.0 → 0.7 * 0 + 0.3 * 1.0 = 0.3
         const chunkV = result.value.find((r) => r.chunk.id === "chunk-v")!;
         const chunkK = result.value.find((r) => r.chunk.id === "chunk-k")!;
-        expect(chunkV.score).toBeCloseTo(0.7);
-        expect(chunkK.score).toBeCloseTo(0.3);
+        expect(chunkV.score).toBeGreaterThan(chunkK.score);
       }
     });
 
     it("should support custom weights", async () => {
+      // With equal weights, vector-only rank-1 and keyword-only rank-1
+      // should get the same raw RRF score
       mockSearchChunksByVector.mockResolvedValue({
         ok: true,
         value: [makeVectorResult("chunk-v", 0.9)],
@@ -353,9 +383,8 @@ describe("Hybrid Search", () => {
       if (result.ok) {
         const chunkV = result.value.find((r) => r.chunk.id === "chunk-v")!;
         const chunkK = result.value.find((r) => r.chunk.id === "chunk-k")!;
-        // Each only found in one search: 0.5 * 1.0 + 0.5 * 0 = 0.5
-        expect(chunkV.score).toBeCloseTo(0.5);
-        expect(chunkK.score).toBeCloseTo(0.5);
+        // Both are rank 1 in their respective searches with equal weights
+        expect(chunkV.score).toBeCloseTo(chunkK.score);
       }
     });
 
@@ -406,9 +435,8 @@ describe("Hybrid Search", () => {
 
         expect(result.ok).toBe(true);
         if (result.ok) {
-          // With weight scaled to 1.0, top result should get score 1.0
+          // Top result should be normalized to 1.0, bottom to 0.0
           expect(result.value[0].score).toBeCloseTo(1.0);
-          // Bottom result normalized to 0
           expect(result.value[1].score).toBeCloseTo(0.0);
         }
       });
@@ -427,7 +455,7 @@ describe("Hybrid Search", () => {
 
         expect(result.ok).toBe(true);
         if (result.ok) {
-          // With weight scaled to 1.0, top result should get score 1.0
+          // Top result should be normalized to 1.0, bottom to 0.0
           expect(result.value[0].score).toBeCloseTo(1.0);
           expect(result.value[1].score).toBeCloseTo(0.0);
         }

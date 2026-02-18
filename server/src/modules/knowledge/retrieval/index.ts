@@ -19,7 +19,7 @@ export {
 
 export {
   searchChunksHybrid,
-  normalizeScores,
+  rrfScore,
   type HybridSearchResult,
   type HybridSearchOptions,
   type HybridSearchError,
