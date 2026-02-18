@@ -16,6 +16,7 @@ import type {
   AnswerSource,
   GeneratedAnswer,
   ResponseGeneratorError,
+  ConversationMessage,
 } from "./types.js";
 
 // ============================================================================
@@ -133,18 +134,33 @@ export function computeConfidence(
  * @param llmService - The LLM service instance to use for generation
  * @returns The generated answer with confidence and citations
  */
+/** Maximum number of history messages to include in the prompt */
+const MAX_HISTORY_MESSAGES = 10;
+
 export async function generateResponse(
   query: string,
   context: BuiltContext,
   llmService: LLMService,
+  conversationHistory?: ConversationMessage[],
 ): Promise<Result<GeneratedAnswer, ResponseGeneratorError>> {
   const userMessage = buildUserMessage(query, context);
 
+  // Build messages array: system, then recent history, then current user message
+  const messages: Array<{ role: "system" | "user" | "assistant"; content: string }> = [
+    { role: "system", content: SYSTEM_PROMPT },
+  ];
+
+  if (conversationHistory && conversationHistory.length > 0) {
+    const recentHistory = conversationHistory.slice(-MAX_HISTORY_MESSAGES);
+    for (const msg of recentHistory) {
+      messages.push({ role: msg.role, content: msg.content });
+    }
+  }
+
+  messages.push({ role: "user", content: userMessage });
+
   const chatResult = await llmService.chat({
-    messages: [
-      { role: "system", content: SYSTEM_PROMPT },
-      { role: "user", content: userMessage },
-    ],
+    messages,
     temperature: 0.3,
   });
 

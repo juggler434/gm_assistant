@@ -121,7 +121,16 @@ export function QueryPage() {
       pendingQueryRef.current = true;
 
       try {
-        const response = await queryAsync({ campaignId, query });
+        // Build conversation history from existing messages (exclude the loading placeholder)
+        const history = localMessages
+          .filter((m) => !m.isLoading && m.content)
+          .map((m) => ({ role: m.role, content: m.content }));
+
+        const response = await queryAsync({
+          campaignId,
+          query,
+          conversationHistory: history.length > 0 ? history : undefined,
+        });
 
         // Update local UI
         setLocalMessages((prev) =>
