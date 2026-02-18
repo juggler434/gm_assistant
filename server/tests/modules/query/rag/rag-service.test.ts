@@ -3,13 +3,18 @@
 import { describe, it, expect, vi, beforeEach } from "vitest";
 
 // Hoist mock functions
-const { mockSearchChunksHybrid, mockFetch } = vi.hoisted(() => ({
+const { mockSearchChunksHybrid, mockExpandNeighborChunks, mockFetch } = vi.hoisted(() => ({
   mockSearchChunksHybrid: vi.fn(),
+  mockExpandNeighborChunks: vi.fn(),
   mockFetch: vi.fn(),
 }));
 
 vi.mock("@/modules/knowledge/retrieval/hybrid-search.js", () => ({
   searchChunksHybrid: mockSearchChunksHybrid,
+}));
+
+vi.mock("@/modules/knowledge/retrieval/chunk-expansion.js", () => ({
+  expandNeighborChunks: mockExpandNeighborChunks,
 }));
 
 vi.mock("@/config/index.js", () => ({
@@ -87,6 +92,8 @@ describe("RAG Service", () => {
 
   beforeEach(() => {
     vi.clearAllMocks();
+    // By default, expansion returns the input unchanged
+    mockExpandNeighborChunks.mockImplementation((results: unknown[]) => Promise.resolve(results));
   });
 
   describe("executeRAGPipeline", () => {

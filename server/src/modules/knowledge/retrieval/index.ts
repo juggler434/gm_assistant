@@ -24,3 +24,5 @@ export {
   type HybridSearchOptions,
   type HybridSearchError,
 } from "./hybrid-search.js";
+
+export { expandNeighborChunks } from "./chunk-expansion.js";

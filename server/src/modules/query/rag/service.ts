@@ -20,6 +20,7 @@ import {
   searchChunksHybrid,
   type HybridSearchOptions,
 } from "@/modules/knowledge/retrieval/hybrid-search.js";
+import { expandNeighborChunks } from "@/modules/knowledge/retrieval/chunk-expansion.js";
 import { buildContext } from "./context-builder.js";
 import { generateResponse } from "./response-generator.js";
 import { rewriteQuery } from "./query-rewriter.js";
@@ -182,6 +183,9 @@ export async function executeRAGPipeline(
 
   const searchResults = searchResult.value;
   const chunksRetrieved = searchResults.length;
+
+  // ---- Step 3b: Expand chunks with neighbor context ----
+  await expandNeighborChunks(searchResults);
 
   // ---- Step 4: Build context from search results ----
   const contextOptions: ContextBuilderOptions = {
