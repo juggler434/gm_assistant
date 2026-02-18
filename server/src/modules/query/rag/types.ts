@@ -83,6 +83,12 @@ export interface ResponseGeneratorError {
 // RAG Service Types
 // ============================================================================
 
+/** A single message in conversation history */
+export interface ConversationMessage {
+  role: "user" | "assistant";
+  content: string;
+}
+
 /** Input for a RAG query */
 export interface RAGQuery {
   /** The user's question */
@@ -93,10 +99,12 @@ export interface RAGQuery {
   documentIds?: string[];
   /** Optional: filter by document types */
   documentTypes?: DocumentType[];
-  /** Maximum number of chunks to retrieve (default: 8) */
+  /** Maximum number of chunks to retrieve (default: 20) */
   maxChunks?: number;
-  /** Maximum token budget for context (default: 3000) */
+  /** Maximum token budget for context (default: 16000) */
   maxContextTokens?: number;
+  /** Optional conversation history for follow-up questions */
+  conversationHistory?: ConversationMessage[];
 }
 
 /** Full result of a RAG pipeline execution */
