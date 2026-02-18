@@ -235,7 +235,7 @@ export function UploadDialog({ campaignId, open, onOpenChange }: UploadDialogPro
           <DialogDescription>Add files to your campaign's knowledge base.</DialogDescription>
         </DialogHeader>
 
-        <div className="space-y-4">
+        <div className="min-w-0 space-y-4">
           {!hasUploads && (
             <>
               <FileUploader
