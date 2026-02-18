@@ -8,8 +8,10 @@
 
 import { config } from "@/config/index.js";
 import { OllamaProvider } from "./providers/ollama.js";
+import { GeminiProvider } from "./providers/gemini.js";
 import { LLMService, type LLMServiceOptions } from "./service.js";
 import type { LLMConfig } from "./types.js";
+import type { LLMProvider } from "./providers/interface.js";
 
 /**
  * Create an LLM service using the application configuration.
@@ -42,7 +44,7 @@ export function createLLMService(options?: LLMServiceOptions): LLMService {
     temperature: config.llm.temperature,
   };
 
-  const provider = new OllamaProvider(llmConfig);
+  const provider = createProvider(llmConfig);
   return new LLMService(provider, llmConfig, options);
 }
 
@@ -57,6 +59,20 @@ export function createLLMServiceWithConfig(
   llmConfig: LLMConfig,
   options?: LLMServiceOptions
 ): LLMService {
-  const provider = new OllamaProvider(llmConfig);
+  const provider = createProvider(llmConfig);
   return new LLMService(provider, llmConfig, options);
+}
+
+function createProvider(llmConfig: LLMConfig): LLMProvider {
+  if (config.llm.provider === "google") {
+    const apiKey = config.googleAi.apiKey;
+    if (!apiKey) {
+      throw new Error(
+        "GOOGLE_AI_API_KEY is required when LLM_PROVIDER is set to 'google'"
+      );
+    }
+    return new GeminiProvider(llmConfig, apiKey);
+  }
+
+  return new OllamaProvider(llmConfig);
 }
