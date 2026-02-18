@@ -2,10 +2,11 @@
 
 import { useMutation } from "@tanstack/react-query";
 import { api } from "@/lib/api-client";
-import type { QueryRequest, QueryResponse } from "@/types";
+import type { QueryRequest, QueryResponse, ConversationHistoryMessage } from "@/types";
 
 interface CampaignQueryParams extends QueryRequest {
   campaignId: string;
+  conversationHistory?: ConversationHistoryMessage[];
 }
 
 export function useCampaignQuery() {

@@ -46,10 +46,17 @@ export interface QueryFilters {
   documentIds?: string[];
 }
 
+/** A single message in a conversation history */
+export interface ConversationHistoryMessage {
+  role: "user" | "assistant";
+  content: string;
+}
+
 /** Request body for POST /api/campaigns/:campaignId/query */
 export interface QueryRequest {
   query: string;
   filters?: QueryFilters;
+  conversationHistory?: ConversationHistoryMessage[];
 }
 
 // ============================================================================

@@ -45,10 +45,10 @@ const EMBEDDING_MODEL = "nomic-embed-text";
 const EMBEDDING_TIMEOUT = 30_000;
 
 /** Default number of chunks to retrieve */
-const DEFAULT_MAX_CHUNKS = 8;
+const DEFAULT_MAX_CHUNKS = 20;
 
 /** Default maximum context token budget */
-const DEFAULT_MAX_CONTEXT_TOKENS = 3000;
+const DEFAULT_MAX_CONTEXT_TOKENS = 16_000;
 
 // ============================================================================
 // Embedding Helper
@@ -185,6 +185,7 @@ export async function executeRAGPipeline(
     trimmedQuestion,
     context,
     llmService,
+    query.conversationHistory,
   );
 
   if (!responseResult.ok) {

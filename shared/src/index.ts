@@ -36,6 +36,7 @@ export type {
   AnswerSource,
   QuerySource,
   QueryFilters,
+  ConversationHistoryMessage,
   QueryRequest,
   ConfidenceLevel,
   QueryResponse,

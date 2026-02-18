@@ -50,7 +50,7 @@ export async function queryRoutes(app: FastifyInstance): Promise<void> {
       });
     }
 
-    const { query, filters } = bodyResult.data;
+    const { query, filters, conversationHistory } = bodyResult.data;
 
     // Resolve filters
     let documentIds: string[] | undefined = filters?.documentIds;
@@ -90,6 +90,9 @@ export async function queryRoutes(app: FastifyInstance): Promise<void> {
     }
     if (documentTypes) {
       ragQuery.documentTypes = documentTypes;
+    }
+    if (conversationHistory && conversationHistory.length > 0) {
+      ragQuery.conversationHistory = conversationHistory;
     }
     const result = await executeRAGPipeline(ragQuery, llmService);
 

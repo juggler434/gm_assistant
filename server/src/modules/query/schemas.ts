@@ -23,6 +23,15 @@ export const queryBodySchema = z.object({
       documentIds: z.array(z.string().uuid()).optional(),
     })
     .optional(),
+  conversationHistory: z
+    .array(
+      z.object({
+        role: z.enum(["user", "assistant"]),
+        content: z.string().max(10_000),
+      }),
+    )
+    .max(20)
+    .optional(),
 });
 
 export type QueryBody = z.infer<typeof queryBodySchema>;
