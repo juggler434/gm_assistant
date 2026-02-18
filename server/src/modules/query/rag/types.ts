@@ -50,8 +50,10 @@ export interface BuiltContext {
 export interface ContextBuilderOptions {
   /** Maximum estimated tokens for the context window (default: 3000) */
   maxTokens?: number;
-  /** Minimum relevance score to include a chunk (default: 0.1) */
+  /** Minimum relevance score to include a chunk (default: 0.3) */
   minRelevanceScore?: number;
+  /** Adaptive ratio — chunks below this fraction of the top score are dropped (default: 0.4) */
+  adaptiveRatio?: number;
 }
 
 // ============================================================================

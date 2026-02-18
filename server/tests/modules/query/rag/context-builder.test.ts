@@ -110,14 +110,42 @@ describe("Context Builder", () => {
     it("should filter out chunks below minRelevanceScore", () => {
       const results = [
         makeSearchResult({ chunkId: "c1", score: 0.8 }),
-        makeSearchResult({ chunkId: "c2", score: 0.05 }),
-        makeSearchResult({ chunkId: "c3", score: 0.02 }),
+        makeSearchResult({ chunkId: "c2", score: 0.2 }),
+        makeSearchResult({ chunkId: "c3", score: 0.1 }),
       ];
 
-      const context = buildContext(results, { minRelevanceScore: 0.1 });
+      const context = buildContext(results, { minRelevanceScore: 0.3, adaptiveRatio: 0 });
 
       expect(context.chunksUsed).toBe(1);
       expect(context.sources[0]?.documentName).toBe("Monster Manual");
+    });
+
+    it("should apply adaptive filtering based on top score", () => {
+      const results = [
+        makeSearchResult({ chunkId: "c1", score: 0.9 }),
+        makeSearchResult({ chunkId: "c2", score: 0.5 }),
+        makeSearchResult({ chunkId: "c3", score: 0.3 }),
+      ];
+
+      // adaptiveRatio 0.6 → floor = 0.9 * 0.6 = 0.54, so only c1 passes
+      const context = buildContext(results, { minRelevanceScore: 0.1, adaptiveRatio: 0.6 });
+
+      expect(context.chunksUsed).toBe(1);
+    });
+
+    it("should use adaptive floor when it exceeds minRelevanceScore", () => {
+      const results = [
+        makeSearchResult({ chunkId: "c1", score: 0.9 }),
+        makeSearchResult({ chunkId: "c2", score: 0.4 }),
+        makeSearchResult({ chunkId: "c3", score: 0.15 }),
+      ];
+
+      // Default adaptive ratio 0.4 → floor = 0.9 * 0.4 = 0.36
+      // minRelevanceScore 0.1 < 0.36 so adaptive floor dominates
+      // c2 (0.4) passes, c3 (0.15) dropped
+      const context = buildContext(results, { minRelevanceScore: 0.1 });
+
+      expect(context.chunksUsed).toBe(2);
     });
 
     it("should return empty context when no results provided", () => {
@@ -135,7 +163,7 @@ describe("Context Builder", () => {
         makeSearchResult({ score: 0.05 }),
       ];
 
-      const context = buildContext(results, { minRelevanceScore: 0.5 });
+      const context = buildContext(results, { minRelevanceScore: 0.5, adaptiveRatio: 0 });
 
       expect(context.chunksUsed).toBe(0);
       expect(context.contextText).toBe("");
