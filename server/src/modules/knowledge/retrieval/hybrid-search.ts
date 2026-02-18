@@ -68,20 +68,19 @@ export interface HybridSearchError {
 }
 
 /**
- * Normalizes an array of scores to the 0-1 range using min-max normalization.
- * If all scores are identical (or there's only one), returns 1.0 for all.
+ * Smoothing constant for Reciprocal Rank Fusion. Standard value from the
+ * original RRF paper (Cormack et al., 2009). Higher values reduce the
+ * influence of rank position, making scores more uniform.
  */
-export function normalizeScores(scores: number[]): number[] {
-  if (scores.length === 0) return [];
+const RRF_K = 60;
 
-  const min = Math.min(...scores);
-  const max = Math.max(...scores);
-
-  if (max === min) {
-    return scores.map(() => 1.0);
-  }
-
-  return scores.map((s) => (s - min) / (max - min));
+/**
+ * Compute the Reciprocal Rank Fusion score for a given rank position.
+ * @param rank - 1-indexed rank position (1 = best)
+ * @param k - Smoothing constant (default: 60)
+ */
+export function rrfScore(rank: number, k: number = RRF_K): number {
+  return 1 / (k + rank);
 }
 
 /**
@@ -91,12 +90,13 @@ export function normalizeScores(scores: number[]): number[] {
  * Algorithm:
  * 1. Run vector search (top 2x limit)
  * 2. Run keyword search (top 2x limit)
- * 3. Normalize scores from each search to 0-1 range
+ * 3. Assign Reciprocal Rank Fusion (RRF) scores based on rank position
  * 4. Combine with weighted scoring (default: 70% vector, 30% keyword)
- * 5. Deduplicate by chunk ID and return top-k
+ * 5. Deduplicate by chunk ID, normalize to 0-1 range, and return top-k
  *
- * When one search returns no results, the other search's weight is
- * scaled to 1.0 so scores are not artificially reduced.
+ * RRF is more robust than min-max normalization because it scores by
+ * rank position rather than raw score, preventing inflated scores when
+ * one search returns only loosely relevant results.
  *
  * @param query - The keyword search query string
  * @param embedding - The query embedding vector (768 dimensions)
@@ -202,23 +202,15 @@ export async function searchChunksHybrid(
   const normVectorWeight = effectiveVectorWeight / totalWeight;
   const normKeywordWeight = effectiveKeywordWeight / totalWeight;
 
-  // Normalize vector scores (using the .score field which is 1 - distance)
-  const vectorScores = vectorResults.map((r) => r.score);
-  const normalizedVectorScores = normalizeScores(vectorScores);
-
-  // Normalize keyword scores (using the .rank field from ts_rank)
-  const keywordScores = keywordResults.map((r) => r.rank);
-  const normalizedKeywordScores = normalizeScores(keywordScores);
-
-  // Build lookup maps by chunk ID
-  const vectorMap = new Map<string, { result: VectorSearchResult; normalizedScore: number }>();
+  // Build RRF lookup maps by chunk ID (1-indexed rank position)
+  const vectorMap = new Map<string, { result: VectorSearchResult; rrfScore: number }>();
   vectorResults.forEach((r, i) => {
-    vectorMap.set(r.chunk.id, { result: r, normalizedScore: normalizedVectorScores[i] ?? 0 });
+    vectorMap.set(r.chunk.id, { result: r, rrfScore: rrfScore(i + 1) });
   });
 
-  const keywordMap = new Map<string, { result: KeywordSearchResult; normalizedScore: number }>();
+  const keywordMap = new Map<string, { result: KeywordSearchResult; rrfScore: number }>();
   keywordResults.forEach((r, i) => {
-    keywordMap.set(r.chunk.id, { result: r, normalizedScore: normalizedKeywordScores[i] ?? 0 });
+    keywordMap.set(r.chunk.id, { result: r, rrfScore: rrfScore(i + 1) });
   });
 
   // Collect all unique chunk IDs
@@ -227,15 +219,15 @@ export async function searchChunksHybrid(
     ...keywordMap.keys(),
   ]);
 
-  // Compute combined scores and build results
+  // Compute weighted RRF scores
   const combined: HybridSearchResult[] = [];
 
   for (const chunkId of allChunkIds) {
     const vectorEntry = vectorMap.get(chunkId);
     const keywordEntry = keywordMap.get(chunkId);
 
-    const vScore = vectorEntry?.normalizedScore ?? 0;
-    const kScore = keywordEntry?.normalizedScore ?? 0;
+    const vScore = vectorEntry?.rrfScore ?? 0;
+    const kScore = keywordEntry?.rrfScore ?? 0;
 
     const combinedScore = normVectorWeight * vScore + normKeywordWeight * kScore;
 
@@ -245,14 +237,26 @@ export async function searchChunksHybrid(
     combined.push({
       chunk: { ...source.chunk },
       score: combinedScore,
-      vectorScore: vectorEntry ? vectorEntry.normalizedScore : null,
-      keywordScore: keywordEntry ? keywordEntry.normalizedScore : null,
+      vectorScore: vectorEntry ? vectorEntry.rrfScore : null,
+      keywordScore: keywordEntry ? keywordEntry.rrfScore : null,
       document: { ...source.document },
     });
   }
 
-  // Sort by combined score descending, return top-k
+  // Sort by combined score descending
   combined.sort((a, b) => b.score - a.score);
 
-  return ok(combined.slice(0, limit));
+  // Normalize combined scores to 0-1 range for downstream consumers
+  const topK = combined.slice(0, limit);
+  if (topK.length > 0) {
+    const maxScore = topK[0].score;
+    const minScore = topK[topK.length - 1]!.score;
+    const range = maxScore - minScore;
+
+    for (const result of topK) {
+      result.score = range > 0 ? (result.score - minScore) / range : 1.0;
+    }
+  }
+
+  return ok(topK);
 }
