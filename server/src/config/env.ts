@@ -38,11 +38,15 @@ const envSchema = z
     S3_SECRET_KEY: z.string().optional(),
 
     // LLM
+    LLM_PROVIDER: z.enum(["ollama", "google"]).default("ollama"),
     LLM_MODEL: z.string().default("gemma3:1b"),
     LLM_BASE_URL: z.string().url().default("http://localhost:11434"),
     LLM_TIMEOUT: z.coerce.number().int().positive().default(120000),
     LLM_MAX_TOKENS: z.coerce.number().int().positive().default(2048),
     LLM_TEMPERATURE: z.coerce.number().min(0).max(2).default(0.7),
+
+    // Google AI (Gemini)
+    GOOGLE_AI_API_KEY: z.string().optional(),
 
     // Auth
     JWT_SECRET: z.string().optional(),
