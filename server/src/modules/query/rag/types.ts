@@ -135,7 +135,8 @@ export interface RAGError {
     | "SEARCH_FAILED"
     | "CONTEXT_BUILD_FAILED"
     | "GENERATION_FAILED"
-    | "REWRITE_FAILED";
+    | "REWRITE_FAILED"
+    | "RERANK_FAILED";
   message: string;
   cause?: unknown;
 }
