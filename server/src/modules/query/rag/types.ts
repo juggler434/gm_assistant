@@ -132,7 +132,8 @@ export interface RAGError {
     | "EMBEDDING_FAILED"
     | "SEARCH_FAILED"
     | "CONTEXT_BUILD_FAILED"
-    | "GENERATION_FAILED";
+    | "GENERATION_FAILED"
+    | "REWRITE_FAILED";
   message: string;
   cause?: unknown;
 }

@@ -22,6 +22,7 @@ import {
 } from "@/modules/knowledge/retrieval/hybrid-search.js";
 import { buildContext } from "./context-builder.js";
 import { generateResponse } from "./response-generator.js";
+import { rewriteQuery } from "./query-rewriter.js";
 import type {
   RAGQuery,
   RAGResult,
@@ -138,13 +139,22 @@ export async function executeRAGPipeline(
     });
   }
 
-  // ---- Step 1: Generate query embedding ----
-  const embeddingResult = await generateQueryEmbedding(trimmedQuestion);
+  // ---- Step 1: Rewrite query if conversation history is present ----
+  const rewriteResult = await rewriteQuery(
+    trimmedQuestion,
+    query.conversationHistory,
+    llmService,
+  );
+  // rewriteQuery always returns ok (falls back to original on failure)
+  const searchQuery = rewriteResult.ok ? rewriteResult.value : trimmedQuestion;
+
+  // ---- Step 2: Generate query embedding ----
+  const embeddingResult = await generateQueryEmbedding(searchQuery);
   if (!embeddingResult.ok) {
     return err(embeddingResult.error);
   }
 
-  // ---- Step 2: Hybrid search for relevant chunks ----
+  // ---- Step 3: Hybrid search for relevant chunks ----
   const searchOptions: HybridSearchOptions = {
     limit: maxChunks,
   };
@@ -156,7 +166,7 @@ export async function executeRAGPipeline(
   }
 
   const searchResult = await searchChunksHybrid(
-    trimmedQuestion,
+    searchQuery,
     embeddingResult.value,
     campaignId,
     searchOptions,
@@ -173,14 +183,14 @@ export async function executeRAGPipeline(
   const searchResults = searchResult.value;
   const chunksRetrieved = searchResults.length;
 
-  // ---- Step 3: Build context from search results ----
+  // ---- Step 4: Build context from search results ----
   const contextOptions: ContextBuilderOptions = {
     maxTokens: maxContextTokens,
   };
 
   const context = buildContext(searchResults, contextOptions);
 
-  // ---- Step 4: Generate response via LLM ----
+  // ---- Step 5: Generate response via LLM ----
   const responseResult = await generateResponse(
     trimmedQuestion,
     context,
@@ -198,7 +208,7 @@ export async function executeRAGPipeline(
 
   const generated = responseResult.value;
 
-  // ---- Step 5: Assemble final result ----
+  // ---- Step 6: Assemble final result ----
   return ok({
     answer: generated.answer,
     confidence: generated.confidence,
