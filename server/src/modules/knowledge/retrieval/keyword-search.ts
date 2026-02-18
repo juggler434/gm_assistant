@@ -78,6 +78,51 @@ function validateQuery(query: string): KeywordSearchError | null {
 }
 
 /**
+ * Build an OR-based tsquery from a natural language query.
+ *
+ * Splits the query into words (filtering out very short ones), wraps each in
+ * `plainto_tsquery` for proper stemming, then joins with `||` (OR). This
+ * dramatically improves recall for natural language questions compared to
+ * the default AND logic of a single `plainto_tsquery`.
+ *
+ * Returns the SQL expression string and the parameter values to append.
+ * Falls back to a single `plainto_tsquery` when no words pass the filter.
+ */
+function buildOrTsquery(
+  query: string,
+  languageParamIndex: number,
+  nextParamIndex: number
+): { sql: string; params: string[] } {
+  const words = query
+    .trim()
+    .split(/\s+/)
+    .filter((w) => w.length > 2);
+
+  if (words.length === 0) {
+    // Fallback: use the full query as-is (single plainto_tsquery)
+    return {
+      sql: `plainto_tsquery($${languageParamIndex}::regconfig, $${nextParamIndex})`,
+      params: [query.trim()],
+    };
+  }
+
+  const parts: string[] = [];
+  const params: string[] = [];
+
+  for (const word of words) {
+    parts.push(
+      `plainto_tsquery($${languageParamIndex}::regconfig, $${nextParamIndex + params.length})`
+    );
+    params.push(word);
+  }
+
+  return {
+    sql: `(${parts.join(" || ")})`,
+    params,
+  };
+}
+
+/**
  * Search for chunks by keyword using PostgreSQL full-text search
  *
  * Uses `to_tsvector` and `plainto_tsquery` for full-text matching,
@@ -108,13 +153,16 @@ export async function searchChunksByKeyword(
   }
 
   try {
-    // Build WHERE conditions
-    // $1 = campaignId, $2 = query, $3 = language config
+    // Build the OR-based tsquery
+    // $1 = campaignId, $2 = language config, $3+ = individual query words
+    const params: unknown[] = [campaignId, language];
+    const tsquery = buildOrTsquery(query, 2, params.length + 1);
+    params.push(...tsquery.params);
+
     const conditions: string[] = [
       "c.campaign_id = $1",
-      "to_tsvector($3::regconfig, c.content) @@ plainto_tsquery($3::regconfig, $2)",
+      `to_tsvector($2::regconfig, c.content) @@ ${tsquery.sql}`,
     ];
-    const params: unknown[] = [campaignId, query.trim(), language];
 
     // Add document ID filter if provided
     if (documentIds && documentIds.length > 0) {
@@ -147,7 +195,7 @@ export async function searchChunksByKeyword(
         c.page_number,
         c.section,
         c.created_at as chunk_created_at,
-        ts_rank(to_tsvector($3::regconfig, c.content), plainto_tsquery($3::regconfig, $2)) as rank,
+        ts_rank(to_tsvector($2::regconfig, c.content), ${tsquery.sql}) as rank,
         d.id as document_id,
         d.name as document_name,
         d.document_type,

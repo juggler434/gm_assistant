@@ -100,14 +100,14 @@ describe("Keyword Search", () => {
       }
     });
 
-    it("should pass campaignId and query as SQL parameters", async () => {
+    it("should pass campaignId, language, and query words as SQL parameters", async () => {
       mockUnsafeResult = [];
 
-      await searchChunksByKeyword("dragon", campaignId);
+      await searchChunksByKeyword("dragon attack", campaignId);
 
       expect(queryClient.unsafe).toHaveBeenCalledWith(
         expect.any(String),
-        expect.arrayContaining([campaignId, "dragon", "english"])
+        expect.arrayContaining([campaignId, "english", "dragon", "attack"])
       );
     });
 
@@ -146,6 +146,46 @@ describe("Keyword Search", () => {
         expect.stringContaining("plainto_tsquery"),
         expect.any(Array)
       );
+    });
+
+    it("should combine multiple words with OR (||) in tsquery", async () => {
+      mockUnsafeResult = [];
+
+      await searchChunksByKeyword("dragon attacks village", campaignId);
+
+      const sql = vi.mocked(queryClient.unsafe).mock.calls[0][0] as string;
+      // Each word gets its own plainto_tsquery, joined with ||
+      expect(sql).toContain("||");
+      // Should have separate parameters for each word
+      expect(queryClient.unsafe).toHaveBeenCalledWith(
+        expect.any(String),
+        expect.arrayContaining(["dragon", "attacks", "village"])
+      );
+    });
+
+    it("should filter out short words (1-2 chars) from tsquery", async () => {
+      mockUnsafeResult = [];
+
+      await searchChunksByKeyword("a dragon is at the village", campaignId);
+
+      // "a", "is", "at" are <= 2 chars and should be filtered out
+      const params = vi.mocked(queryClient.unsafe).mock.calls[0][1] as string[];
+      expect(params).toContain("dragon");
+      expect(params).toContain("the");
+      expect(params).toContain("village");
+      expect(params).not.toContain("a");
+      expect(params).not.toContain("is");
+      expect(params).not.toContain("at");
+    });
+
+    it("should fall back to full query when all words are short", async () => {
+      mockUnsafeResult = [];
+
+      await searchChunksByKeyword("do it", campaignId);
+
+      const params = vi.mocked(queryClient.unsafe).mock.calls[0][1] as string[];
+      // Falls back to full trimmed query
+      expect(params).toContain("do it");
     });
 
     it("should include ts_rank for relevance scoring", async () => {
@@ -213,7 +253,7 @@ describe("Keyword Search", () => {
       await searchChunksByKeyword("dragon", campaignId);
 
       expect(queryClient.unsafe).toHaveBeenCalledWith(
-        expect.stringContaining("$3::regconfig"),
+        expect.stringContaining("$2::regconfig"),
         expect.arrayContaining(["english"])
       );
     });
