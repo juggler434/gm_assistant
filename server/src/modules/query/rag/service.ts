@@ -24,6 +24,7 @@ import { expandNeighborChunks } from "@/modules/knowledge/retrieval/chunk-expans
 import { buildContext } from "./context-builder.js";
 import { generateResponse } from "./response-generator.js";
 import { rewriteQuery } from "./query-rewriter.js";
+import { rerankChunks } from "./reranker.js";
 import type {
   RAGQuery,
   RAGResult,
@@ -187,12 +188,16 @@ export async function executeRAGPipeline(
   // ---- Step 3b: Expand chunks with neighbor context ----
   await expandNeighborChunks(searchResults);
 
+  // ---- Step 3c: Re-rank chunks with LLM ----
+  const rerankResult = await rerankChunks(searchQuery, searchResults, llmService);
+  const rankedResults = rerankResult.ok ? rerankResult.value : searchResults;
+
   // ---- Step 4: Build context from search results ----
   const contextOptions: ContextBuilderOptions = {
     maxTokens: maxContextTokens,
   };
 
-  const context = buildContext(searchResults, contextOptions);
+  const context = buildContext(rankedResults, contextOptions);
 
   // ---- Step 5: Generate response via LLM ----
   const responseResult = await generateResponse(
