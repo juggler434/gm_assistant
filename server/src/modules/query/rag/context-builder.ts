@@ -23,7 +23,13 @@ import type {
 const DEFAULT_MAX_TOKENS = 3000;
 
 /** Default minimum relevance score for inclusion */
-const DEFAULT_MIN_RELEVANCE_SCORE = 0.1;
+const DEFAULT_MIN_RELEVANCE_SCORE = 0.3;
+
+/**
+ * Default adaptive score ratio — chunks scoring below this fraction of the
+ * top result's score are dropped, even if they exceed the absolute minimum.
+ */
+const DEFAULT_ADAPTIVE_RATIO = 0.4;
 
 /** Approximate characters per token (same heuristic used by the chunking service) */
 const CHARS_PER_TOKEN = 4;
@@ -84,7 +90,14 @@ export function buildContext(
   const {
     maxTokens = DEFAULT_MAX_TOKENS,
     minRelevanceScore = DEFAULT_MIN_RELEVANCE_SCORE,
+    adaptiveRatio = DEFAULT_ADAPTIVE_RATIO,
   } = options;
+
+  // Compute the effective minimum: the higher of the absolute threshold and
+  // an adaptive floor derived from the top result's score.
+  const topScore = searchResults.length > 0 ? searchResults[0]!.score : 0;
+  const adaptiveFloor = topScore * adaptiveRatio;
+  const effectiveMin = Math.max(minRelevanceScore, adaptiveFloor);
 
   const sources: SourceCitation[] = [];
   const contextParts: string[] = [];
@@ -92,8 +105,8 @@ export function buildContext(
   let citationIndex = 0;
 
   for (const result of searchResults) {
-    // Skip chunks below the relevance threshold
-    if (result.score < minRelevanceScore) {
+    // Skip chunks below the effective relevance threshold
+    if (result.score < effectiveMin) {
       continue;
     }
 
