@@ -29,8 +29,8 @@ import type {
 // Constants
 // ============================================================================
 
-/** Embedding model matching the 768-dimension chunks table */
-const EMBEDDING_MODEL = "nomic-embed-text";
+/** Embedding model matching the 1024-dimension chunks table */
+const EMBEDDING_MODEL = "mxbai-embed-large";
 
 /** Timeout for embedding requests (ms) */
 const EMBEDDING_TIMEOUT = 30_000;
@@ -73,6 +73,7 @@ async function generateQueryEmbedding(
       body: JSON.stringify({
         model: EMBEDDING_MODEL,
         input: [query],
+        truncate: true,
       }),
       signal: controller.signal,
     });

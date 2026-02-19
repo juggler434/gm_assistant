@@ -77,7 +77,7 @@ function makeHybridResult(
 function mockEmbeddingResponse(): void {
   mockFetch.mockResolvedValueOnce({
     ok: true,
-    json: async () => ({ embeddings: [Array(768).fill(0.1)] }),
+    json: async () => ({ embeddings: [Array(1024).fill(0.1)] }),
     text: async () => "",
   });
 }
@@ -508,7 +508,7 @@ describe("Adventure Hook Generator", () => {
         "http://localhost:11434/api/embed",
         expect.objectContaining({
           method: "POST",
-          body: expect.stringContaining("nomic-embed-text"),
+          body: expect.stringContaining("mxbai-embed-large"),
         }),
       );
     });

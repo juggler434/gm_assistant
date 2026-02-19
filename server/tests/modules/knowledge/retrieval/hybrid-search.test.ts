@@ -30,7 +30,7 @@ import type {
 
 describe("Hybrid Search", () => {
   const campaignId = "123e4567-e89b-12d3-a456-426614174000";
-  const embedding = Array(768).fill(0.1);
+  const embedding = Array(1024).fill(0.1);
 
   function makeVectorResult(
     id: string,
