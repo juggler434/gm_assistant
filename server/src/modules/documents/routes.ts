@@ -91,7 +91,22 @@ export async function documentRoutes(app: FastifyInstance): Promise<void> {
       });
     }
 
-    // Parse optional metadata from form fields
+    // Generate document ID and storage path
+    const documentId = randomUUID();
+    const storagePath = `campaigns/${campaignId}/documents/${documentId}`;
+
+    // Read file content as buffer
+    // Must consume the file stream BEFORE reading fields, because
+    // fields appended after the file in the multipart body are only
+    // available in data.fields once the file stream has been fully consumed.
+    const chunks: Buffer[] = [];
+    for await (const chunk of data.file) {
+      chunks.push(chunk);
+    }
+    const fileBuffer = Buffer.concat(chunks);
+    const fileSize = fileBuffer.length;
+
+    // Parse optional metadata from form fields (available now that file stream is consumed)
     const fields: Record<string, string> = {};
     for (const [key, value] of Object.entries(data.fields)) {
       if (value && typeof value === "object" && "value" in value) {
@@ -101,18 +116,6 @@ export async function documentRoutes(app: FastifyInstance): Promise<void> {
 
     const metadataResult = uploadMetadataSchema.safeParse(fields);
     const metadata = metadataResult.success ? metadataResult.data : {};
-
-    // Generate document ID and storage path
-    const documentId = randomUUID();
-    const storagePath = `campaigns/${campaignId}/documents/${documentId}`;
-
-    // Read file content as buffer
-    const chunks: Buffer[] = [];
-    for await (const chunk of data.file) {
-      chunks.push(chunk);
-    }
-    const fileBuffer = Buffer.concat(chunks);
-    const fileSize = fileBuffer.length;
 
     // Upload to storage
     const uploadResult = await storage.upload(campaignId, documentId, fileBuffer, {
