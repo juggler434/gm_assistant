@@ -81,8 +81,8 @@ interface ExtractionResult {
 // Constants
 // ============================================================================
 
-/** Embedding model matching the 768-dimension chunks table */
-const EMBEDDING_MODEL = "nomic-embed-text";
+/** Embedding model matching the 1024-dimension chunks table */
+const EMBEDDING_MODEL = "mxbai-embed-large";
 
 /** Maximum number of texts to embed in a single API call */
 const EMBEDDING_BATCH_SIZE = 20;
@@ -126,6 +126,7 @@ async function generateEmbeddings(
       body: JSON.stringify({
         model: EMBEDDING_MODEL,
         input: texts,
+        truncate: true,
       }),
       signal: controller.signal,
     });
