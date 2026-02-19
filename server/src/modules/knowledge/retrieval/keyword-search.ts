@@ -88,6 +88,24 @@ function validateQuery(query: string): KeywordSearchError | null {
  * Returns the SQL expression string and the parameter values to append.
  * Falls back to a single `plainto_tsquery` when no words pass the filter.
  */
+/** Common English stop words to filter from OR queries */
+const STOP_WORDS = new Set([
+  "the", "and", "for", "are", "but", "not", "you", "all", "can", "had",
+  "her", "was", "one", "our", "out", "has", "his", "how", "its", "may",
+  "new", "now", "old", "see", "way", "who", "did", "get", "got", "him",
+  "let", "say", "she", "too", "use", "why", "any", "few", "own", "nor",
+  "from", "been", "have", "into", "more", "much", "must", "some", "such",
+  "than", "that", "them", "then", "they", "this", "very", "what", "when",
+  "will", "with", "also", "back", "been", "come", "each", "even", "give",
+  "here", "just", "know", "like", "long", "look", "make", "many", "most",
+  "only", "over", "said", "same", "take", "tell", "than", "that", "them",
+  "then", "they", "time", "upon", "used", "were", "which", "about", "after",
+  "being", "could", "every", "first", "found", "great", "other", "since",
+  "still", "their", "there", "these", "thing", "those", "three", "under",
+  "where", "while", "would", "shall", "should", "before", "between",
+  "does", "doing", "done", "down", "during",
+]);
+
 function buildOrTsquery(
   query: string,
   languageParamIndex: number,
@@ -96,7 +114,7 @@ function buildOrTsquery(
   const words = query
     .trim()
     .split(/\s+/)
-    .filter((w) => w.length > 2);
+    .filter((w) => w.length > 2 && !STOP_WORDS.has(w.toLowerCase()));
 
   if (words.length === 0) {
     // Fallback: use the full query as-is (single plainto_tsquery)

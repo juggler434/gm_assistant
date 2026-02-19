@@ -128,8 +128,8 @@ describe("Hybrid Search", () => {
       expect(result.ok).toBe(true);
       if (result.ok) {
         expect(result.value).toHaveLength(1);
-        // Single result normalizes to 1.0
-        expect(result.value[0].score).toBeCloseTo(1.0);
+        // Combined RRF score from both searches
+        expect(result.value[0].score).toBeGreaterThan(0);
         expect(result.value[0].vectorScore).not.toBeNull();
         expect(result.value[0].keywordScore).not.toBeNull();
       }
@@ -435,9 +435,10 @@ describe("Hybrid Search", () => {
 
         expect(result.ok).toBe(true);
         if (result.ok) {
-          // Top result should be normalized to 1.0, bottom to 0.0
-          expect(result.value[0].score).toBeCloseTo(1.0);
-          expect(result.value[1].score).toBeCloseTo(0.0);
+          // Both results use full vector weight; rank 1 scores higher than rank 2
+          expect(result.value[0].score).toBeGreaterThan(result.value[1].score);
+          expect(result.value[0].score).toBeGreaterThan(0);
+          expect(result.value[1].score).toBeGreaterThan(0);
         }
       });
 
@@ -455,9 +456,10 @@ describe("Hybrid Search", () => {
 
         expect(result.ok).toBe(true);
         if (result.ok) {
-          // Top result should be normalized to 1.0, bottom to 0.0
-          expect(result.value[0].score).toBeCloseTo(1.0);
-          expect(result.value[1].score).toBeCloseTo(0.0);
+          // Both results use full keyword weight; rank 1 scores higher than rank 2
+          expect(result.value[0].score).toBeGreaterThan(result.value[1].score);
+          expect(result.value[0].score).toBeGreaterThan(0);
+          expect(result.value[1].score).toBeGreaterThan(0);
         }
       });
 
@@ -618,7 +620,7 @@ describe("Hybrid Search", () => {
         }
       });
 
-      it("should have score between 0 and 1", async () => {
+      it("should have positive scores", async () => {
         mockSearchChunksByVector.mockResolvedValue({
           ok: true,
           value: [
@@ -639,8 +641,7 @@ describe("Hybrid Search", () => {
         expect(result.ok).toBe(true);
         if (result.ok) {
           for (const r of result.value) {
-            expect(r.score).toBeGreaterThanOrEqual(0);
-            expect(r.score).toBeLessThanOrEqual(1);
+            expect(r.score).toBeGreaterThan(0);
           }
         }
       });

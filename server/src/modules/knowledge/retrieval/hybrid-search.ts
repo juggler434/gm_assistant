@@ -25,7 +25,7 @@ export interface HybridSearchResult {
     section: string | null;
     createdAt: Date;
   };
-  /** Combined weighted score (0 to 1, higher = more relevant) */
+  /** Combined weighted RRF score (higher = more relevant) */
   score: number;
   /** Normalized vector similarity score (0 to 1), or null if not found by vector search */
   vectorScore: number | null;
@@ -92,7 +92,7 @@ export function rrfScore(rank: number, k: number = RRF_K): number {
  * 2. Run keyword search (top 2x limit)
  * 3. Assign Reciprocal Rank Fusion (RRF) scores based on rank position
  * 4. Combine with weighted scoring (default: 70% vector, 30% keyword)
- * 5. Deduplicate by chunk ID, normalize to 0-1 range, and return top-k
+ * 5. Deduplicate by chunk ID and return top-k
  *
  * RRF is more robust than min-max normalization because it scores by
  * rank position rather than raw score, preventing inflated scores when
@@ -246,17 +246,5 @@ export async function searchChunksHybrid(
   // Sort by combined score descending
   combined.sort((a, b) => b.score - a.score);
 
-  // Normalize combined scores to 0-1 range for downstream consumers
-  const topK = combined.slice(0, limit);
-  if (topK.length > 0) {
-    const maxScore = topK[0].score;
-    const minScore = topK[topK.length - 1]!.score;
-    const range = maxScore - minScore;
-
-    for (const result of topK) {
-      result.score = range > 0 ? (result.score - minScore) / range : 1.0;
-    }
-  }
-
-  return ok(topK);
+  return ok(combined.slice(0, limit));
 }
