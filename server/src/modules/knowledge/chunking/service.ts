@@ -33,27 +33,27 @@ import type {
 /** Characters per token (heuristic for English text) */
 const CHARS_PER_TOKEN = 4;
 
-/** Default fixed-size chunking options */
+/** Default fixed-size chunking options (sized for mxbai-embed-large 512-token context) */
 const DEFAULT_FIXED_SIZE_OPTIONS: Required<FixedSizeChunkingOptions> = {
-  targetTokens: 512,
-  overlapTokens: 100,
-  minChunkTokens: 50,
+  targetTokens: 256,
+  overlapTokens: 50,
+  minChunkTokens: 30,
 };
 
-/** Default semantic chunking options */
+/** Default semantic chunking options (sized for mxbai-embed-large 512-token context) */
 const DEFAULT_SEMANTIC_OPTIONS: Required<SemanticChunkingOptions> = {
-  maxTokens: 1024,
-  minTokens: 100,
+  maxTokens: 256,
+  minTokens: 50,
   maxHeadingLevel: 3,
 };
 
 /** Field name used to identify PDF chunking inputs */
 const PDF_PAGES_FIELD = "pages";
 
-/** Default markdown chunking options */
+/** Default markdown chunking options (sized for mxbai-embed-large 512-token context) */
 const DEFAULT_MARKDOWN_OPTIONS: Required<MarkdownChunkingOptions> = {
-  targetTokens: 512,
-  overlapTokens: 100,
+  targetTokens: 256,
+  overlapTokens: 50,
   preserveCodeBlocks: true,
   preserveLists: true,
 };

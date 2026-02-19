@@ -29,6 +29,13 @@
       "when": 1771286400000,
       "tag": "0003_add_conversations_tables",
       "breakpoints": true
+    },
+    {
+      "idx": 4,
+      "version": "7",
+      "when": 1771372800000,
+      "tag": "0004_update_embedding_dimensions",
+      "breakpoints": true
     }
   ]
 }

@@ -298,13 +298,13 @@ Uses **Drizzle ORM** with **PostgreSQL** + **pgvector** extension. Four tables:
 - **users** — id, email, passwordHash, name, timestamps
 - **campaigns** — id, userId (FK), name, description, timestamps
 - **documents** — id, campaignId (FK), uploadedBy (FK), name, file metadata, status (pending/processing/ready/error), documentType, tags
-- **chunks** — id, documentId (FK), campaignId (FK), content, embedding (vector(768)), chunkIndex, tokenCount, pageNumber, section, timestamps. Uses HNSW index for vector similarity search.
+- **chunks** — id, documentId (FK), campaignId (FK), content, embedding (vector(1024)), chunkIndex, tokenCount, pageNumber, section, timestamps. Uses HNSW index for vector similarity search.
 
 ## RAG Pipeline
 
 The query module implements a Retrieval-Augmented Generation pipeline (not yet wired to an API route):
 
-1. **Embed** — Generate query embedding via Ollama (`nomic-embed-text`, 768 dimensions)
+1. **Embed** — Generate query embedding via Ollama (`mxbai-embed-large`, 1024 dimensions)
 2. **Search** — Hybrid search combining vector similarity (70% weight) and keyword full-text search (30% weight)
 3. **Context** — Build context from top-k chunks within a token budget
 4. **Generate** — Send question + context to LLM for answer generation

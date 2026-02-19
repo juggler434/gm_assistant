@@ -162,7 +162,7 @@ function fakeChunkingResult(count = 2) {
 /** Build a fake embeddings fetch response */
 function fakeEmbeddingResponse(count: number) {
   const embeddings = Array.from({ length: count }, () =>
-    Array.from({ length: 768 }, () => Math.random()),
+    Array.from({ length: 1024 }, () => Math.random()),
   );
   return {
     ok: true,
