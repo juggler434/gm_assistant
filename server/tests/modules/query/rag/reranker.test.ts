@@ -99,7 +99,7 @@ describe("LLM Re-ranker", () => {
     expect(mockChat).toHaveBeenCalledOnce();
     const chatCall = mockChat.mock.calls[0][0];
     expect(chatCall.temperature).toBe(0.1);
-    expect(chatCall.maxTokens).toBe(500);
+    expect(chatCall.maxTokens).toBe(2000);
     expect(chatCall.messages[0].role).toBe("system");
     expect(chatCall.messages[1].content).toContain("What are dragon weaknesses?");
     expect(chatCall.messages[1].content).toContain("[1]");
@@ -119,7 +119,7 @@ describe("LLM Re-ranker", () => {
           role: "assistant",
           content: JSON.stringify([
             { index: 1, score: 8 },
-            { index: 2, score: 2 }, // Below 0.3 threshold (2/10 = 0.2)
+            { index: 2, score: 1 }, // Below 0.2 threshold (1/10 = 0.1)
           ]),
         },
         model: "llama3",

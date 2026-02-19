@@ -185,12 +185,14 @@ export async function executeRAGPipeline(
   const searchResults = searchResult.value;
   const chunksRetrieved = searchResults.length;
 
-  // ---- Step 3b: Expand chunks with neighbor context ----
-  await expandNeighborChunks(searchResults);
-
-  // ---- Step 3c: Re-rank chunks with LLM ----
+  // ---- Step 3b: Re-rank chunks with LLM (before expansion for clean signals) ----
   const rerankResult = await rerankChunks(searchQuery, searchResults, llmService);
-  const rankedResults = rerankResult.ok ? rerankResult.value : searchResults;
+  // Fall back to original results if reranking failed or filtered everything out
+  const reranked = rerankResult.ok ? rerankResult.value : searchResults;
+  const rankedResults = reranked.length > 0 ? reranked : searchResults;
+
+  // ---- Step 3c: Expand surviving chunks with neighbor context ----
+  await expandNeighborChunks(rankedResults);
 
   // ---- Step 4: Build context from search results ----
   const contextOptions: ContextBuilderOptions = {
