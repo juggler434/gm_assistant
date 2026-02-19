@@ -24,16 +24,16 @@ import type { RAGError } from "./types.js";
 const RERANK_TEMPERATURE = 0.1;
 
 /** Max tokens for the JSON array response */
-const RERANK_MAX_TOKENS = 500;
+const RERANK_MAX_TOKENS = 2000;
 
 /** Timeout for the rerank call (ms) */
 const RERANK_TIMEOUT = 30_000;
 
 /** Minimum normalized score to keep a chunk (0-1) */
-const MIN_SCORE_THRESHOLD = 0.3;
+const MIN_SCORE_THRESHOLD = 0.2;
 
 /** Truncate chunk content in the prompt to this many characters */
-const MAX_CHUNK_CHARS = 500;
+const MAX_CHUNK_CHARS = 1500;
 
 const RERANK_SYSTEM_PROMPT = `You are a relevance judge. Given a question and numbered text passages, rate each passage's relevance to answering the question on a scale of 1-10. Output ONLY a JSON array of objects: [{"index": 1, "score": 8}, ...]. Do not explain.`;
 

@@ -200,22 +200,35 @@ describe("Keyword Search", () => {
         );
       });
 
-      it("should filter out short words (1-2 chars) from OR tsquery", async () => {
+      it("should filter out short words and stop words from OR tsquery", async () => {
         setMockResult([]);
 
         await searchChunksByKeyword("a dragon is at the village", campaignId);
 
-        // Second call is OR fallback — "a", "is", "at" should be filtered
+        // Second call is OR fallback — "a", "is", "at" (short) and "the" (stop word) should be filtered
         const params = vi.mocked(queryClient.unsafe).mock.calls[1][1] as string[];
         expect(params).toContain("dragon");
-        expect(params).toContain("the");
         expect(params).toContain("village");
         expect(params).not.toContain("a");
         expect(params).not.toContain("is");
         expect(params).not.toContain("at");
+        expect(params).not.toContain("the");
       });
 
-      it("should fall back to full query when all words are short", async () => {
+      it("should filter common stop words from OR tsquery", async () => {
+        setMockResult([]);
+
+        await searchChunksByKeyword("who is giving the challenger lecture", campaignId);
+
+        // Second call is OR fallback — "who", "the", "giving" are stop words
+        const params = vi.mocked(queryClient.unsafe).mock.calls[1][1] as string[];
+        expect(params).toContain("challenger");
+        expect(params).toContain("lecture");
+        expect(params).not.toContain("who");
+        expect(params).not.toContain("the");
+      });
+
+      it("should fall back to full query when all words are short or stop words", async () => {
         setMockResult([]);
 
         await searchChunksByKeyword("do it", campaignId);

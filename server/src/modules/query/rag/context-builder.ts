@@ -22,8 +22,8 @@ import type {
 /** Default maximum token budget for the context window */
 const DEFAULT_MAX_TOKENS = 3000;
 
-/** Default minimum relevance score for inclusion */
-const DEFAULT_MIN_RELEVANCE_SCORE = 0.3;
+/** Default minimum relevance score for inclusion (0 = rely on adaptive ratio only) */
+const DEFAULT_MIN_RELEVANCE_SCORE = 0;
 
 /**
  * Default adaptive score ratio — chunks scoring below this fraction of the
