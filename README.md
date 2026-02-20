@@ -1,6 +1,14 @@
 # GM Assistant
 
-An AI-powered RPG Game Master campaign management tool. Features include user authentication, campaign CRUD, document upload/processing, and a RAG pipeline for answering questions from campaign documents.
+An AI-powered RPG Game Master campaign management tool. Features include user authentication, campaign CRUD, document upload/processing, a RAG pipeline for answering questions from campaign documents, AI content generation, and persistent conversation history.
+
+## License
+
+This project is licensed under [AGPL-3.0-or-later](LICENSE).
+
+## Tested LLM
+
+The app has been tested with **Google Gemini 2.5 Flash**. Set `LLM_PROVIDER=google` and provide a `GOOGLE_AI_API_KEY` in your `.env` to use it. Other providers (e.g. Ollama) are supported but may require additional tuning.
 
 ## Prerequisites
 
@@ -31,12 +39,14 @@ gm_assistant/
 │   │   ├── modules/
 │   │   │   ├── auth/           # Authentication (register, login, sessions)
 │   │   │   ├── campaigns/      # Campaign CRUD
+│   │   │   ├── conversations/  # Persistent conversation history
 │   │   │   ├── documents/      # Document upload & management
+│   │   │   ├── generation/     # AI content generation (adventure hooks)
 │   │   │   ├── knowledge/      # Knowledge base & retrieval
 │   │   │   ├── query/          # RAG pipeline
 │   │   │   └── metrics/        # Admin metrics endpoint
 │   │   ├── services/
-│   │   │   ├── llm/            # LLM service (Ollama provider)
+│   │   │   ├── llm/            # LLM service (Ollama + Gemini providers)
 │   │   │   ├── storage/        # S3-compatible storage (MinIO)
 │   │   │   └── metrics/        # PostHog analytics
 │   │   ├── jobs/               # BullMQ background job system
@@ -48,7 +58,15 @@ gm_assistant/
 │       ├── main.tsx            # Entry point
 │       ├── App.tsx             # Root component (providers, router)
 │       ├── index.css           # Tailwind imports + theme tokens
-│       ├── components/ui/      # Reusable UI component library (shadcn/ui)
+│       ├── components/
+│       │   ├── ui/             # Reusable UI component library (shadcn/ui)
+│       │   ├── auth/           # Auth guards
+│       │   ├── campaigns/      # Campaign cards, forms, dialogs
+│       │   ├── citations/      # Source citation display
+│       │   ├── documents/      # Document list, details, filters
+│       │   ├── generation/     # Adventure hook generator UI
+│       │   ├── layouts/        # App layout, sidebar, header
+│       │   └── query/          # Chat interface, context panel
 │       ├── pages/              # Route pages
 │       ├── lib/                # Utilities
 │       └── types/              # Type re-exports
@@ -110,6 +128,8 @@ cp .env.example server/.env
 
 The defaults in `.env.example` match the Docker Compose service credentials, so no changes are required for local development.
 
+The `LLM_PROVIDER` variable controls which LLM backend is used (`ollama` or `google`). When using Google, set `GOOGLE_AI_API_KEY` as well.
+
 ### 5. Set up the database
 
 ```bash
@@ -133,6 +153,34 @@ npm run dev
 The Vite dev server proxies `/api` requests to the Fastify backend at `http://localhost:3000`.
 
 Open [http://localhost:5173](http://localhost:5173) in your browser.
+
+## API Routes
+
+| Method | Path | Auth | Description |
+|--------|------|------|-------------|
+| GET | `/health` | No | Health check |
+| POST | `/api/auth/register` | No | Register new user |
+| POST | `/api/auth/login` | No | Login |
+| GET | `/api/auth/me` | Yes | Get current user |
+| POST | `/api/auth/logout` | Yes | Logout |
+| POST | `/api/campaigns` | Yes | Create campaign |
+| GET | `/api/campaigns` | Yes | List user's campaigns |
+| GET | `/api/campaigns/:id` | Yes | Get campaign details |
+| PATCH | `/api/campaigns/:id` | Yes | Update campaign |
+| DELETE | `/api/campaigns/:id` | Yes | Delete campaign |
+| POST | `/api/campaigns/:campaignId/documents` | Yes | Upload document (multipart) |
+| GET | `/api/campaigns/:campaignId/documents` | Yes | List documents |
+| GET | `/api/campaigns/:campaignId/documents/:id` | Yes | Get document details |
+| GET | `/api/campaigns/:campaignId/documents/:id/download` | Yes | Get signed download URL |
+| DELETE | `/api/campaigns/:campaignId/documents/:id` | Yes | Delete document |
+| POST | `/api/campaigns/:campaignId/query` | Yes | RAG query against campaign documents |
+| POST | `/api/campaigns/:campaignId/generate/hooks` | Yes | Generate adventure hooks |
+| GET | `/api/campaigns/:campaignId/conversations` | Yes | List conversations |
+| POST | `/api/campaigns/:campaignId/conversations` | Yes | Create conversation |
+| GET | `/api/campaigns/:campaignId/conversations/:id` | Yes | Get conversation with messages |
+| POST | `/api/campaigns/:campaignId/conversations/:id/messages` | Yes | Add message to conversation |
+| DELETE | `/api/campaigns/:campaignId/conversations/:id` | Yes | Delete conversation |
+| GET | `/api/admin/metrics` | Yes | Aggregated app metrics |
 
 ## Available Scripts
 
