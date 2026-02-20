@@ -29,7 +29,7 @@ const DEFAULT_MIN_RELEVANCE_SCORE = 0;
  * Default adaptive score ratio — chunks scoring below this fraction of the
  * top result's score are dropped, even if they exceed the absolute minimum.
  */
-const DEFAULT_ADAPTIVE_RATIO = 0.4;
+const DEFAULT_ADAPTIVE_RATIO = 0.3;
 
 /** Approximate characters per token (same heuristic used by the chunking service) */
 const CHARS_PER_TOKEN = 4;
