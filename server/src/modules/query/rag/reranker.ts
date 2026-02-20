@@ -11,7 +11,7 @@
  * so the pipeline degrades gracefully.
  */
 
-import { type Result, ok } from "@/types/index.js";
+import { type Result, ok, err } from "@/types/index.js";
 import type { LLMService } from "@/services/llm/service.js";
 import type { HybridSearchResult } from "@/modules/knowledge/retrieval/hybrid-search.js";
 import type { RAGError } from "./types.js";
@@ -27,7 +27,7 @@ const RERANK_TEMPERATURE = 0.1;
 const RERANK_MAX_TOKENS = 2000;
 
 /** Timeout for the rerank call (ms) */
-const RERANK_TIMEOUT = 30_000;
+const RERANK_TIMEOUT = 120_000;
 
 /** Minimum normalized score to keep a chunk (0-1) */
 const MIN_SCORE_THRESHOLD = 0.2;
@@ -53,7 +53,8 @@ interface RerankScore {
  * relevance scores, and returns chunks sorted by score with low-scoring
  * ones filtered out.
  *
- * On any failure, returns the original chunks unchanged.
+ * On any failure, returns an error so the caller can apply its own fallback
+ * strategy (e.g. limiting to top-N by original score).
  */
 export async function rerankChunks(
   question: string,
@@ -82,22 +83,36 @@ export async function rerankChunks(
   });
 
   if (!result.ok) {
-    // Non-fatal: fall back to original chunks
-    return ok(chunks);
+    return err({
+      code: "RERANK_FAILED",
+      message: `Reranker LLM call failed: ${result.error.message}`,
+      cause: result.error,
+    });
   }
 
-  const responseText = result.value.message.content.trim();
+  let responseText = result.value.message.content.trim();
+
+  // Strip markdown code fences (e.g. ```json ... ```) that LLMs commonly add
+  const fenceMatch = responseText.match(/^```(?:json)?\s*\n?([\s\S]*?)\n?\s*```$/);
+  if (fenceMatch) {
+    responseText = fenceMatch[1]!.trim();
+  }
 
   // Parse JSON scores from the response
   let scores: RerankScore[];
   try {
     scores = JSON.parse(responseText) as RerankScore[];
     if (!Array.isArray(scores)) {
-      return ok(chunks);
+      return err({
+        code: "RERANK_FAILED",
+        message: `Reranker returned non-array: ${responseText.slice(0, 200)}`,
+      });
     }
   } catch {
-    // Non-fatal: fall back to original chunks
-    return ok(chunks);
+    return err({
+      code: "RERANK_FAILED",
+      message: `Reranker returned invalid JSON: ${responseText.slice(0, 200)}`,
+    });
   }
 
   // Build a map of 1-based index → normalized score

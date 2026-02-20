@@ -106,6 +106,35 @@ describe("LLM Re-ranker", () => {
     expect(chatCall.messages[1].content).toContain("[2]");
   });
 
+  it("should handle JSON wrapped in markdown code fences", async () => {
+    const chunks = [
+      makeChunk({ id: "chunk-1", content: "Dragons breathe fire", score: 0.9 }),
+      makeChunk({ id: "chunk-2", content: "Tavern menu prices", score: 0.7 }),
+    ];
+
+    mockChat.mockResolvedValue({
+      ok: true,
+      value: {
+        message: {
+          role: "assistant",
+          content: "```json\n[\n  {\"index\": 1, \"score\": 9},\n  {\"index\": 2, \"score\": 2}\n]\n```",
+        },
+        model: "gemini-2.5-flash",
+      },
+    });
+
+    const result = await rerankChunks("Tell me about dragons", chunks, llmService);
+
+    expect(result.ok).toBe(true);
+    if (result.ok) {
+      expect(result.value).toHaveLength(2);
+      expect(result.value[0].chunk.id).toBe("chunk-1");
+      expect(result.value[0].score).toBe(0.9);
+      expect(result.value[1].chunk.id).toBe("chunk-2");
+      expect(result.value[1].score).toBe(0.2);
+    }
+  });
+
   it("should filter out low-scoring chunks", async () => {
     const chunks = [
       makeChunk({ id: "chunk-1", content: "Relevant content", score: 0.9 }),
@@ -136,7 +165,7 @@ describe("LLM Re-ranker", () => {
     }
   });
 
-  it("should fall back to original chunks on LLM error", async () => {
+  it("should return error on LLM failure", async () => {
     const chunks = [
       makeChunk({ id: "chunk-1", score: 0.9 }),
       makeChunk({ id: "chunk-2", score: 0.7 }),
@@ -149,16 +178,14 @@ describe("LLM Re-ranker", () => {
 
     const result = await rerankChunks("What is this?", chunks, llmService);
 
-    expect(result.ok).toBe(true);
-    if (result.ok) {
-      // Returns original chunks unchanged
-      expect(result.value).toHaveLength(2);
-      expect(result.value[0].score).toBe(0.9);
-      expect(result.value[1].score).toBe(0.7);
+    expect(result.ok).toBe(false);
+    if (!result.ok) {
+      expect(result.error.code).toBe("RERANK_FAILED");
+      expect(result.error.message).toContain("Connection refused");
     }
   });
 
-  it("should fall back to original chunks on malformed JSON response", async () => {
+  it("should return error on malformed JSON response", async () => {
     const chunks = [
       makeChunk({ id: "chunk-1", score: 0.8 }),
     ];
@@ -176,10 +203,10 @@ describe("LLM Re-ranker", () => {
 
     const result = await rerankChunks("What is this?", chunks, llmService);
 
-    expect(result.ok).toBe(true);
-    if (result.ok) {
-      expect(result.value).toHaveLength(1);
-      expect(result.value[0].score).toBe(0.8);
+    expect(result.ok).toBe(false);
+    if (!result.ok) {
+      expect(result.error.code).toBe("RERANK_FAILED");
+      expect(result.error.message).toContain("invalid JSON");
     }
   });
 
@@ -193,7 +220,7 @@ describe("LLM Re-ranker", () => {
     expect(mockChat).not.toHaveBeenCalled();
   });
 
-  it("should fall back to original chunks when response is not an array", async () => {
+  it("should return error when response is not an array", async () => {
     const chunks = [
       makeChunk({ id: "chunk-1", score: 0.8 }),
     ];
@@ -211,10 +238,10 @@ describe("LLM Re-ranker", () => {
 
     const result = await rerankChunks("What is this?", chunks, llmService);
 
-    expect(result.ok).toBe(true);
-    if (result.ok) {
-      expect(result.value).toHaveLength(1);
-      expect(result.value[0].score).toBe(0.8);
+    expect(result.ok).toBe(false);
+    if (!result.ok) {
+      expect(result.error.code).toBe("RERANK_FAILED");
+      expect(result.error.message).toContain("non-array");
     }
   });
 });
