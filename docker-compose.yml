@@ -67,6 +67,18 @@ services:
     profiles:
       - with-ollama
 
+  ollama-init:
+    image: curlimages/curl:latest
+    container_name: gm_assistant_ollama_init
+    depends_on:
+      ollama:
+        condition: service_healthy
+    entrypoint: >
+      sh -c "curl -X POST http://ollama:11434/api/pull -d '{\"name\": \"mxbai-embed-large\"}' &&
+             curl -X POST http://ollama:11434/api/pull -d '{\"name\": \"gemma3:1b\"}'"
+    profiles:
+      - with-ollama
+
 volumes:
   postgres_data:
   redis_data:
