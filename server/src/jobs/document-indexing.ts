@@ -90,6 +90,13 @@ const EMBEDDING_BATCH_SIZE = 20;
 /** Timeout per embedding request (ms) */
 const EMBEDDING_TIMEOUT = 120_000;
 
+/**
+ * Hard character limit per text sent to the embedding model.
+ * mxbai-embed-large has a 512-token context window. Using ~2 chars/token
+ * as a conservative estimate to handle worst-case tokenization.
+ */
+const MAX_EMBED_CHARS = 500;
+
 /** MIME types handled by the PDF processor */
 const PDF_MIME_TYPES = new Set(["application/pdf"]);
 
@@ -112,6 +119,11 @@ async function generateEmbeddings(
   texts: string[],
   signal: AbortSignal,
 ): Promise<Result<number[][], DocumentIndexingError>> {
+  // Truncate texts that exceed the model's context window
+  const safeTexts = texts.map((t) =>
+    t.length > MAX_EMBED_CHARS ? t.slice(0, MAX_EMBED_CHARS) : t,
+  );
+
   const controller = new AbortController();
   const timeoutId = setTimeout(() => controller.abort(), EMBEDDING_TIMEOUT);
 
@@ -125,7 +137,7 @@ async function generateEmbeddings(
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({
         model: EMBEDDING_MODEL,
-        input: texts,
+        input: safeTexts,
         truncate: true,
       }),
       signal: controller.signal,

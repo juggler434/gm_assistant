@@ -35,15 +35,15 @@ const CHARS_PER_TOKEN = 4;
 
 /** Default fixed-size chunking options (sized for mxbai-embed-large 512-token context) */
 const DEFAULT_FIXED_SIZE_OPTIONS: Required<FixedSizeChunkingOptions> = {
-  targetTokens: 256,
-  overlapTokens: 50,
-  minChunkTokens: 30,
+  targetTokens: 128,
+  overlapTokens: 24,
+  minChunkTokens: 20,
 };
 
 /** Default semantic chunking options (sized for mxbai-embed-large 512-token context) */
 const DEFAULT_SEMANTIC_OPTIONS: Required<SemanticChunkingOptions> = {
-  maxTokens: 256,
-  minTokens: 50,
+  maxTokens: 128,
+  minTokens: 30,
   maxHeadingLevel: 3,
 };
 
@@ -52,8 +52,8 @@ const PDF_PAGES_FIELD = "pages";
 
 /** Default markdown chunking options (sized for mxbai-embed-large 512-token context) */
 const DEFAULT_MARKDOWN_OPTIONS: Required<MarkdownChunkingOptions> = {
-  targetTokens: 256,
-  overlapTokens: 50,
+  targetTokens: 128,
+  overlapTokens: 24,
   preserveCodeBlocks: true,
   preserveLists: true,
 };
