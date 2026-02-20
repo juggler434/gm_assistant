@@ -53,6 +53,9 @@ const DEFAULT_MAX_CHUNKS = 20;
 /** Default maximum context token budget */
 const DEFAULT_MAX_CONTEXT_TOKENS = 16_000;
 
+/** Max chunks to keep when reranker fails (limits noise in context) */
+const RERANK_FALLBACK_LIMIT = 5;
+
 // ============================================================================
 // Embedding Helper
 // ============================================================================
@@ -186,11 +189,37 @@ export async function executeRAGPipeline(
   const searchResults = searchResult.value;
   const chunksRetrieved = searchResults.length;
 
+  console.log(`[RAG] Using LLM: ${llmService.providerName} / ${llmService.model}`);
+  console.log(`[RAG] Search returned ${chunksRetrieved} chunks for query: "${searchQuery}"`);
+  if (searchResults.length > 0) {
+    console.log(`[RAG] Top 3 search scores: ${searchResults.slice(0, 3).map((r) => r.score.toFixed(3)).join(", ")}`);
+  }
+
   // ---- Step 3b: Re-rank chunks with LLM (before expansion for clean signals) ----
   const rerankResult = await rerankChunks(searchQuery, searchResults, llmService);
-  // Fall back to original results if reranking failed or filtered everything out
-  const reranked = rerankResult.ok ? rerankResult.value : searchResults;
-  const rankedResults = reranked.length > 0 ? reranked : searchResults;
+  let rankedResults: typeof searchResults;
+
+  if (!rerankResult.ok) {
+    // Reranker LLM call or parse failed — fall back to top N by RRF score
+    // to limit noise (RRF scores are rank-based, not relevance-based)
+    rankedResults = searchResults.slice(0, RERANK_FALLBACK_LIMIT);
+    console.log(`[RAG] Reranker failed (${rerankResult.error.message}), falling back to top ${rankedResults.length} chunks`);
+  } else if (rerankResult.value.length > 0) {
+    // Reranker succeeded and found relevant chunks
+    rankedResults = rerankResult.value;
+    console.log(`[RAG] Reranker kept ${rankedResults.length} chunks (from ${chunksRetrieved})`);
+  } else {
+    // Reranker succeeded but filtered everything out — nothing is relevant
+    rankedResults = [];
+    console.log(`[RAG] Reranker filtered out all chunks — nothing relevant found`);
+  }
+
+  if (rankedResults.length > 0) {
+    console.log(`[RAG] Top 3 scores: ${rankedResults.slice(0, 3).map((r) => r.score.toFixed(3)).join(", ")}`);
+    for (const r of rankedResults.slice(0, 3)) {
+      console.log(`[RAG]   - [${r.document.name}] ${r.chunk.content.slice(0, 120).replace(/\n/g, " ")}...`);
+    }
+  }
 
   // ---- Step 3c: Expand surviving chunks with neighbor context ----
   await expandNeighborChunks(rankedResults);
@@ -201,6 +230,21 @@ export async function executeRAGPipeline(
   };
 
   const context = buildContext(rankedResults, contextOptions);
+
+  console.log(`[RAG] Context built: ${context.chunksUsed} chunks used, ~${context.estimatedTokens} tokens`);
+
+  // ---- Step 4b: Early return when no relevant context was found ----
+  if (context.chunksUsed === 0) {
+    return ok({
+      answer:
+        "I don't have enough information in your campaign documents to answer this question.",
+      confidence: 0.1,
+      sources: [],
+      isUnanswerable: true,
+      chunksRetrieved,
+      chunksUsed: 0,
+    });
+  }
 
   // ---- Step 5: Generate response via LLM ----
   const responseResult = await generateResponse(

@@ -216,16 +216,6 @@ describe("RAG Service", () => {
 
       mockEmbeddingResponse();
       mockSearchChunksHybrid.mockResolvedValue({ ok: true, value: [] });
-      mockChat.mockResolvedValue({
-        ok: true,
-        value: {
-          message: {
-            role: "assistant",
-            content: "I don't have enough information about unicorns in the campaign documents.",
-          },
-          model: "llama3",
-        },
-      });
 
       const result = await executeRAGPipeline(query, llm);
 
@@ -236,6 +226,28 @@ describe("RAG Service", () => {
         expect(result.value.isUnanswerable).toBe(true);
         expect(result.value.sources).toHaveLength(0);
       }
+    });
+
+    it("should skip LLM call and return canned response when no context chunks are found", async () => {
+      const llm = makeMockLLMService();
+      const query: RAGQuery = { question: "What about unicorns?", campaignId };
+
+      mockEmbeddingResponse();
+      mockSearchChunksHybrid.mockResolvedValue({ ok: true, value: [] });
+
+      const result = await executeRAGPipeline(query, llm);
+
+      expect(result.ok).toBe(true);
+      if (result.ok) {
+        expect(result.value.answer).toContain(
+          "I don't have enough information in your campaign documents",
+        );
+        expect(result.value.confidence).toBe(0.1);
+        expect(result.value.isUnanswerable).toBe(true);
+        expect(result.value.usage).toBeUndefined();
+      }
+      // LLM should NOT have been called
+      expect(mockChat).not.toHaveBeenCalled();
     });
 
     it("should pass filter options through to hybrid search", async () => {

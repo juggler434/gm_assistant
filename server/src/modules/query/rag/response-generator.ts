@@ -27,14 +27,14 @@ import type {
  * System prompt that instructs the LLM how to behave as a RAG assistant
  * for a tabletop RPG game master.
  */
-const SYSTEM_PROMPT = `You are a helpful assistant for a tabletop RPG game master. Answer questions using ONLY the provided context from their campaign documents.
+const SYSTEM_PROMPT = `You are a helpful assistant for a tabletop RPG game master. Answer questions based on the provided source text from their campaign documents.
 
 Rules:
-- Base your answer strictly on the provided context. Do not invent or assume information not present in the context.
-- Reference sources using their citation markers (e.g. [1], [2]) when the information comes from a specific source.
-- If the context does not contain enough information to answer the question, say so clearly. Begin your response with "I don't have enough information" and explain what is missing.
-- Be concise but thorough. Provide actionable information relevant to running a game.
-- If multiple sources provide conflicting information, note the discrepancy and cite both sources.`;
+1. Base your answer on the provided source text. When the source text contains relevant information, answer clearly and specifically. Quote exact numbers, dice, DCs, ranges, durations, and mechanics verbatim — write "1d20" not "a die roll", write "DC 15" not "a moderate difficulty".
+2. Do NOT add information from your own knowledge. Only state what the source text says.
+3. Cite sources using their markers (e.g. [1], [2]).
+4. If the source text does not address the question at all, begin with "I don't have enough information" and explain what's missing.
+5. If sources conflict, note the discrepancy and cite both.`;
 
 /**
  * Builds the user message that combines the context and question.
@@ -53,7 +53,7 @@ function buildUserMessage(query: string, context: BuiltContext): string {
     })
     .join("\n");
 
-  return `Context from campaign documents:\n\n${context.contextText}\n\nSources:\n${sourceLegend}\n\nQuestion: ${query}`;
+  return `SOURCE TEXT:\n\n${context.contextText}\n\nSOURCES:\n${sourceLegend}\n\nQUESTION: ${query}\n\nAnswer using the source text above. Quote exact values and game mechanics verbatim.`;
 }
 
 // ============================================================================
@@ -161,7 +161,7 @@ export async function generateResponse(
 
   const chatResult = await llmService.chat({
     messages,
-    temperature: 0.3,
+    temperature: 0,
   });
 
   if (!chatResult.ok) {

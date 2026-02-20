@@ -237,8 +237,8 @@ describe("Response Generator", () => {
       expect(callArgs.messages[0].role).toBe("system");
       expect(callArgs.messages[1].role).toBe("user");
       expect(callArgs.messages[1].content).toContain("My question");
-      expect(callArgs.messages[1].content).toContain("Context from campaign documents");
-      expect(callArgs.temperature).toBe(0.3);
+      expect(callArgs.messages[1].content).toContain("SOURCE TEXT:");
+      expect(callArgs.temperature).toBe(0);
     });
   });
 });
