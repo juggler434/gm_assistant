@@ -29,6 +29,13 @@ function buildDocumentQueryString(params?: DocumentListQuery): string {
   return qs ? `?${qs}` : "";
 }
 
+const PROCESSING_POLL_INTERVAL = 3000;
+
+function hasDocumentsInProgress(data: DocumentListResponse | undefined): boolean {
+  if (!data) return false;
+  return data.documents.some((d) => d.status === "pending" || d.status === "processing");
+}
+
 export function useDocuments(campaignId: string, params?: DocumentListQuery) {
   return useQuery({
     queryKey: [...documentKeys.all(campaignId), params],
@@ -37,6 +44,8 @@ export function useDocuments(campaignId: string, params?: DocumentListQuery) {
         `/api/campaigns/${campaignId}/documents${buildDocumentQueryString(params)}`
       ),
     select: (data) => data.documents,
+    refetchInterval: (query) =>
+      hasDocumentsInProgress(query.state.data) ? PROCESSING_POLL_INTERVAL : false,
   });
 }
 
@@ -45,6 +54,10 @@ export function useDocument(campaignId: string, id: string) {
     queryKey: documentKeys.detail(campaignId, id),
     queryFn: () => api.get<DocumentResponse>(`/api/campaigns/${campaignId}/documents/${id}`),
     select: (data) => data.document,
+    refetchInterval: (query) => {
+      const status = query.state.data?.document.status;
+      return status === "pending" || status === "processing" ? PROCESSING_POLL_INTERVAL : false;
+    },
   });
 }
 
