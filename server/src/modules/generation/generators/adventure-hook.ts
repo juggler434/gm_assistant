@@ -44,6 +44,9 @@ const MAX_CONTEXT_TOKENS = 2500;
 /** LLM temperature for creative generation */
 const GENERATION_TEMPERATURE = 0.8;
 
+/** Max tokens for hook generation (needs more than default 2048 for 3-5 structured hooks) */
+const GENERATION_MAX_TOKENS = 4096;
+
 // ============================================================================
 // Ollama Embed Types
 // ============================================================================
@@ -299,6 +302,7 @@ export async function generateAdventureHooks(
       { role: "user", content: user },
     ],
     temperature: GENERATION_TEMPERATURE,
+    maxTokens: GENERATION_MAX_TOKENS,
   });
 
   if (!chatResult.ok) {
