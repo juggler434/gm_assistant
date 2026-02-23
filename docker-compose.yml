@@ -58,24 +58,18 @@ services:
       - "11434:11434"
     volumes:
       - ollama_data:/root/.ollama
+    entrypoint: >
+      sh -c "ollama serve &
+             until ollama list 2>/dev/null; do sleep 2; done &&
+             ollama pull mxbai-embed-large &&
+             ollama pull gemma3:1b &&
+             wait"
     healthcheck:
       test: ["CMD", "ollama", "list"]
       interval: 30s
       timeout: 10s
       retries: 3
       start_period: 60s
-    profiles:
-      - with-ollama
-
-  ollama-init:
-    image: curlimages/curl:latest
-    container_name: gm_assistant_ollama_init
-    depends_on:
-      ollama:
-        condition: service_healthy
-    entrypoint: >
-      sh -c "curl -X POST http://ollama:11434/api/pull -d '{\"name\": \"mxbai-embed-large\"}' &&
-             curl -X POST http://ollama:11434/api/pull -d '{\"name\": \"gemma3:1b\"}'"
     profiles:
       - with-ollama
 
