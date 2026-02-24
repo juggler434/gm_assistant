@@ -96,17 +96,12 @@ cd shared && npm run build
 
 ### 3. Start infrastructure services
 
-From the project root, start PostgreSQL, Redis, and MinIO with Docker Compose:
+From the project root, start PostgreSQL, Redis, MinIO, Ollama, and OCR with Docker Compose:
 
 ```bash
 docker-compose up -d
 ```
 
-To also start Ollama for local LLM inference:
-
-```bash
-docker-compose --profile with-ollama up -d
-```
 
 #### Service ports
 
@@ -116,7 +111,8 @@ docker-compose --profile with-ollama up -d
 | Redis      | 6379  | Job queue and caching       |
 | MinIO      | 9000  | S3-compatible storage API   |
 | MinIO      | 9001  | MinIO web console           |
-| Ollama     | 11434 | LLM API (optional)          |
+| Ollama     | 11434 | LLM API                     |
+| OCR        | 8080  | PDF to Text conversion API  |
 
 ### 4. Configure environment variables
 
@@ -133,7 +129,7 @@ The `LLM_PROVIDER` variable controls which LLM backend is used (`ollama` or `goo
 ### 5. Set up the database
 
 ```bash
-cd server && npm run db:push
+cd server && npm run db:setup && npm run db:push
 ```
 
 ### 6. Run the app
