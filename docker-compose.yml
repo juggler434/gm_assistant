@@ -62,8 +62,6 @@ services:
       timeout: 5s
       retries: 3
       start_period: 10s
-    profiles:
-      - with-ocr
 
   ollama:
     image: ollama/ollama:latest
@@ -84,8 +82,6 @@ services:
       timeout: 10s
       retries: 3
       start_period: 60s
-    profiles:
-      - with-ollama
 
 volumes:
   postgres_data:
