@@ -18,6 +18,7 @@ import { QueryPage } from "@/pages/campaign-query";
 import { GeneratePage } from "@/pages/campaign-generate";
 import { SessionsPage } from "@/pages/campaign-sessions";
 import { SettingsPage } from "@/pages/campaign-settings";
+import { LandingPage } from "@/pages/landing";
 
 const queryClient = new QueryClient({
   defaultOptions: {
@@ -35,6 +36,9 @@ function App() {
         <BrowserRouter>
           <ErrorBoundary>
             <Routes>
+              {/* Landing page */}
+              <Route path="/" element={<LandingPage />} />
+
               {/* Public routes */}
               <Route element={<PublicLayout />}>
                 <Route path="/login" element={<LoginPage />} />
@@ -44,7 +48,6 @@ function App() {
               {/* Protected routes */}
               <Route element={<ProtectedRoute />}>
                 <Route element={<AppLayout />}>
-                  <Route path="/" element={<Navigate to="/campaigns" replace />} />
                   <Route path="/campaigns" element={<CampaignListPage />} />
                   <Route path="/campaigns/:id" element={<CampaignLayout />}>
                     <Route index element={<Navigate to="documents" replace />} />
