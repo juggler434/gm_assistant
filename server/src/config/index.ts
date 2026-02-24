@@ -40,6 +40,10 @@ export const config = {
     updateAgeHours: env.SESSION_UPDATE_AGE_HOURS,
     cookieName: "session_token",
   },
+  ocr: {
+    serviceUrl: env.OCR_SERVICE_URL,
+    timeout: env.OCR_TIMEOUT,
+  },
   posthog: {
     apiKey: env.POSTHOG_API_KEY,
     host: env.POSTHOG_HOST,

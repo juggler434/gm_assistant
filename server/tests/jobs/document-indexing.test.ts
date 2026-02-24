@@ -64,10 +64,12 @@ vi.mock("@/modules/documents/repository.js", () => ({
 
 // -- Processors ---------------------------------------------------------------
 const mockPdfProcess = vi.fn();
+const mockParsePdfBuffer = vi.fn();
 const mockTextProcess = vi.fn();
 
 vi.mock("@/modules/documents/processors/pdf.js", () => ({
   createPdfProcessor: () => ({ process: mockPdfProcess }),
+  parsePdfBuffer: (...args: unknown[]) => mockParsePdfBuffer(...args),
 }));
 
 vi.mock("@/modules/documents/processors/text.js", () => ({
@@ -85,8 +87,19 @@ vi.mock("@/modules/knowledge/chunking/service.js", () => ({
 }));
 
 // -- Storage ------------------------------------------------------------------
+const mockStorageDownload = vi.fn();
+
 vi.mock("@/services/storage/index.js", () => ({
-  createStorageService: () => ({}),
+  createStorageService: () => ({ download: mockStorageDownload }),
+}));
+
+// -- OCR Service --------------------------------------------------------------
+const mockIsOcrEnabled = vi.fn();
+const mockOcrPdf = vi.fn();
+
+vi.mock("@/services/ocr/index.js", () => ({
+  isOcrEnabled: (...args: unknown[]) => mockIsOcrEnabled(...args),
+  ocrPdf: (...args: unknown[]) => mockOcrPdf(...args),
 }));
 
 // -- Config -------------------------------------------------------------------
@@ -510,6 +523,154 @@ describe("Document Indexing Job", () => {
       );
       // Should not have attempted extraction
       expect(mockTextProcess).not.toHaveBeenCalled();
+    });
+  });
+
+  // --------------------------------------------------------------------------
+  // OCR fallback for scanned PDFs
+  // --------------------------------------------------------------------------
+  describe("OCR fallback", () => {
+    /** Helpers for scanned-PDF scenario */
+    function setupScannedPdf() {
+      mockFindDocumentById.mockResolvedValue(
+        fakeDocument({ mimeType: "application/pdf" }),
+      );
+      mockPdfProcess.mockResolvedValue(
+        ok({
+          content: "\n\n--- Page 1 ---\n\n",
+          pages: [{ pageNumber: 1, content: "", startOffset: 0, endOffset: 0 }],
+          pageCount: 1,
+          metadata: { pageCount: 1 },
+          characterCount: 17,
+          tokenCount: 5,
+          hasExtractedText: false,
+        }),
+      );
+    }
+
+    function setupOcrSuccess() {
+      mockStorageDownload.mockResolvedValue(
+        ok({ content: Buffer.from("raw-pdf"), contentType: "application/pdf" }),
+      );
+      mockOcrPdf.mockResolvedValue(ok(Buffer.from("ocr-pdf")));
+      mockParsePdfBuffer.mockResolvedValue(
+        ok({
+          content: "OCR extracted text from page 1",
+          pages: [{ pageNumber: 1, content: "OCR extracted text from page 1", startOffset: 0, endOffset: 30 }],
+          pageCount: 1,
+          metadata: { pageCount: 1 },
+          characterCount: 30,
+          tokenCount: 8,
+          hasExtractedText: true,
+        }),
+      );
+    }
+
+    it("fails with descriptive error when OCR is disabled", async () => {
+      const handler = await getHandler();
+      const context = createMockContext();
+      setupScannedPdf();
+      mockIsOcrEnabled.mockReturnValue(false);
+
+      await expect(
+        handler({ documentId: "doc-1", campaignId: "camp-1" }, context),
+      ).rejects.toThrow("scanned document");
+
+      expect(mockUpdateDocumentStatus).toHaveBeenCalledWith(
+        "doc-1", "failed", expect.stringContaining("scanned document"),
+      );
+      expect(mockOcrPdf).not.toHaveBeenCalled();
+    });
+
+    it("runs OCR and continues pipeline when OCR is enabled", async () => {
+      const handler = await getHandler();
+      const context = createMockContext();
+      setupScannedPdf();
+      mockIsOcrEnabled.mockReturnValue(true);
+      setupOcrSuccess();
+      mockChunk.mockReturnValue(fakeChunkingResult(1));
+      mockFetch.mockResolvedValue(fakeEmbeddingResponse(1));
+
+      await handler(
+        { documentId: "doc-1", campaignId: "camp-1" },
+        context,
+      );
+
+      // OCR was called
+      expect(mockOcrPdf).toHaveBeenCalledOnce();
+      // parsePdfBuffer was called with the OCR'd buffer
+      expect(mockParsePdfBuffer).toHaveBeenCalledWith(Buffer.from("ocr-pdf"));
+      // Pipeline completed successfully
+      expect(mockUpdateDocumentChunkCount).toHaveBeenCalledWith("doc-1", 1);
+    });
+
+    it("fails document when OCR service returns an error", async () => {
+      const handler = await getHandler();
+      const context = createMockContext();
+      setupScannedPdf();
+      mockIsOcrEnabled.mockReturnValue(true);
+      mockStorageDownload.mockResolvedValue(
+        ok({ content: Buffer.from("raw-pdf"), contentType: "application/pdf" }),
+      );
+      mockOcrPdf.mockResolvedValue(
+        err({ code: "OCR_REQUEST_FAILED", message: "OCR service returned 500" }),
+      );
+
+      await expect(
+        handler({ documentId: "doc-1", campaignId: "camp-1" }, context),
+      ).rejects.toThrow("OCR failed");
+
+      expect(mockUpdateDocumentStatus).toHaveBeenCalledWith(
+        "doc-1", "failed", expect.stringContaining("OCR failed"),
+      );
+    });
+
+    it("fails document when OCR produces no usable text", async () => {
+      const handler = await getHandler();
+      const context = createMockContext();
+      setupScannedPdf();
+      mockIsOcrEnabled.mockReturnValue(true);
+      mockStorageDownload.mockResolvedValue(
+        ok({ content: Buffer.from("raw-pdf"), contentType: "application/pdf" }),
+      );
+      mockOcrPdf.mockResolvedValue(ok(Buffer.from("ocr-pdf")));
+      mockParsePdfBuffer.mockResolvedValue(
+        ok({
+          content: "",
+          pages: [{ pageNumber: 1, content: "", startOffset: 0, endOffset: 0 }],
+          pageCount: 1,
+          metadata: { pageCount: 1 },
+          characterCount: 0,
+          tokenCount: 0,
+          hasExtractedText: false,
+        }),
+      );
+
+      await expect(
+        handler({ documentId: "doc-1", campaignId: "camp-1" }, context),
+      ).rejects.toThrow("OCR could not extract");
+
+      expect(mockUpdateDocumentStatus).toHaveBeenCalledWith(
+        "doc-1", "failed", expect.stringContaining("OCR could not extract"),
+      );
+    });
+
+    it("fails document when storage download fails during OCR", async () => {
+      const handler = await getHandler();
+      const context = createMockContext();
+      setupScannedPdf();
+      mockIsOcrEnabled.mockReturnValue(true);
+      mockStorageDownload.mockResolvedValue(
+        err({ code: "NOT_FOUND", message: "File not found in storage" }),
+      );
+
+      await expect(
+        handler({ documentId: "doc-1", campaignId: "camp-1" }, context),
+      ).rejects.toThrow("download document for OCR");
+
+      expect(mockUpdateDocumentStatus).toHaveBeenCalledWith(
+        "doc-1", "failed", expect.stringContaining("download document for OCR"),
+      );
     });
   });
 });

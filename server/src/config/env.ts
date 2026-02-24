@@ -57,6 +57,10 @@ const envSchema = z
     SESSION_MAX_AGE_DAYS: z.coerce.number().int().positive().default(30),
     SESSION_UPDATE_AGE_HOURS: z.coerce.number().int().positive().default(1),
 
+    // OCR Service
+    OCR_SERVICE_URL: z.string().url().optional(),
+    OCR_TIMEOUT: z.coerce.number().int().positive().default(300000),
+
     // PostHog Analytics
     POSTHOG_API_KEY: z.string().optional(),
     POSTHOG_HOST: z.string().url().optional(),

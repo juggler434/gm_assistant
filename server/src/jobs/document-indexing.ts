@@ -23,7 +23,7 @@ import { documents } from "@/db/schema/documents.js";
 import { config } from "@/config/index.js";
 import { ok, err } from "@/types/index.js";
 import type { Result } from "@/types/index.js";
-import { createPdfProcessor } from "@/modules/documents/processors/pdf.js";
+import { createPdfProcessor, parsePdfBuffer } from "@/modules/documents/processors/pdf.js";
 import { createTextProcessor } from "@/modules/documents/processors/text.js";
 import { createChunkingService } from "@/modules/knowledge/chunking/service.js";
 import { createStorageService } from "@/services/storage/index.js";
@@ -33,6 +33,7 @@ import {
   findDocumentById,
 } from "@/modules/documents/repository.js";
 import { trackEvent } from "@/services/metrics/index.js";
+import { isOcrEnabled, ocrPdf } from "@/services/ocr/index.js";
 import { registerHandler } from "./handlers/index.js";
 import type { BaseJobData, JobContext } from "./types.js";
 import type { ChunkingInput } from "@/modules/knowledge/chunking/types.js";
@@ -418,6 +419,93 @@ async function handleDocumentIndexing(
   }
 
   const extracted = extractionResult.value;
+
+  // Handle scanned PDFs with no extractable text
+  if (extracted.metadata.extractedText === false) {
+    if (!isOcrEnabled()) {
+      const error: DocumentIndexingError = {
+        code: "EXTRACTION_FAILED",
+        message:
+          "Could not extract text from this PDF. It may be a scanned document or contain only images. " +
+          "Try uploading a text-based PDF or a plain text / Markdown file instead.",
+      };
+      await handleFailure(documentId, error, context);
+      throw new Error(error.message);
+    }
+
+    // Attempt OCR on the scanned PDF
+    context.logger.info("No extractable text found, attempting OCR", { documentId });
+    await context.updateProgress({
+      percentage: 10,
+      message: "Running OCR on scanned document",
+      metadata: { stage: "ocr" },
+    });
+
+    const storage = createStorageService();
+    const downloadResult = await storage.download(campaignId, documentId);
+    if (!downloadResult.ok) {
+      const error: DocumentIndexingError = {
+        code: "EXTRACTION_FAILED",
+        message: `Failed to download document for OCR: ${downloadResult.error.message}`,
+        cause: downloadResult.error,
+      };
+      await handleFailure(documentId, error, context);
+      throw new Error(error.message);
+    }
+
+    const ocrResult = await ocrPdf(downloadResult.value.content, context.signal);
+    if (!ocrResult.ok) {
+      const error: DocumentIndexingError = {
+        code: "EXTRACTION_FAILED",
+        message: `OCR failed: ${ocrResult.error.message}`,
+        cause: ocrResult.error,
+      };
+      await handleFailure(documentId, error, context);
+      throw new Error(error.message);
+    }
+
+    // Re-parse the OCR'd PDF
+    const ocrParseResult = await parsePdfBuffer(ocrResult.value);
+    if (!ocrParseResult.ok) {
+      const error: DocumentIndexingError = {
+        code: "EXTRACTION_FAILED",
+        message: `Failed to parse OCR'd PDF: ${ocrParseResult.error.message}`,
+        cause: ocrParseResult.error,
+      };
+      await handleFailure(documentId, error, context);
+      throw new Error(error.message);
+    }
+
+    // Check if OCR actually produced usable text
+    if (!ocrParseResult.value.hasExtractedText) {
+      const error: DocumentIndexingError = {
+        code: "EXTRACTION_FAILED",
+        message:
+          "OCR could not extract usable text from this PDF. The document may contain " +
+          "handwritten content or very low quality scans.",
+      };
+      await handleFailure(documentId, error, context);
+      throw new Error(error.message);
+    }
+
+    // Replace extraction results with OCR results
+    extracted.content = ocrParseResult.value.content;
+    extracted.chunkingInput = {
+      content: ocrParseResult.value.content,
+      pages: ocrParseResult.value.pages,
+      pageCount: ocrParseResult.value.pageCount,
+    } as ChunkingInput;
+    extracted.metadata = {
+      pageCount: ocrParseResult.value.pageCount,
+      extractedText: true,
+      ocrApplied: true,
+    };
+
+    context.logger.info("OCR completed successfully", {
+      documentId,
+      contentLength: ocrParseResult.value.content.length,
+    });
+  }
 
   // Persist extraction metadata on the document
   await db
