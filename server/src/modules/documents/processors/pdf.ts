@@ -161,6 +161,139 @@ function isInvalidPdfError(error: unknown): boolean {
   return false;
 }
 
+/**
+ * Parse a PDF buffer and extract text content, pages, and metadata.
+ *
+ * This is the core parsing logic used by both the document processor
+ * (after downloading from storage) and the OCR fallback path (after
+ * running OCR on a scanned PDF).
+ */
+export async function parsePdfBuffer(
+  buffer: Buffer,
+  options?: PdfProcessorOptions,
+): Promise<Result<PdfProcessorResult, PdfProcessorError>> {
+  const pageDelimiter = options?.pageDelimiter ?? DEFAULT_PAGE_DELIMITER;
+  const minTextLength = options?.minTextLength ?? DEFAULT_MIN_TEXT_LENGTH;
+
+  // Collect page texts during parsing
+  const pageTexts: string[] = [];
+
+  try {
+    // Parse PDF with custom page renderer to capture per-page text
+    const pdfData = await pdf(buffer, {
+      pagerender: async (pageData: {
+        getTextContent: () => Promise<{ items: PdfTextItem[] }>;
+      }) => {
+        const textContent = await pageData.getTextContent();
+        const text = textContent.items
+          .map((item: PdfTextItem) => item.str)
+          .join(" ");
+        pageTexts.push(text);
+        return text;
+      },
+      max: options?.maxPages ?? 0, // 0 = all pages
+    });
+
+    // Check for empty PDF (no pages)
+    if (pdfData.numpages === 0) {
+      return err({
+        code: "EMPTY_PDF",
+        message: "PDF document has no pages",
+      });
+    }
+
+    // Build pages array with character offsets
+    const pages: PdfPage[] = [];
+    let currentOffset = 0;
+
+    for (let i = 0; i < pageTexts.length; i++) {
+      const pageNumber = i + 1;
+      const pageContent = pageTexts[i]!.trim();
+
+      // Add page delimiter if not the first page
+      if (i > 0) {
+        const delimiter = formatPageDelimiter(pageDelimiter, pageNumber);
+        currentOffset += delimiter.length;
+      }
+
+      const startOffset = currentOffset;
+      const endOffset = startOffset + pageContent.length;
+      currentOffset = endOffset;
+
+      pages.push({
+        pageNumber,
+        content: pageContent,
+        startOffset,
+        endOffset,
+      });
+    }
+
+    // Build full content with page delimiters
+    const contentParts: string[] = [];
+    for (let i = 0; i < pages.length; i++) {
+      if (i > 0) {
+        const delimiter = formatPageDelimiter(pageDelimiter, i + 1);
+        contentParts.push(delimiter);
+      }
+      contentParts.push(pages[i]!.content);
+    }
+    const content = contentParts.join("");
+
+    // Determine if text was successfully extracted
+    const totalTextLength = pages.reduce(
+      (sum, page) => sum + page.content.length,
+      0
+    );
+    const averageTextPerPage =
+      pages.length > 0 ? totalTextLength / pages.length : 0;
+    const hasExtractedText = averageTextPerPage >= minTextLength;
+
+    // Extract metadata
+    const metadata = extractMetadata(
+      pdfData.info as PdfInfo | undefined,
+      pdfData.numpages,
+      pdfData.metadata?._metadata?.["dc:format"] as string | undefined
+    );
+
+    return ok({
+      content,
+      pages,
+      pageCount: pdfData.numpages,
+      metadata,
+      characterCount: content.length,
+      tokenCount: estimateTokenCount(content),
+      hasExtractedText,
+    });
+  } catch (error) {
+    // Handle specific PDF errors
+    if (isEncryptedPdfError(error)) {
+      return err({
+        code: "ENCRYPTED_PDF",
+        message: "PDF is password-protected and cannot be processed",
+        cause: error,
+      });
+    }
+
+    if (isInvalidPdfError(error)) {
+      return err({
+        code: "INVALID_PDF",
+        message: "File is not a valid PDF document",
+        cause: error,
+      });
+    }
+
+    // Generic parse error
+    return err({
+      code: "PARSE_ERROR",
+      message:
+        error instanceof Error
+          ? `Failed to parse PDF: ${error.message}`
+          : "Failed to parse PDF",
+      cause: error,
+    });
+  }
+}
+
 export interface PdfProcessorDeps {
   storage: ReturnType<typeof createStorageService>;
 }
@@ -190,127 +323,7 @@ export function createPdfProcessor(
         });
       }
 
-      const { content: buffer } = downloadResult.value;
-      const pageDelimiter = options?.pageDelimiter ?? DEFAULT_PAGE_DELIMITER;
-      const minTextLength = options?.minTextLength ?? DEFAULT_MIN_TEXT_LENGTH;
-
-      // Collect page texts during parsing
-      const pageTexts: string[] = [];
-
-      try {
-        // Parse PDF with custom page renderer to capture per-page text
-        const pdfData = await pdf(buffer, {
-          pagerender: async (pageData: {
-            getTextContent: () => Promise<{ items: PdfTextItem[] }>;
-          }) => {
-            const textContent = await pageData.getTextContent();
-            const text = textContent.items
-              .map((item: PdfTextItem) => item.str)
-              .join(" ");
-            pageTexts.push(text);
-            return text;
-          },
-          max: options?.maxPages ?? 0, // 0 = all pages
-        });
-
-        // Check for empty PDF (no pages)
-        if (pdfData.numpages === 0) {
-          return err({
-            code: "EMPTY_PDF",
-            message: "PDF document has no pages",
-          });
-        }
-
-        // Build pages array with character offsets
-        const pages: PdfPage[] = [];
-        let currentOffset = 0;
-
-        for (let i = 0; i < pageTexts.length; i++) {
-          const pageNumber = i + 1;
-          const pageContent = pageTexts[i]!.trim();
-
-          // Add page delimiter if not the first page
-          if (i > 0) {
-            const delimiter = formatPageDelimiter(pageDelimiter, pageNumber);
-            currentOffset += delimiter.length;
-          }
-
-          const startOffset = currentOffset;
-          const endOffset = startOffset + pageContent.length;
-          currentOffset = endOffset;
-
-          pages.push({
-            pageNumber,
-            content: pageContent,
-            startOffset,
-            endOffset,
-          });
-        }
-
-        // Build full content with page delimiters
-        const contentParts: string[] = [];
-        for (let i = 0; i < pages.length; i++) {
-          if (i > 0) {
-            const delimiter = formatPageDelimiter(pageDelimiter, i + 1);
-            contentParts.push(delimiter);
-          }
-          contentParts.push(pages[i]!.content);
-        }
-        const content = contentParts.join("");
-
-        // Determine if text was successfully extracted
-        const totalTextLength = pages.reduce(
-          (sum, page) => sum + page.content.length,
-          0
-        );
-        const averageTextPerPage =
-          pages.length > 0 ? totalTextLength / pages.length : 0;
-        const hasExtractedText = averageTextPerPage >= minTextLength;
-
-        // Extract metadata
-        const metadata = extractMetadata(
-          pdfData.info as PdfInfo | undefined,
-          pdfData.numpages,
-          pdfData.metadata?._metadata?.["dc:format"] as string | undefined
-        );
-
-        return ok({
-          content,
-          pages,
-          pageCount: pdfData.numpages,
-          metadata,
-          characterCount: content.length,
-          tokenCount: estimateTokenCount(content),
-          hasExtractedText,
-        });
-      } catch (error) {
-        // Handle specific PDF errors
-        if (isEncryptedPdfError(error)) {
-          return err({
-            code: "ENCRYPTED_PDF",
-            message: "PDF is password-protected and cannot be processed",
-            cause: error,
-          });
-        }
-
-        if (isInvalidPdfError(error)) {
-          return err({
-            code: "INVALID_PDF",
-            message: "File is not a valid PDF document",
-            cause: error,
-          });
-        }
-
-        // Generic parse error
-        return err({
-          code: "PARSE_ERROR",
-          message:
-            error instanceof Error
-              ? `Failed to parse PDF: ${error.message}`
-              : "Failed to parse PDF",
-          cause: error,
-        });
-      }
+      return parsePdfBuffer(downloadResult.value.content, options);
     },
   };
 }

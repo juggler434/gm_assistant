@@ -220,6 +220,36 @@ describe("LLM Re-ranker", () => {
     expect(mockChat).not.toHaveBeenCalled();
   });
 
+  it("should return error when LLM uses wrong property names", async () => {
+    const chunks = [
+      makeChunk({ id: "chunk-1", content: "Dragon lore", score: 0.9 }),
+      makeChunk({ id: "chunk-2", content: "Tavern info", score: 0.7 }),
+    ];
+
+    // LLM returns valid JSON array but with wrong property names
+    mockChat.mockResolvedValue({
+      ok: true,
+      value: {
+        message: {
+          role: "assistant",
+          content: JSON.stringify([
+            { passage: 1, relevance: 8 },
+            { passage: 2, relevance: 3 },
+          ]),
+        },
+        model: "llama3",
+      },
+    });
+
+    const result = await rerankChunks("Tell me about dragons", chunks, llmService);
+
+    expect(result.ok).toBe(false);
+    if (!result.ok) {
+      expect(result.error.code).toBe("RERANK_FAILED");
+      expect(result.error.message).toContain("none had valid index/score fields");
+    }
+  });
+
   it("should return error when response is not an array", async () => {
     const chunks = [
       makeChunk({ id: "chunk-1", score: 0.8 }),

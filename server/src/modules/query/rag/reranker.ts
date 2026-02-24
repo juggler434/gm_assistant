@@ -129,6 +129,15 @@ export async function rerankChunks(
     }
   }
 
+  // If no valid scores were mapped despite having input, the LLM likely used
+  // an unexpected format (wrong property names, 0-based indices, etc.)
+  if (scoreMap.size === 0 && scores.length > 0) {
+    return err({
+      code: "RERANK_FAILED",
+      message: `Reranker returned ${scores.length} entries but none had valid index/score fields: ${responseText.slice(0, 200)}`,
+    });
+  }
+
   // Apply scores and filter
   const reranked: HybridSearchResult[] = [];
   for (let i = 0; i < chunks.length; i++) {
