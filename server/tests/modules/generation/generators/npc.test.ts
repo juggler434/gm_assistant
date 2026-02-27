@@ -649,6 +649,148 @@ describe("NPC Generator", () => {
       expect(callArgs.messages[0].content).toContain("Do NOT include stat blocks");
     });
 
+    it("should recover complete NPCs from truncated JSON response", async () => {
+      const llm = makeMockLLMService();
+      const request: NpcGenerationRequest = { campaignId, tone: "dark" };
+
+      mockEmbeddingResponse();
+      mockSearchChunksHybrid.mockResolvedValue({ ok: true, value: [] });
+
+      // Simulate truncated response: 2 complete NPCs, 3rd cut off
+      const truncatedJSON = `{
+  "npcs": [
+    {
+      "name": "Complete NPC 1",
+      "race": "Elf",
+      "classRole": "Ranger",
+      "level": "Level 3",
+      "appearance": "Tall and lean",
+      "personality": "Quiet",
+      "motivations": "Protect the forest",
+      "secrets": "Exiled from home",
+      "backstory": "A wanderer",
+      "statBlock": null,
+      "statBlockGrounded": false
+    },
+    {
+      "name": "Complete NPC 2",
+      "race": "Dwarf",
+      "classRole": "Cleric",
+      "level": "Level 5",
+      "appearance": "Stocky with a braided beard",
+      "personality": "Jovial",
+      "motivations": "Find lost relics",
+      "secrets": "Doubts the gods",
+      "backstory": "Former miner",
+      "statBlock": null,
+      "statBlockGrounded": false
+    },
+    {
+      "name": "Truncated NPC",
+      "race": "Hum`;
+
+      mockChat.mockResolvedValue({
+        ok: true,
+        value: {
+          message: { role: "assistant", content: truncatedJSON },
+          model: "llama3",
+        },
+      });
+
+      const result = await generateNpcs(request, llm);
+
+      expect(result.ok).toBe(true);
+      if (result.ok) {
+        // Should recover the 2 complete NPCs, discard the truncated 3rd
+        expect(result.value.npcs).toHaveLength(2);
+        expect(result.value.npcs[0]?.name).toBe("Complete NPC 1");
+        expect(result.value.npcs[1]?.name).toBe("Complete NPC 2");
+      }
+    });
+
+    it("should recover NPCs from truncated JSON with nested stat blocks", async () => {
+      const llm = makeMockLLMService();
+      const request: NpcGenerationRequest = {
+        campaignId,
+        tone: "heroic",
+        includeStatBlock: true,
+      };
+
+      mockEmbeddingResponse();
+      mockSearchChunksHybrid.mockResolvedValue({ ok: true, value: [] });
+
+      // Complete NPC with stat block + truncated second NPC
+      const truncatedJSON = `{
+  "npcs": [
+    {
+      "name": "Sir Aldric",
+      "race": "Human",
+      "classRole": "Paladin",
+      "level": "Level 8",
+      "appearance": "Imposing",
+      "personality": "Noble",
+      "motivations": "Justice",
+      "secrets": "Hidden past",
+      "backstory": "Knight of the realm",
+      "statBlock": { "strength": 18, "dexterity": 12, "hitPoints": 72, "armorClass": 18 },
+      "statBlockGrounded": false
+    },
+    {
+      "name": "Truncated Wizard",
+      "race": "Elf",
+      "classRole": "Wizard",
+      "statBlock": { "intelligence": 20`;
+
+      mockChat.mockResolvedValue({
+        ok: true,
+        value: {
+          message: { role: "assistant", content: truncatedJSON },
+          model: "llama3",
+        },
+      });
+
+      const result = await generateNpcs(request, llm);
+
+      expect(result.ok).toBe(true);
+      if (result.ok) {
+        expect(result.value.npcs).toHaveLength(1);
+        expect(result.value.npcs[0]?.name).toBe("Sir Aldric");
+        expect(result.value.npcs[0]?.statBlock).toEqual({
+          strength: 18, dexterity: 12, hitPoints: 72, armorClass: 18,
+        });
+      }
+    });
+
+    it("should return parse error when truncated JSON has no complete NPCs", async () => {
+      const llm = makeMockLLMService();
+      const request: NpcGenerationRequest = { campaignId, tone: "dark" };
+
+      mockEmbeddingResponse();
+      mockSearchChunksHybrid.mockResolvedValue({ ok: true, value: [] });
+
+      // Truncated before even the first NPC is complete
+      const truncatedJSON = `{
+  "npcs": [
+    {
+      "name": "Kaelen, the Serpent's Scion",
+      "race": "Naga`;
+
+      mockChat.mockResolvedValue({
+        ok: true,
+        value: {
+          message: { role: "assistant", content: truncatedJSON },
+          model: "llama3",
+        },
+      });
+
+      const result = await generateNpcs(request, llm);
+
+      expect(result.ok).toBe(false);
+      if (!result.ok) {
+        expect(result.error.code).toBe("PARSE_ERROR");
+      }
+    });
+
     it("should include count in system prompt when provided", async () => {
       const llm = makeMockLLMService();
       const request: NpcGenerationRequest = {

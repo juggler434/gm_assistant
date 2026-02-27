@@ -52,6 +52,7 @@ export function GeneratePage() {
   } = useGenerateNpcsStream();
   const createNpc = useCreateNpc(campaignId ?? "");
   const [savingNpcIndex, setSavingNpcIndex] = useState<number | null>(null);
+  const [lastNpcFormValues, setLastNpcFormValues] = useState<NpcGenerationFormValues | null>(null);
 
   // ---- Adventure Hooks handlers ----
 
@@ -112,6 +113,7 @@ export function GeneratePage() {
   const handleGenerateNpcs = useCallback(
     (values: NpcGenerationFormValues) => {
       if (!campaignId) return;
+      setLastNpcFormValues(values);
       generateNpcs({
         campaignId,
         tone: values.tone,
@@ -143,6 +145,7 @@ export function GeneratePage() {
           secrets: npc.secrets || null,
           backstory: npc.backstory || null,
           statBlock: npc.statBlock,
+          importance: lastNpcFormValues?.importance ?? "minor",
           isGenerated: true,
         });
         toast.success(`${npc.name} saved to campaign`);
@@ -152,7 +155,7 @@ export function GeneratePage() {
         setSavingNpcIndex(null);
       }
     },
-    [campaignId, createNpc]
+    [campaignId, createNpc, lastNpcFormValues]
   );
 
   return (

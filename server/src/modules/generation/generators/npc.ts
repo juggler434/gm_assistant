@@ -34,7 +34,8 @@ const EMBEDDING_TIMEOUT = 30_000;
 const DEFAULT_MAX_CONTEXT_CHUNKS = 6;
 const MAX_CONTEXT_TOKENS = 2500;
 const GENERATION_TEMPERATURE = 0.85;
-const GENERATION_MAX_TOKENS = 6144;
+const GENERATION_MAX_TOKENS = 8192;
+const GENERATION_CONTEXT_SIZE = 16384;
 
 // ============================================================================
 // Ollama Embed Types
@@ -116,6 +117,61 @@ function buildSettingQuery(tone: string, constraints?: string): string {
 }
 
 // ============================================================================
+// Truncated JSON Recovery
+// ============================================================================
+
+/**
+ * Attempts to recover complete NPC objects from truncated JSON.
+ * When the LLM hits the token limit, the JSON is cut off mid-response.
+ * This extracts any fully-formed NPC objects before the truncation point.
+ */
+function recoverTruncatedNpcs(text: string): unknown | null {
+  // Find the start of the npcs array
+  const arrayStart = text.indexOf("[", text.indexOf('"npcs"'));
+  if (arrayStart === -1) return null;
+
+  // Walk through the text tracking brace depth to find complete objects
+  const completeObjects: string[] = [];
+  let depth = 0;
+  let objectStart = -1;
+
+  for (let i = arrayStart + 1; i < text.length; i++) {
+    const ch = text[i];
+
+    // Skip characters inside strings (handle escaped quotes)
+    if (ch === '"') {
+      i++;
+      while (i < text.length && text[i] !== '"') {
+        if (text[i] === "\\") i++; // skip escaped char
+        i++;
+      }
+      continue;
+    }
+
+    if (ch === "{") {
+      if (depth === 0) objectStart = i;
+      depth++;
+    } else if (ch === "}") {
+      depth--;
+      if (depth === 0 && objectStart !== -1) {
+        completeObjects.push(text.slice(objectStart, i + 1));
+        objectStart = -1;
+      }
+    }
+  }
+
+  if (completeObjects.length === 0) return null;
+
+  // Re-parse the recovered objects
+  try {
+    const recovered = completeObjects.map((obj) => JSON.parse(obj) as unknown);
+    return { npcs: recovered };
+  } catch {
+    return null;
+  }
+}
+
+// ============================================================================
 // Response Parser
 // ============================================================================
 
@@ -133,10 +189,16 @@ function parseNpcsResponse(
   try {
     parsed = JSON.parse(cleaned);
   } catch {
-    return err({
-      code: "PARSE_ERROR",
-      message: `Failed to parse LLM response as JSON: ${cleaned.slice(0, 200)}`,
-    });
+    // Attempt to recover complete NPCs from truncated JSON
+    const recovered = recoverTruncatedNpcs(cleaned);
+    if (recovered) {
+      parsed = recovered;
+    } else {
+      return err({
+        code: "PARSE_ERROR",
+        message: `Failed to parse LLM response as JSON: ${cleaned.slice(0, 200)}`,
+      });
+    }
   }
 
   if (
@@ -279,6 +341,7 @@ export async function generateNpcs(
     ],
     temperature: GENERATION_TEMPERATURE,
     maxTokens: GENERATION_MAX_TOKENS,
+    contextSize: GENERATION_CONTEXT_SIZE,
   });
 
   if (!chatResult.ok) {
