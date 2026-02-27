@@ -76,6 +76,15 @@ export class OllamaProvider implements LLMProvider {
     const timeoutId = setTimeout(() => controller.abort(), timeout);
 
     try {
+      const options: Record<string, unknown> = {
+        num_predict: request.maxTokens ?? this.config.maxTokens,
+        temperature: request.temperature ?? this.config.temperature,
+        stop: request.stop,
+      };
+      if (request.contextSize) {
+        options.num_ctx = request.contextSize;
+      }
+
       const response = await fetch(
         `${this.config.baseUrl}/api/generate`,
         {
@@ -86,11 +95,7 @@ export class OllamaProvider implements LLMProvider {
             prompt: request.prompt,
             system: request.system,
             stream: false,
-            options: {
-              num_predict: request.maxTokens ?? this.config.maxTokens,
-              temperature: request.temperature ?? this.config.temperature,
-              stop: request.stop,
-            },
+            options,
           }),
           signal: controller.signal,
         }
@@ -161,6 +166,15 @@ export class OllamaProvider implements LLMProvider {
     const timeoutId = setTimeout(() => controller.abort(), timeout);
 
     try {
+      const options: Record<string, unknown> = {
+        num_predict: request.maxTokens ?? this.config.maxTokens,
+        temperature: request.temperature ?? this.config.temperature,
+        stop: request.stop,
+      };
+      if (request.contextSize) {
+        options.num_ctx = request.contextSize;
+      }
+
       const response = await fetch(
         `${this.config.baseUrl}/api/chat`,
         {
@@ -170,11 +184,7 @@ export class OllamaProvider implements LLMProvider {
             model: this.config.model,
             messages: request.messages,
             stream: false,
-            options: {
-              num_predict: request.maxTokens ?? this.config.maxTokens,
-              temperature: request.temperature ?? this.config.temperature,
-              stop: request.stop,
-            },
+            options,
           }),
           signal: controller.signal,
         }

@@ -27,6 +27,8 @@ export interface GenerateOptions {
   stop?: string[];
   /** Request timeout in milliseconds */
   timeout?: number;
+  /** Total context window size (prompt + output). Provider-specific; used by Ollama as num_ctx. */
+  contextSize?: number;
 }
 
 /** Request for text generation (completion) */
