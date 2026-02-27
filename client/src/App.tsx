@@ -16,6 +16,7 @@ import { CampaignListPage } from "@/pages/campaigns";
 import { DocumentsPage } from "@/pages/campaign-documents";
 import { QueryPage } from "@/pages/campaign-query";
 import { GeneratePage } from "@/pages/campaign-generate";
+import { NpcsPage } from "@/pages/campaign-npcs";
 import { SessionsPage } from "@/pages/campaign-sessions";
 import { SettingsPage } from "@/pages/campaign-settings";
 import { LandingPage } from "@/pages/landing";
@@ -54,6 +55,7 @@ function App() {
                     <Route path="documents" element={<DocumentsPage />} />
                     <Route path="query" element={<QueryPage />} />
                     <Route path="generate" element={<GeneratePage />} />
+                    <Route path="npcs" element={<NpcsPage />} />
                     <Route path="sessions" element={<SessionsPage />} />
                     <Route path="settings" element={<SettingsPage />} />
                   </Route>

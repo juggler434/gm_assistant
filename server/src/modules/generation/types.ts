@@ -11,9 +11,11 @@ import type {
   AdventureHook,
   HookTone,
   TokenUsage,
+  NpcTone,
+  GeneratedNpc,
 } from "@gm-assistant/shared";
 
-export type { AnswerSource, AdventureHook, HookTone };
+export type { AnswerSource, AdventureHook, HookTone, NpcTone, GeneratedNpc };
 
 // ============================================================================
 // Adventure Hook Types
@@ -51,6 +53,44 @@ export interface AdventureHookResult {
 
 /** Error types for adventure hook generation */
 export interface AdventureHookError {
+  code:
+    | "INVALID_REQUEST"
+    | "EMBEDDING_FAILED"
+    | "SEARCH_FAILED"
+    | "GENERATION_FAILED"
+    | "PARSE_ERROR";
+  message: string;
+  cause?: unknown;
+}
+
+// ============================================================================
+// NPC Generation Types
+// ============================================================================
+
+/** Parameters for generating NPCs (server-internal) */
+export interface NpcGenerationRequest {
+  campaignId: string;
+  tone: NpcTone;
+  race?: string;
+  classRole?: string;
+  level?: string;
+  importance?: string;
+  count?: number;
+  includeStatBlock?: boolean;
+  constraints?: string;
+  maxContextChunks?: number;
+}
+
+/** Result of NPC generation */
+export interface NpcGenerationResult {
+  npcs: GeneratedNpc[];
+  sources: AnswerSource[];
+  chunksUsed: number;
+  usage?: TokenUsage;
+}
+
+/** Error types for NPC generation */
+export interface NpcGenerationError {
   code:
     | "INVALID_REQUEST"
     | "EMBEDDING_FAILED"

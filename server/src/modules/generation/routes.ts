@@ -6,8 +6,14 @@ import { findCampaignByIdAndUserId } from "@/modules/campaigns/index.js";
 import { createLLMService } from "@/services/llm/factory.js";
 import { trackEvent } from "@/services/metrics/index.js";
 import { generateAdventureHooks } from "./generators/adventure-hook.js";
-import { generateHooksParamSchema, generateHooksBodySchema } from "./schemas.js";
-import type { AdventureHookRequest } from "./types.js";
+import { generateNpcs } from "./generators/npc.js";
+import {
+  generateHooksParamSchema,
+  generateHooksBodySchema,
+  generateNpcsParamSchema,
+  generateNpcsBodySchema,
+} from "./schemas.js";
+import type { AdventureHookRequest, NpcGenerationRequest } from "./types.js";
 
 export async function generationRoutes(app: FastifyInstance): Promise<void> {
   // All generation routes require authentication
@@ -113,6 +119,112 @@ export async function generationRoutes(app: FastifyInstance): Promise<void> {
 
     return reply.status(200).send({
       hooks: result.value.hooks,
+      sources: result.value.sources,
+      chunksUsed: result.value.chunksUsed,
+      usage: result.value.usage,
+    });
+  });
+
+  // POST /api/campaigns/:campaignId/generate/npcs - Generate NPCs
+  app.post("/:campaignId/generate/npcs", async (request, reply) => {
+    // Validate params
+    const paramResult = generateNpcsParamSchema.safeParse(request.params);
+    if (!paramResult.success) {
+      return reply.status(400).send({
+        statusCode: 400,
+        error: "Bad Request",
+        message: paramResult.error.issues[0]?.message ?? "Invalid campaign ID",
+      });
+    }
+
+    // Validate body
+    const bodyResult = generateNpcsBodySchema.safeParse(request.body);
+    if (!bodyResult.success) {
+      return reply.status(400).send({
+        statusCode: 400,
+        error: "Bad Request",
+        message: bodyResult.error.issues[0]?.message ?? "Validation failed",
+      });
+    }
+
+    const { campaignId } = paramResult.data;
+    const { tone, race, classRole, level, importance, count, includeStatBlock, constraints } = bodyResult.data;
+    const userId = request.userId!;
+
+    // Verify user owns the campaign
+    const campaign = await findCampaignByIdAndUserId(campaignId, userId);
+    if (!campaign) {
+      return reply.status(404).send({
+        statusCode: 404,
+        error: "Not Found",
+        message: "Campaign not found",
+      });
+    }
+
+    // Check if client wants streaming via Accept header
+    const acceptHeader = request.headers.accept ?? "";
+    const wantsStream = acceptHeader.includes("text/event-stream");
+
+    const npcRequest: NpcGenerationRequest = {
+      campaignId,
+      tone,
+      ...(race !== undefined && { race }),
+      ...(classRole !== undefined && { classRole }),
+      ...(level !== undefined && { level }),
+      ...(importance !== undefined && { importance }),
+      ...(count !== undefined && { count }),
+      ...(count !== undefined && { maxContextChunks: Math.max(count, 6) }),
+      ...(includeStatBlock !== undefined && { includeStatBlock }),
+      ...(constraints !== undefined && { constraints }),
+    };
+
+    const llmService = createLLMService();
+
+    const result = await generateNpcs(npcRequest, llmService);
+
+    if (!result.ok) {
+      request.log.error(
+        { error: result.error, campaignId },
+        "NPC generation failed"
+      );
+      const statusCode = errorCodeToStatus(result.error.code);
+      return reply.status(statusCode).send({
+        statusCode,
+        error: result.error.code,
+        message: result.error.message,
+      });
+    }
+
+    trackEvent(userId, "npcs_generated", {
+      campaign_id: campaignId,
+      tone,
+      npc_count: result.value.npcs.length,
+    });
+
+    if (wantsStream) {
+      reply.raw.writeHead(200, {
+        "Content-Type": "text/event-stream",
+        "Cache-Control": "no-cache",
+        Connection: "keep-alive",
+      });
+
+      for (const npc of result.value.npcs) {
+        reply.raw.write(`data: ${JSON.stringify({ type: "npc", npc })}\n\n`);
+      }
+
+      reply.raw.write(`data: ${JSON.stringify({
+        type: "complete",
+        sources: result.value.sources,
+        chunksUsed: result.value.chunksUsed,
+        usage: result.value.usage,
+      })}\n\n`);
+
+      reply.raw.end();
+      return reply;
+    }
+
+    return reply.status(200).send({
+      npcs: result.value.npcs,
       sources: result.value.sources,
       chunksUsed: result.value.chunksUsed,
       usage: result.value.usage,

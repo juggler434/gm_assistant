@@ -46,7 +46,7 @@ const generationTypes: GenerationTypeOption[] = [
     label: "NPCs",
     description: "Non-player characters with backstories and motivations",
     icon: Users,
-    available: false,
+    available: true,
   },
   {
     id: "locations",
