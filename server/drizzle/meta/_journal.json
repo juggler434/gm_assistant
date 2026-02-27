@@ -36,6 +36,13 @@
       "when": 1771372800000,
       "tag": "0004_update_embedding_dimensions",
       "breakpoints": true
+    },
+    {
+      "idx": 5,
+      "version": "7",
+      "when": 1771459200000,
+      "tag": "0005_add_npcs_table",
+      "breakpoints": true
     }
   ]
 }

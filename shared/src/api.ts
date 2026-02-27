@@ -13,6 +13,9 @@ import type {
   Document,
   DocumentType,
   DocumentStatus,
+  Npc,
+  NpcStatus,
+  NpcImportance,
 } from "./entities.js";
 
 // ============================================================================
@@ -124,6 +127,67 @@ export interface CreateConversationRequest {
 /** Response wrapping a newly created conversation */
 export interface CreateConversationResponse {
   conversation: Conversation;
+}
+
+// ============================================================================
+// NPC API
+// ============================================================================
+
+/** POST /api/campaigns/:campaignId/npcs - request body */
+export interface CreateNpcRequest {
+  name: string;
+  race?: string | null;
+  classRole?: string | null;
+  level?: string | null;
+  appearance?: string | null;
+  personality?: string | null;
+  motivations?: string | null;
+  secrets?: string | null;
+  backstory?: string | null;
+  statBlock?: Record<string, unknown> | null;
+  importance?: NpcImportance;
+  status?: NpcStatus;
+  tags?: string[] | null;
+  isGenerated?: boolean;
+  notes?: string | null;
+}
+
+/** PATCH /api/campaigns/:campaignId/npcs/:id - request body */
+export interface UpdateNpcRequest {
+  name?: string;
+  race?: string | null;
+  classRole?: string | null;
+  level?: string | null;
+  appearance?: string | null;
+  personality?: string | null;
+  motivations?: string | null;
+  secrets?: string | null;
+  backstory?: string | null;
+  statBlock?: Record<string, unknown> | null;
+  importance?: NpcImportance;
+  status?: NpcStatus;
+  tags?: string[] | null;
+  isGenerated?: boolean;
+  notes?: string | null;
+}
+
+/** Query parameters for GET /api/campaigns/:campaignId/npcs */
+export interface NpcListQuery {
+  search?: string;
+  status?: NpcStatus;
+  importance?: NpcImportance;
+  limit?: number;
+  offset?: number;
+}
+
+/** Response wrapping a single NPC */
+export interface NpcResponse {
+  npc: Npc;
+}
+
+/** Response wrapping a list of NPCs */
+export interface NpcListResponse {
+  npcs: Npc[];
 }
 
 // ============================================================================

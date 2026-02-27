@@ -14,23 +14,46 @@ import {
   type AdventureHookFormValues,
 } from "@/components/generation/adventure-hook-form";
 import { GenerationResult } from "@/components/generation/generation-result";
+import {
+  NpcGenerationForm,
+  type NpcGenerationFormValues,
+} from "@/components/generation/npc-generation-form";
+import { NpcGenerationResult } from "@/components/generation/npc-generation-result";
 import { useGenerateHooksStream } from "@/hooks/use-generation";
+import { useGenerateNpcsStream } from "@/hooks/use-generate-npcs";
+import { useCreateNpc } from "@/hooks/use-npcs";
 import { useSavedHooks } from "@/hooks/use-saved-hooks";
+import type { GeneratedNpc } from "@/types";
 
 const COMING_SOON_LABELS: Record<string, string> = {
   "adventure-outlines": "Adventure Outlines",
   "full-adventures": "Full Adventures",
-  npcs: "NPCs",
   locations: "Locations",
 };
 
 export function GeneratePage() {
   const { id: campaignId } = useParams<{ id: string }>();
   const [selectedType, setSelectedType] = useState<GenerationType>("adventure-hooks");
+
+  // Adventure hooks state
   const { generate, regenerateOne, hooks, sources, status, error, isStreaming } =
     useGenerateHooksStream();
   const [lastFormValues, setLastFormValues] = useState<AdventureHookFormValues | null>(null);
   const { savedHooks, saveHook, unsaveHook } = useSavedHooks(campaignId ?? "");
+
+  // NPC generation state
+  const {
+    generate: generateNpcs,
+    npcs: generatedNpcs,
+    sources: npcSources,
+    status: npcStatus,
+    error: npcError,
+    isStreaming: npcIsStreaming,
+  } = useGenerateNpcsStream();
+  const createNpc = useCreateNpc(campaignId ?? "");
+  const [savingNpcIndex, setSavingNpcIndex] = useState<number | null>(null);
+
+  // ---- Adventure Hooks handlers ----
 
   const handleGenerate = useCallback(
     (values: AdventureHookFormValues) => {
@@ -84,6 +107,54 @@ export function GeneratePage() {
     [unsaveHook]
   );
 
+  // ---- NPC Generation handlers ----
+
+  const handleGenerateNpcs = useCallback(
+    (values: NpcGenerationFormValues) => {
+      if (!campaignId) return;
+      generateNpcs({
+        campaignId,
+        tone: values.tone,
+        race: values.race,
+        classRole: values.classRole,
+        level: values.level,
+        importance: values.importance,
+        count: values.count,
+        includeStatBlock: values.includeStatBlock,
+        constraints: values.constraints,
+      });
+    },
+    [campaignId, generateNpcs]
+  );
+
+  const handleSaveNpc = useCallback(
+    async (npc: GeneratedNpc, index: number) => {
+      if (!campaignId) return;
+      setSavingNpcIndex(index);
+      try {
+        await createNpc.mutateAsync({
+          name: npc.name,
+          race: npc.race || null,
+          classRole: npc.classRole || null,
+          level: npc.level || null,
+          appearance: npc.appearance || null,
+          personality: npc.personality || null,
+          motivations: npc.motivations || null,
+          secrets: npc.secrets || null,
+          backstory: npc.backstory || null,
+          statBlock: npc.statBlock,
+          isGenerated: true,
+        });
+        toast.success(`${npc.name} saved to campaign`);
+      } catch {
+        toast.error("Failed to save NPC");
+      } finally {
+        setSavingNpcIndex(null);
+      }
+    },
+    [campaignId, createNpc]
+  );
+
   return (
     <div className="space-y-6">
       <GenerationTypeSelector selected={selectedType} onSelect={setSelectedType} />
@@ -108,6 +179,25 @@ export function GeneratePage() {
             onRegenerateOne={handleRegenerateOne}
             onSave={handleSave}
             onUnsave={handleUnsave}
+          />
+        </div>
+      ) : selectedType === "npcs" ? (
+        <div className="space-y-6">
+          <div className="rounded-[var(--radius)] border border-border bg-card p-5">
+            <h3 className="mb-4 text-base font-semibold text-foreground">
+              Generate NPCs
+            </h3>
+            <NpcGenerationForm onSubmit={handleGenerateNpcs} isLoading={npcIsStreaming} />
+          </div>
+
+          <NpcGenerationResult
+            npcs={generatedNpcs}
+            sources={npcSources}
+            status={npcStatus}
+            error={npcError}
+            isStreaming={npcIsStreaming}
+            savingIndex={savingNpcIndex}
+            onSave={handleSaveNpc}
           />
         </div>
       ) : (

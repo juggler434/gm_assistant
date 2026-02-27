@@ -49,6 +49,54 @@ export interface GenerateHooksResponse {
 }
 
 // ============================================================================
+// NPC Generation
+// ============================================================================
+
+/** Supported tone options for NPC generation */
+export type NpcTone =
+  | "dark"
+  | "comedic"
+  | "mysterious"
+  | "heroic"
+  | "gritty"
+  | "whimsical";
+
+/** Request body for POST /api/campaigns/:campaignId/generate/npcs */
+export interface GenerateNpcsRequest {
+  tone: NpcTone;
+  race?: string;
+  classRole?: string;
+  level?: string;
+  importance?: "major" | "minor" | "background";
+  count?: number;
+  includeStatBlock?: boolean;
+  constraints?: string;
+}
+
+/** A single generated NPC (preview before saving) */
+export interface GeneratedNpc {
+  name: string;
+  race: string;
+  classRole: string;
+  level: string;
+  appearance: string;
+  personality: string;
+  motivations: string;
+  secrets: string;
+  backstory: string;
+  statBlock: Record<string, unknown> | null;
+  statBlockGrounded: boolean;
+}
+
+/** Response from POST /api/campaigns/:campaignId/generate/npcs */
+export interface GenerateNpcsResponse {
+  npcs: GeneratedNpc[];
+  sources: AnswerSource[];
+  chunksUsed: number;
+  usage?: TokenUsage;
+}
+
+// ============================================================================
 // SSE Streaming Events (for Accept: text/event-stream)
 // ============================================================================
 
@@ -62,6 +110,12 @@ export interface GenerationStatusEvent {
 export interface GenerationHookEvent {
   type: "hook";
   hook: AdventureHook;
+}
+
+/** SSE event: a single generated NPC */
+export interface GenerationNpcEvent {
+  type: "npc";
+  npc: GeneratedNpc;
 }
 
 /** SSE event: generation complete with metadata */
@@ -84,5 +138,12 @@ export interface GenerationErrorEvent {
 export type GenerationSSEEvent =
   | GenerationStatusEvent
   | GenerationHookEvent
+  | GenerationCompleteEvent
+  | GenerationErrorEvent;
+
+/** Union of all SSE event types for NPC generation */
+export type NpcGenerationSSEEvent =
+  | GenerationStatusEvent
+  | GenerationNpcEvent
   | GenerationCompleteEvent
   | GenerationErrorEvent;

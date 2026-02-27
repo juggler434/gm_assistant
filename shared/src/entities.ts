@@ -160,6 +160,37 @@ export interface Transcript {
 }
 
 // ============================================================================
+// NPC
+// ============================================================================
+
+/** NPC lifecycle status */
+export type NpcStatus = "alive" | "dead" | "unknown" | "missing";
+
+/** NPC narrative importance */
+export type NpcImportance = "major" | "minor" | "background";
+
+/** NPC entity matching server/src/db/schema/npcs.ts */
+export interface Npc extends BaseEntity {
+  campaignId: Id;
+  createdBy: Id;
+  name: string;
+  race: string | null;
+  classRole: string | null;
+  level: string | null;
+  appearance: string | null;
+  personality: string | null;
+  motivations: string | null;
+  secrets: string | null;
+  backstory: string | null;
+  statBlock: Record<string, unknown> | null;
+  importance: NpcImportance;
+  status: NpcStatus;
+  tags: string[] | null;
+  isGenerated: boolean;
+  notes: string | null;
+}
+
+// ============================================================================
 // Conversation
 // ============================================================================
 
