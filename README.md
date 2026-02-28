@@ -148,7 +148,7 @@ npm run dev
 
 The Vite dev server proxies `/api` requests to the Fastify backend at `http://localhost:3000`.
 
-Open [http://localhost:5173](http://localhost:5173) in your browser.
+Open [http://localhost:5173/register](http://localhost:5173/register) in your browser to create your account and get started.
 
 ## API Routes
 
