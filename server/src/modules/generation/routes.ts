@@ -7,13 +7,16 @@ import { createLLMService } from "@/services/llm/factory.js";
 import { trackEvent } from "@/services/metrics/index.js";
 import { generateAdventureHooks } from "./generators/adventure-hook.js";
 import { generateNpcs } from "./generators/npc.js";
+import { generateLocations } from "./generators/location.js";
 import {
   generateHooksParamSchema,
   generateHooksBodySchema,
   generateNpcsParamSchema,
   generateNpcsBodySchema,
+  generateLocationsParamSchema,
+  generateLocationsBodySchema,
 } from "./schemas.js";
-import type { AdventureHookRequest, NpcGenerationRequest } from "./types.js";
+import type { AdventureHookRequest, NpcGenerationRequest, LocationGenerationRequest } from "./types.js";
 
 export async function generationRoutes(app: FastifyInstance): Promise<void> {
   // All generation routes require authentication
@@ -225,6 +228,110 @@ export async function generationRoutes(app: FastifyInstance): Promise<void> {
 
     return reply.status(200).send({
       npcs: result.value.npcs,
+      sources: result.value.sources,
+      chunksUsed: result.value.chunksUsed,
+      usage: result.value.usage,
+    });
+  });
+
+  // POST /api/campaigns/:campaignId/generate/locations - Generate location descriptions
+  app.post("/:campaignId/generate/locations", async (request, reply) => {
+    // Validate params
+    const paramResult = generateLocationsParamSchema.safeParse(request.params);
+    if (!paramResult.success) {
+      return reply.status(400).send({
+        statusCode: 400,
+        error: "Bad Request",
+        message: paramResult.error.issues[0]?.message ?? "Invalid campaign ID",
+      });
+    }
+
+    // Validate body
+    const bodyResult = generateLocationsBodySchema.safeParse(request.body);
+    if (!bodyResult.success) {
+      return reply.status(400).send({
+        statusCode: 400,
+        error: "Bad Request",
+        message: bodyResult.error.issues[0]?.message ?? "Validation failed",
+      });
+    }
+
+    const { campaignId } = paramResult.data;
+    const { tone, terrain, climate, size, count, constraints } = bodyResult.data;
+    const userId = request.userId!;
+
+    // Verify user owns the campaign
+    const campaign = await findCampaignByIdAndUserId(campaignId, userId);
+    if (!campaign) {
+      return reply.status(404).send({
+        statusCode: 404,
+        error: "Not Found",
+        message: "Campaign not found",
+      });
+    }
+
+    // Check if client wants streaming via Accept header
+    const acceptHeader = request.headers.accept ?? "";
+    const wantsStream = acceptHeader.includes("text/event-stream");
+
+    const locationRequest: LocationGenerationRequest = {
+      campaignId,
+      tone,
+      ...(terrain !== undefined && { terrain }),
+      ...(climate !== undefined && { climate }),
+      ...(size !== undefined && { size }),
+      ...(count !== undefined && { count }),
+      ...(count !== undefined && { maxContextChunks: Math.max(count, 6) }),
+      ...(constraints !== undefined && { constraints }),
+    };
+
+    const llmService = createLLMService();
+
+    const result = await generateLocations(locationRequest, llmService);
+
+    if (!result.ok) {
+      request.log.error(
+        { error: result.error, campaignId },
+        "Location generation failed"
+      );
+      const statusCode = errorCodeToStatus(result.error.code);
+      return reply.status(statusCode).send({
+        statusCode,
+        error: result.error.code,
+        message: result.error.message,
+      });
+    }
+
+    trackEvent(userId, "locations_generated", {
+      campaign_id: campaignId,
+      tone,
+      location_count: result.value.locations.length,
+    });
+
+    if (wantsStream) {
+      reply.raw.writeHead(200, {
+        "Content-Type": "text/event-stream",
+        "Cache-Control": "no-cache",
+        Connection: "keep-alive",
+      });
+
+      for (const location of result.value.locations) {
+        reply.raw.write(`data: ${JSON.stringify({ type: "location", location })}\n\n`);
+      }
+
+      reply.raw.write(`data: ${JSON.stringify({
+        type: "complete",
+        sources: result.value.sources,
+        chunksUsed: result.value.chunksUsed,
+        usage: result.value.usage,
+      })}\n\n`);
+
+      reply.raw.end();
+      return reply;
+    }
+
+    return reply.status(200).send({
+      locations: result.value.locations,
       sources: result.value.sources,
       chunksUsed: result.value.chunksUsed,
       usage: result.value.usage,

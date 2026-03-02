@@ -97,6 +97,57 @@ export interface GenerateNpcsResponse {
 }
 
 // ============================================================================
+// Location Generation
+// ============================================================================
+
+/** Supported tone options for location description generation */
+export type LocationTone =
+  | "dark"
+  | "peaceful"
+  | "mysterious"
+  | "bustling"
+  | "ruined"
+  | "magical";
+
+/** Request body for POST /api/campaigns/:campaignId/generate/locations */
+export interface GenerateLocationsRequest {
+  tone: LocationTone;
+  terrain?: string;
+  climate?: string;
+  size?: "small" | "medium" | "large";
+  count?: number;
+  constraints?: string;
+}
+
+/** A single generated location description */
+export interface GeneratedLocation {
+  name: string;
+  terrain: string;
+  climate: string;
+  size: string;
+  readAloud: string;
+  keyFeatures: string[];
+  pointsOfInterest: string[];
+  sensoryDetails: {
+    sights: string;
+    sounds: string;
+    smells: string;
+  };
+  encounters: string[];
+  secrets: string[];
+  npcsPresent: string[];
+  factions: string[];
+}
+
+/** Response from POST /api/campaigns/:campaignId/generate/locations */
+export interface GenerateLocationsResponse {
+  locations: GeneratedLocation[];
+  sources: AnswerSource[];
+  chunksUsed: number;
+  usage?: TokenUsage;
+}
+
+// ============================================================================
 // SSE Streaming Events (for Accept: text/event-stream)
 // ============================================================================
 
@@ -116,6 +167,12 @@ export interface GenerationHookEvent {
 export interface GenerationNpcEvent {
   type: "npc";
   npc: GeneratedNpc;
+}
+
+/** SSE event: a single generated location */
+export interface GenerationLocationEvent {
+  type: "location";
+  location: GeneratedLocation;
 }
 
 /** SSE event: generation complete with metadata */
@@ -145,5 +202,12 @@ export type GenerationSSEEvent =
 export type NpcGenerationSSEEvent =
   | GenerationStatusEvent
   | GenerationNpcEvent
+  | GenerationCompleteEvent
+  | GenerationErrorEvent;
+
+/** Union of all SSE event types for location generation */
+export type LocationGenerationSSEEvent =
+  | GenerationStatusEvent
+  | GenerationLocationEvent
   | GenerationCompleteEvent
   | GenerationErrorEvent;

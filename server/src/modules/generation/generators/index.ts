@@ -2,3 +2,4 @@
 
 export { generateAdventureHooks } from "./adventure-hook.js";
 export { generateNpcs } from "./npc.js";
+export { generateLocations } from "./location.js";

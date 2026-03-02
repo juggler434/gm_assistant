@@ -19,8 +19,14 @@ import {
   type NpcGenerationFormValues,
 } from "@/components/generation/npc-generation-form";
 import { NpcGenerationResult } from "@/components/generation/npc-generation-result";
+import {
+  LocationGenerationForm,
+  type LocationGenerationFormValues,
+} from "@/components/generation/location-generation-form";
+import { LocationGenerationResult } from "@/components/generation/location-generation-result";
 import { useGenerateHooksStream } from "@/hooks/use-generation";
 import { useGenerateNpcsStream } from "@/hooks/use-generate-npcs";
+import { useGenerateLocationsStream } from "@/hooks/use-generate-locations";
 import { useCreateNpc } from "@/hooks/use-npcs";
 import { useSavedHooks } from "@/hooks/use-saved-hooks";
 import type { GeneratedNpc } from "@/types";
@@ -28,7 +34,6 @@ import type { GeneratedNpc } from "@/types";
 const COMING_SOON_LABELS: Record<string, string> = {
   "adventure-outlines": "Adventure Outlines",
   "full-adventures": "Full Adventures",
-  locations: "Locations",
 };
 
 export function GeneratePage() {
@@ -53,6 +58,16 @@ export function GeneratePage() {
   const createNpc = useCreateNpc(campaignId ?? "");
   const [savingNpcIndex, setSavingNpcIndex] = useState<number | null>(null);
   const [lastNpcFormValues, setLastNpcFormValues] = useState<NpcGenerationFormValues | null>(null);
+
+  // Location generation state
+  const {
+    generate: generateLocs,
+    locations: generatedLocations,
+    sources: locationSources,
+    status: locationStatus,
+    error: locationError,
+    isStreaming: locationIsStreaming,
+  } = useGenerateLocationsStream();
 
   // ---- Adventure Hooks handlers ----
 
@@ -158,6 +173,24 @@ export function GeneratePage() {
     [campaignId, createNpc, lastNpcFormValues]
   );
 
+  // ---- Location Generation handlers ----
+
+  const handleGenerateLocations = useCallback(
+    (values: LocationGenerationFormValues) => {
+      if (!campaignId) return;
+      generateLocs({
+        campaignId,
+        tone: values.tone,
+        terrain: values.terrain,
+        climate: values.climate,
+        size: values.size,
+        count: values.count,
+        constraints: values.constraints,
+      });
+    },
+    [campaignId, generateLocs]
+  );
+
   return (
     <div className="space-y-6">
       <GenerationTypeSelector selected={selectedType} onSelect={setSelectedType} />
@@ -187,9 +220,7 @@ export function GeneratePage() {
       ) : selectedType === "npcs" ? (
         <div className="space-y-6">
           <div className="rounded-[var(--radius)] border border-border bg-card p-5">
-            <h3 className="mb-4 text-base font-semibold text-foreground">
-              Generate NPCs
-            </h3>
+            <h3 className="mb-4 text-base font-semibold text-foreground">Generate NPCs</h3>
             <NpcGenerationForm onSubmit={handleGenerateNpcs} isLoading={npcIsStreaming} />
           </div>
 
@@ -201,6 +232,24 @@ export function GeneratePage() {
             isStreaming={npcIsStreaming}
             savingIndex={savingNpcIndex}
             onSave={handleSaveNpc}
+          />
+        </div>
+      ) : selectedType === "locations" ? (
+        <div className="space-y-6">
+          <div className="rounded-[var(--radius)] border border-border bg-card p-5">
+            <h3 className="mb-4 text-base font-semibold text-foreground">Generate Locations</h3>
+            <LocationGenerationForm
+              onSubmit={handleGenerateLocations}
+              isLoading={locationIsStreaming}
+            />
+          </div>
+
+          <LocationGenerationResult
+            locations={generatedLocations}
+            sources={locationSources}
+            status={locationStatus}
+            error={locationError}
+            isStreaming={locationIsStreaming}
           />
         </div>
       ) : (

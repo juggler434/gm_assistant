@@ -44,3 +44,20 @@ export const generateNpcsBodySchema = z.object({
 });
 
 export type GenerateNpcsBody = z.infer<typeof generateNpcsBodySchema>;
+
+export const generateLocationsParamSchema = z.object({
+  campaignId: z.string().uuid("Invalid campaign ID"),
+});
+
+export type GenerateLocationsParam = z.infer<typeof generateLocationsParamSchema>;
+
+export const generateLocationsBodySchema = z.object({
+  tone: z.enum(["dark", "peaceful", "mysterious", "bustling", "ruined", "magical"]),
+  terrain: z.string().max(100).optional(),
+  climate: z.string().max(100).optional(),
+  size: z.enum(["small", "medium", "large"]).optional(),
+  count: z.number().int().min(1).max(5).optional(),
+  constraints: z.string().max(500).optional(),
+});
+
+export type GenerateLocationsBody = z.infer<typeof generateLocationsBodySchema>;
