@@ -1,6 +1,6 @@
 // SPDX-License-Identifier: AGPL-3.0-or-later
 
-import { Copy, Check, Eye, EyeOff } from "lucide-react";
+import { Copy, Check, Eye, EyeOff, Save } from "lucide-react";
 import { useState } from "react";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -9,6 +9,8 @@ import type { GeneratedLocation } from "@/types";
 
 interface GeneratedLocationCardProps {
   location: GeneratedLocation;
+  onSave?: (location: GeneratedLocation) => void;
+  isSaving?: boolean;
 }
 
 function ListSection({ title, items }: { title: string; items: string[] }) {
@@ -27,7 +29,7 @@ function ListSection({ title, items }: { title: string; items: string[] }) {
   );
 }
 
-export function GeneratedLocationCard({ location }: GeneratedLocationCardProps) {
+export function GeneratedLocationCard({ location, onSave, isSaving }: GeneratedLocationCardProps) {
   const [copied, setCopied] = useState(false);
   const [showSecrets, setShowSecrets] = useState(false);
 
@@ -81,6 +83,18 @@ export function GeneratedLocationCard({ location }: GeneratedLocationCardProps) 
             {subtitle && <p className="mt-0.5 text-xs text-muted-foreground">{subtitle}</p>}
           </div>
           <div className="flex shrink-0 gap-1">
+            {onSave && (
+              <Button
+                variant="outline"
+                size="sm"
+                className="gap-1.5"
+                onClick={() => onSave(location)}
+                disabled={isSaving}
+              >
+                <Save className="h-3.5 w-3.5" />
+                Save to Campaign
+              </Button>
+            )}
             <Button
               variant="ghost"
               size="icon"

@@ -191,6 +191,35 @@ export interface Npc extends BaseEntity {
 }
 
 // ============================================================================
+// Location
+// ============================================================================
+
+/** Location entity matching server/src/db/schema/locations.ts */
+export interface Location extends BaseEntity {
+  campaignId: Id;
+  createdBy: Id;
+  name: string;
+  terrain: string | null;
+  climate: string | null;
+  size: string | null;
+  readAloud: string | null;
+  keyFeatures: string[] | null;
+  pointsOfInterest: string[] | null;
+  encounters: string[] | null;
+  secrets: string[] | null;
+  npcsPresent: string[] | null;
+  factions: string[] | null;
+  sensoryDetails: {
+    sights?: string;
+    sounds?: string;
+    smells?: string;
+  } | null;
+  tags: string[] | null;
+  isGenerated: boolean;
+  notes: string | null;
+}
+
+// ============================================================================
 // Conversation
 // ============================================================================
 
