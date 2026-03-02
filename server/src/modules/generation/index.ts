@@ -4,9 +4,11 @@ export { generationRoutes } from "./routes.js";
 
 export { generateAdventureHooks } from "./generators/index.js";
 export { generateNpcs } from "./generators/index.js";
+export { generateLocations } from "./generators/index.js";
 
 export { buildAdventureHookPrompt } from "./prompts/index.js";
 export { buildNpcPrompt } from "./prompts/index.js";
+export { buildLocationPrompt } from "./prompts/index.js";
 
 export {
   generateHooksParamSchema,
@@ -17,6 +19,10 @@ export {
   generateNpcsBodySchema,
   type GenerateNpcsParam,
   type GenerateNpcsBody,
+  generateLocationsParamSchema,
+  generateLocationsBodySchema,
+  type GenerateLocationsParam,
+  type GenerateLocationsBody,
 } from "./schemas.js";
 
 export type {
@@ -30,4 +36,9 @@ export type {
   GeneratedNpc,
   NpcGenerationResult,
   NpcGenerationError,
+  LocationTone,
+  LocationGenerationRequest,
+  GeneratedLocation,
+  LocationGenerationResult,
+  LocationGenerationError,
 } from "./types.js";

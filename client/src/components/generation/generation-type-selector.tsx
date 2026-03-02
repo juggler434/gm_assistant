@@ -53,7 +53,7 @@ const generationTypes: GenerationTypeOption[] = [
     label: "Locations",
     description: "Detailed locations with descriptions and points of interest",
     icon: MapPin,
-    available: false,
+    available: true,
   },
 ];
 

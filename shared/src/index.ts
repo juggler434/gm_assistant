@@ -56,13 +56,19 @@ export type {
   GenerateNpcsRequest,
   GeneratedNpc,
   GenerateNpcsResponse,
+  LocationTone,
+  GenerateLocationsRequest,
+  GeneratedLocation,
+  GenerateLocationsResponse,
   GenerationStatusEvent,
   GenerationHookEvent,
   GenerationNpcEvent,
+  GenerationLocationEvent,
   GenerationCompleteEvent,
   GenerationErrorEvent,
   GenerationSSEEvent,
   NpcGenerationSSEEvent,
+  LocationGenerationSSEEvent,
 } from "./generation.js";
 
 // API request/response types

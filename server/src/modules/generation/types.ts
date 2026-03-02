@@ -13,9 +13,11 @@ import type {
   TokenUsage,
   NpcTone,
   GeneratedNpc,
+  LocationTone,
+  GeneratedLocation,
 } from "@gm-assistant/shared";
 
-export type { AnswerSource, AdventureHook, HookTone, NpcTone, GeneratedNpc };
+export type { AnswerSource, AdventureHook, HookTone, NpcTone, GeneratedNpc, LocationTone, GeneratedLocation };
 
 // ============================================================================
 // Adventure Hook Types
@@ -91,6 +93,42 @@ export interface NpcGenerationResult {
 
 /** Error types for NPC generation */
 export interface NpcGenerationError {
+  code:
+    | "INVALID_REQUEST"
+    | "EMBEDDING_FAILED"
+    | "SEARCH_FAILED"
+    | "GENERATION_FAILED"
+    | "PARSE_ERROR";
+  message: string;
+  cause?: unknown;
+}
+
+// ============================================================================
+// Location Generation Types
+// ============================================================================
+
+/** Parameters for generating locations (server-internal) */
+export interface LocationGenerationRequest {
+  campaignId: string;
+  tone: LocationTone;
+  terrain?: string;
+  climate?: string;
+  size?: "small" | "medium" | "large";
+  count?: number;
+  constraints?: string;
+  maxContextChunks?: number;
+}
+
+/** Result of location generation */
+export interface LocationGenerationResult {
+  locations: GeneratedLocation[];
+  sources: AnswerSource[];
+  chunksUsed: number;
+  usage?: TokenUsage;
+}
+
+/** Error types for location generation */
+export interface LocationGenerationError {
   code:
     | "INVALID_REQUEST"
     | "EMBEDDING_FAILED"
