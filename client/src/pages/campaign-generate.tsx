@@ -28,8 +28,9 @@ import { useGenerateHooksStream } from "@/hooks/use-generation";
 import { useGenerateNpcsStream } from "@/hooks/use-generate-npcs";
 import { useGenerateLocationsStream } from "@/hooks/use-generate-locations";
 import { useCreateNpc } from "@/hooks/use-npcs";
+import { useCreateLocation } from "@/hooks/use-locations";
 import { useSavedHooks } from "@/hooks/use-saved-hooks";
-import type { GeneratedNpc } from "@/types";
+import type { GeneratedNpc, GeneratedLocation } from "@/types";
 
 const COMING_SOON_LABELS: Record<string, string> = {
   "adventure-outlines": "Adventure Outlines",
@@ -68,6 +69,8 @@ export function GeneratePage() {
     error: locationError,
     isStreaming: locationIsStreaming,
   } = useGenerateLocationsStream();
+  const createLocation = useCreateLocation(campaignId ?? "");
+  const [savingLocationIndex, setSavingLocationIndex] = useState<number | null>(null);
 
   // ---- Adventure Hooks handlers ----
 
@@ -191,6 +194,37 @@ export function GeneratePage() {
     [campaignId, generateLocs]
   );
 
+  const handleSaveLocation = useCallback(
+    async (location: GeneratedLocation, index: number) => {
+      if (!campaignId) return;
+      setSavingLocationIndex(index);
+      try {
+        await createLocation.mutateAsync({
+          name: location.name,
+          terrain: location.terrain || null,
+          climate: location.climate || null,
+          size: location.size || null,
+          readAloud: location.readAloud || null,
+          keyFeatures: location.keyFeatures,
+          pointsOfInterest: location.pointsOfInterest,
+          encounters: location.encounters,
+          secrets: location.secrets,
+          npcsPresent: location.npcsPresent,
+          factions: location.factions,
+          sensoryDetails: location.sensoryDetails,
+          tags: null,
+          isGenerated: true,
+        });
+        toast.success(`${location.name} saved to campaign`);
+      } catch {
+        toast.error("Failed to save location");
+      } finally {
+        setSavingLocationIndex(null);
+      }
+    },
+    [campaignId, createLocation]
+  );
+
   return (
     <div className="space-y-6">
       <GenerationTypeSelector selected={selectedType} onSelect={setSelectedType} />
@@ -250,6 +284,8 @@ export function GeneratePage() {
             status={locationStatus}
             error={locationError}
             isStreaming={locationIsStreaming}
+            savingIndex={savingLocationIndex}
+            onSave={handleSaveLocation}
           />
         </div>
       ) : (

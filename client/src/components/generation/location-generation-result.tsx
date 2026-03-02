@@ -12,6 +12,8 @@ interface LocationGenerationResultProps {
   status: string | null;
   error: Error | null;
   isStreaming: boolean;
+  savingIndex?: number | null;
+  onSave?: (location: GeneratedLocation, index: number) => void;
 }
 
 export function LocationGenerationResult({
@@ -20,6 +22,8 @@ export function LocationGenerationResult({
   status,
   error,
   isStreaming,
+  savingIndex,
+  onSave,
 }: LocationGenerationResultProps) {
   if (locations.length === 0 && !isStreaming && !error) {
     return null;
@@ -46,7 +50,12 @@ export function LocationGenerationResult({
       {locations.length > 0 && (
         <div className="space-y-4">
           {locations.map((location, index) => (
-            <GeneratedLocationCard key={`${location.name}-${index}`} location={location} />
+            <GeneratedLocationCard
+              key={`${location.name}-${index}`}
+              location={location}
+              onSave={onSave ? (loc) => onSave(loc, index) : undefined}
+              isSaving={savingIndex === index}
+            />
           ))}
         </div>
       )}

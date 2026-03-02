@@ -13,6 +13,7 @@ import type {
   Document,
   DocumentType,
   DocumentStatus,
+  Location,
   Npc,
   NpcStatus,
   NpcImportance,
@@ -188,6 +189,65 @@ export interface NpcResponse {
 /** Response wrapping a list of NPCs */
 export interface NpcListResponse {
   npcs: Npc[];
+}
+
+// ============================================================================
+// Location API
+// ============================================================================
+
+/** POST /api/campaigns/:campaignId/locations - request body */
+export interface CreateLocationRequest {
+  name: string;
+  terrain?: string | null;
+  climate?: string | null;
+  size?: string | null;
+  readAloud?: string | null;
+  keyFeatures?: string[] | null;
+  pointsOfInterest?: string[] | null;
+  encounters?: string[] | null;
+  secrets?: string[] | null;
+  npcsPresent?: string[] | null;
+  factions?: string[] | null;
+  sensoryDetails?: { sights?: string; sounds?: string; smells?: string } | null;
+  tags?: string[] | null;
+  isGenerated?: boolean;
+  notes?: string | null;
+}
+
+/** PATCH /api/campaigns/:campaignId/locations/:id - request body */
+export interface UpdateLocationRequest {
+  name?: string;
+  terrain?: string | null;
+  climate?: string | null;
+  size?: string | null;
+  readAloud?: string | null;
+  keyFeatures?: string[] | null;
+  pointsOfInterest?: string[] | null;
+  encounters?: string[] | null;
+  secrets?: string[] | null;
+  npcsPresent?: string[] | null;
+  factions?: string[] | null;
+  sensoryDetails?: { sights?: string; sounds?: string; smells?: string } | null;
+  tags?: string[] | null;
+  isGenerated?: boolean;
+  notes?: string | null;
+}
+
+/** Query parameters for GET /api/campaigns/:campaignId/locations */
+export interface LocationListQuery {
+  search?: string;
+  limit?: number;
+  offset?: number;
+}
+
+/** Response wrapping a single location */
+export interface LocationResponse {
+  location: Location;
+}
+
+/** Response wrapping a list of locations */
+export interface LocationListResponse {
+  locations: Location[];
 }
 
 // ============================================================================
