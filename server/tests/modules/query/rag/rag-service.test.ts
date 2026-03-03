@@ -82,7 +82,7 @@ function makeHybridResult(
 function mockEmbeddingResponse(): void {
   mockFetch.mockResolvedValueOnce({
     ok: true,
-    json: async () => ({ embeddings: [Array(1024).fill(0.1)] }),
+    json: async () => ({ embeddings: [Array(768).fill(0.1)] }),
     text: async () => "",
   });
 }
@@ -305,7 +305,7 @@ describe("RAG Service", () => {
         expect.objectContaining({
           method: "POST",
           body: JSON.stringify({
-            model: "mxbai-embed-large",
+            model: "nomic-embed-text",
             input: ["Tell me about elves"],
             truncate: true,
           }),

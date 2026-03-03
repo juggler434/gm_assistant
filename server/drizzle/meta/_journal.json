@@ -43,6 +43,13 @@
       "when": 1771459200000,
       "tag": "0005_add_npcs_table",
       "breakpoints": true
+    },
+    {
+      "idx": 6,
+      "version": "7",
+      "when": 1771545600000,
+      "tag": "0006_switch_to_nomic_embed",
+      "breakpoints": true
     }
   ]
 }

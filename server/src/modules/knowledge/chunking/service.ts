@@ -33,14 +33,14 @@ import type {
 /** Characters per token (heuristic for English text) */
 const CHARS_PER_TOKEN = 4;
 
-/** Default fixed-size chunking options (sized for mxbai-embed-large 512-token context) */
+/** Default fixed-size chunking options (sized for nomic-embed-text 8192-token context) */
 const DEFAULT_FIXED_SIZE_OPTIONS: Required<FixedSizeChunkingOptions> = {
   targetTokens: 256,
   overlapTokens: 50,
   minChunkTokens: 30,
 };
 
-/** Default semantic chunking options (sized for mxbai-embed-large 512-token context) */
+/** Default semantic chunking options (sized for nomic-embed-text 8192-token context) */
 const DEFAULT_SEMANTIC_OPTIONS: Required<SemanticChunkingOptions> = {
   maxTokens: 256,
   minTokens: 50,
@@ -50,7 +50,7 @@ const DEFAULT_SEMANTIC_OPTIONS: Required<SemanticChunkingOptions> = {
 /** Field name used to identify PDF chunking inputs */
 const PDF_PAGES_FIELD = "pages";
 
-/** Default markdown chunking options (sized for mxbai-embed-large 512-token context) */
+/** Default markdown chunking options (sized for nomic-embed-text 8192-token context) */
 const DEFAULT_MARKDOWN_OPTIONS: Required<MarkdownChunkingOptions> = {
   targetTokens: 256,
   overlapTokens: 50,

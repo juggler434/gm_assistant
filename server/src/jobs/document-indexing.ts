@@ -20,9 +20,9 @@ import { eq } from "drizzle-orm";
 import { db } from "@/db/index.js";
 import { chunks, type NewChunk } from "@/db/schema/chunks.js";
 import { documents } from "@/db/schema/documents.js";
-import { config } from "@/config/index.js";
 import { ok, err } from "@/types/index.js";
 import type { Result } from "@/types/index.js";
+import { generateEmbeddings, EMBEDDING_BATCH_SIZE, type EmbeddingError } from "@/services/llm/index.js";
 import { createPdfProcessor, parsePdfBuffer } from "@/modules/documents/processors/pdf.js";
 import { createTextProcessor } from "@/modules/documents/processors/text.js";
 import { createChunkingService } from "@/modules/knowledge/chunking/service.js";
@@ -47,11 +47,6 @@ import type { ChunkingResult } from "@/modules/knowledge/chunking/types.js";
 export interface DocumentIndexingJobData extends BaseJobData {
   documentId: string;
   campaignId: string;
-}
-
-/** Ollama embed API response */
-interface OllamaEmbedResponse {
-  embeddings: number[][];
 }
 
 /** Error codes for document indexing */
@@ -82,15 +77,6 @@ interface ExtractionResult {
 // Constants
 // ============================================================================
 
-/** Embedding model matching the 1024-dimension chunks table */
-const EMBEDDING_MODEL = "mxbai-embed-large";
-
-/** Maximum number of texts to embed in a single API call */
-const EMBEDDING_BATCH_SIZE = 20;
-
-/** Timeout per embedding request (ms) */
-const EMBEDDING_TIMEOUT = 120_000;
-
 /** MIME types handled by the PDF processor */
 const PDF_MIME_TYPES = new Set(["application/pdf"]);
 
@@ -104,59 +90,9 @@ const TEXT_MIME_TYPES = new Set([
 // Embedding Helper
 // ============================================================================
 
-/**
- * Generate embeddings for a batch of texts using the Ollama embed API.
- *
- * Calls POST /api/embed with the `input` array format.
- */
-async function generateEmbeddings(
-  texts: string[],
-  signal: AbortSignal,
-): Promise<Result<number[][], DocumentIndexingError>> {
-  const controller = new AbortController();
-  const timeoutId = setTimeout(() => controller.abort(), EMBEDDING_TIMEOUT);
-
-  // Abort on both timeout and external signal
-  const onAbort = () => controller.abort();
-  signal.addEventListener("abort", onAbort, { once: true });
-
-  try {
-    const response = await fetch(`${config.llm.baseUrl}/api/embed`, {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({
-        model: EMBEDDING_MODEL,
-        input: texts,
-        truncate: true,
-      }),
-      signal: controller.signal,
-    });
-
-    if (!response.ok) {
-      const body = await response.text();
-      return err({
-        code: "EMBEDDING_FAILED",
-        message: `Embedding request failed (${response.status}): ${body}`,
-      });
-    }
-
-    const data = (await response.json()) as OllamaEmbedResponse;
-    return ok(data.embeddings);
-  } catch (error) {
-    if (signal.aborted) {
-      return err({ code: "CANCELLED", message: "Job cancelled" });
-    }
-    return err({
-      code: "EMBEDDING_FAILED",
-      message: error instanceof Error
-        ? `Embedding request error: ${error.message}`
-        : "Embedding request failed",
-      cause: error,
-    });
-  } finally {
-    clearTimeout(timeoutId);
-    signal.removeEventListener("abort", onAbort);
-  }
+/** Map shared EmbeddingError to DocumentIndexingError */
+function mapEmbeddingError(e: EmbeddingError): DocumentIndexingError {
+  return { code: e.code === "CANCELLED" ? "CANCELLED" : "EMBEDDING_FAILED", message: e.message, cause: e.cause };
 }
 
 // ============================================================================
@@ -262,7 +198,7 @@ async function embedChunks(
     const batch = chunkTexts.slice(i, i + EMBEDDING_BATCH_SIZE);
     const result = await generateEmbeddings(batch, signal);
     if (!result.ok) {
-      return result;
+      return err(mapEmbeddingError(result.error));
     }
     allEmbeddings.push(...result.value);
 
