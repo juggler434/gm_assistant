@@ -9,8 +9,8 @@
  */
 
 import { type Result, ok, err } from "@/types/index.js";
-import { config } from "@/config/index.js";
 import type { LLMService } from "@/services/llm/service.js";
+import { generateEmbedding, type EmbeddingError } from "@/services/llm/index.js";
 import {
   searchChunksHybrid,
   type HybridSearchOptions,
@@ -29,12 +29,6 @@ import type {
 // Constants
 // ============================================================================
 
-/** Embedding model matching the 1024-dimension chunks table */
-const EMBEDDING_MODEL = "mxbai-embed-large";
-
-/** Timeout for embedding requests (ms) */
-const EMBEDDING_TIMEOUT = 30_000;
-
 /** Default number of chunks to retrieve for setting context */
 const DEFAULT_MAX_CONTEXT_CHUNKS = 6;
 
@@ -48,68 +42,21 @@ const GENERATION_TEMPERATURE = 0.8;
 const GENERATION_MAX_TOKENS = 4096;
 
 // ============================================================================
-// Ollama Embed Types
-// ============================================================================
-
-/** Ollama embed API response */
-interface OllamaEmbedResponse {
-  embeddings: number[][];
-}
-
-// ============================================================================
 // Embedding Helper
 // ============================================================================
 
-/**
- * Generate an embedding for a setting context query using the Ollama embed API.
- */
+/** Map shared EmbeddingError to AdventureHookError */
+function mapEmbeddingError(e: EmbeddingError): AdventureHookError {
+  return { code: "EMBEDDING_FAILED", message: e.message, cause: e.cause };
+}
+
+/** Generate a query embedding, mapping errors to AdventureHookError */
 async function generateQueryEmbedding(
   query: string,
 ): Promise<Result<number[], AdventureHookError>> {
-  const controller = new AbortController();
-  const timeoutId = setTimeout(() => controller.abort(), EMBEDDING_TIMEOUT);
-
-  try {
-    const response = await fetch(`${config.llm.baseUrl}/api/embed`, {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({
-        model: EMBEDDING_MODEL,
-        input: [query],
-        truncate: true,
-      }),
-      signal: controller.signal,
-    });
-
-    if (!response.ok) {
-      const body = await response.text();
-      return err({
-        code: "EMBEDDING_FAILED",
-        message: `Embedding request failed (${response.status}): ${body}`,
-      });
-    }
-
-    const data = (await response.json()) as OllamaEmbedResponse;
-    const embedding = data.embeddings[0];
-    if (!embedding) {
-      return err({
-        code: "EMBEDDING_FAILED",
-        message: "No embedding returned from API",
-      });
-    }
-
-    return ok(embedding);
-  } catch (error) {
-    return err({
-      code: "EMBEDDING_FAILED",
-      message: error instanceof Error
-        ? `Embedding error: ${error.message}`
-        : "Embedding request failed",
-      cause: error,
-    });
-  } finally {
-    clearTimeout(timeoutId);
-  }
+  const result = await generateEmbedding(query);
+  if (!result.ok) return err(mapEmbeddingError(result.error));
+  return result;
 }
 
 // ============================================================================

@@ -73,7 +73,7 @@ services:
     entrypoint: >
       sh -c "ollama serve &
              until ollama list 2>/dev/null; do sleep 2; done &&
-             ollama pull mxbai-embed-large &&
+             ollama pull nomic-embed-text &&
              ollama pull gemma3:1b &&
              wait"
     healthcheck:

@@ -12,8 +12,8 @@ import {
 import { documents } from "./documents.js";
 import { campaigns } from "./campaigns.js";
 
-// Embedding dimensions for mxbai-embed-large model
-export const EMBEDDING_DIMENSIONS = 1024;
+// Embedding dimensions for nomic-embed-text model
+export const EMBEDDING_DIMENSIONS = 768;
 
 export const chunks = pgTable(
   "chunks",
@@ -29,7 +29,7 @@ export const chunks = pgTable(
     // Chunk content
     content: text("content").notNull(),
 
-    // Vector embedding for similarity search (1024 dimensions for mxbai-embed-large)
+    // Vector embedding for similarity search (768 dimensions for nomic-embed-text)
     embedding: vector("embedding", { dimensions: EMBEDDING_DIMENSIONS }),
 
     // Chunk positioning

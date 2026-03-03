@@ -52,6 +52,16 @@ export type {
 // Errors
 export { LLMError, type LLMErrorCode } from "./errors.js";
 
+// Embedding utility
+export {
+  generateEmbedding,
+  generateEmbeddings,
+  type EmbeddingError,
+  EMBEDDING_MODEL,
+  EMBEDDING_DIMENSIONS,
+  EMBEDDING_BATCH_SIZE,
+} from "./embedding.js";
+
 // Provider types (for advanced usage)
 export type { LLMProvider } from "./providers/index.js";
 export { OllamaProvider } from "./providers/index.js";
