@@ -220,6 +220,24 @@ export interface Location extends BaseEntity {
 }
 
 // ============================================================================
+// Adventure Hook
+// ============================================================================
+
+/** Adventure hook entity matching server/src/db/schema/adventure-hooks.ts */
+export interface AdventureHookEntity extends BaseEntity {
+  campaignId: Id;
+  createdBy: Id;
+  title: string;
+  description: string;
+  npcs: string[] | null;
+  locations: string[] | null;
+  factions: string[] | null;
+  tags: string[] | null;
+  isGenerated: boolean;
+  notes: string | null;
+}
+
+// ============================================================================
 // Conversation
 // ============================================================================
 

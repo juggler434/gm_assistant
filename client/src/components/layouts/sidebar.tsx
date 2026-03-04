@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: AGPL-3.0-or-later
 
 import { NavLink, useParams } from "react-router-dom";
-import { LayoutDashboard, FileText, MessageSquare, Sparkles, Users, MapPin, Clock, Settings } from "lucide-react";
+import { LayoutDashboard, FileText, MessageSquare, Sparkles, Bookmark, Users, MapPin, Clock, Settings } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { CampaignSwitcher } from "@/components/layouts/campaign-switcher";
 
@@ -9,6 +9,7 @@ const campaignNavItems = [
   { to: "documents", label: "Documents", icon: FileText },
   { to: "query", label: "Ask Questions", icon: MessageSquare },
   { to: "generate", label: "Generate Content", icon: Sparkles },
+  { to: "adventure-hooks", label: "Adventure Hooks", icon: Bookmark },
   { to: "npcs", label: "NPCs", icon: Users },
   { to: "locations", label: "Locations", icon: MapPin },
   { to: "sessions", label: "Sessions", icon: Clock },

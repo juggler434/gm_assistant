@@ -6,6 +6,7 @@
  */
 
 import type {
+  AdventureHookEntity,
   AuthUser,
   Campaign,
   Conversation,
@@ -248,6 +249,51 @@ export interface LocationResponse {
 /** Response wrapping a list of locations */
 export interface LocationListResponse {
   locations: Location[];
+}
+
+// ============================================================================
+// Adventure Hook API
+// ============================================================================
+
+/** POST /api/campaigns/:campaignId/adventure-hooks - request body */
+export interface CreateAdventureHookRequest {
+  title: string;
+  description: string;
+  npcs?: string[] | null;
+  locations?: string[] | null;
+  factions?: string[] | null;
+  tags?: string[] | null;
+  isGenerated?: boolean;
+  notes?: string | null;
+}
+
+/** PATCH /api/campaigns/:campaignId/adventure-hooks/:id - request body */
+export interface UpdateAdventureHookRequest {
+  title?: string;
+  description?: string;
+  npcs?: string[] | null;
+  locations?: string[] | null;
+  factions?: string[] | null;
+  tags?: string[] | null;
+  isGenerated?: boolean;
+  notes?: string | null;
+}
+
+/** Query parameters for GET /api/campaigns/:campaignId/adventure-hooks */
+export interface AdventureHookListQuery {
+  search?: string;
+  limit?: number;
+  offset?: number;
+}
+
+/** Response wrapping a single adventure hook */
+export interface AdventureHookResponse {
+  adventureHook: AdventureHookEntity;
+}
+
+/** Response wrapping a list of adventure hooks */
+export interface AdventureHookListResponse {
+  adventureHooks: AdventureHookEntity[];
 }
 
 // ============================================================================

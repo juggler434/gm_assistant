@@ -9,11 +9,10 @@ interface GenerationResultProps {
   status: string | null;
   error: Error | null;
   isStreaming: boolean;
-  savedHooks: AdventureHook[];
+  savingIndex: number | null;
   onRegenerate: () => void;
   onRegenerateOne?: (index: number) => void;
-  onSave: (hook: AdventureHook) => void;
-  onUnsave: (hook: AdventureHook) => void;
+  onSave: (hook: AdventureHook, index: number) => void;
 }
 
 export function GenerationResult({
@@ -22,11 +21,10 @@ export function GenerationResult({
   status,
   error,
   isStreaming,
-  savedHooks,
+  savingIndex,
   onRegenerate,
   onRegenerateOne,
   onSave,
-  onUnsave,
 }: GenerationResultProps) {
   return (
     <HooksList
@@ -35,11 +33,10 @@ export function GenerationResult({
       status={status}
       error={error}
       isStreaming={isStreaming}
-      savedHooks={savedHooks}
+      savingIndex={savingIndex}
       onRegenerate={onRegenerate}
       onRegenerateOne={onRegenerateOne}
       onSave={onSave}
-      onUnsave={onUnsave}
     />
   );
 }

@@ -29,7 +29,7 @@ import { useGenerateNpcsStream } from "@/hooks/use-generate-npcs";
 import { useGenerateLocationsStream } from "@/hooks/use-generate-locations";
 import { useCreateNpc } from "@/hooks/use-npcs";
 import { useCreateLocation } from "@/hooks/use-locations";
-import { useSavedHooks } from "@/hooks/use-saved-hooks";
+import { useCreateAdventureHook } from "@/hooks/use-adventure-hooks";
 import type { GeneratedNpc, GeneratedLocation, AdventureHook, AnswerSource } from "@/types";
 
 const COMING_SOON_LABELS: Record<string, string> = {
@@ -65,7 +65,8 @@ export function GeneratePage() {
       return null;
     }
   });
-  const { savedHooks, saveHook, unsaveHook } = useSavedHooks(campaignId ?? "");
+  const createAdventureHook = useCreateAdventureHook(campaignId ?? "");
+  const [savingHookIndex, setSavingHookIndex] = useState<number | null>(null);
 
   // Persist generated hooks and sources to sessionStorage whenever they change
   useEffect(() => {
@@ -142,20 +143,27 @@ export function GeneratePage() {
     [campaignId, lastFormValues, regenerateOne]
   );
 
-  const handleSave = useCallback(
-    (hook: Parameters<typeof saveHook>[0]) => {
-      saveHook(hook);
-      toast.success("Hook saved");
+  const handleSaveHook = useCallback(
+    async (hook: AdventureHook, index: number) => {
+      if (!campaignId) return;
+      setSavingHookIndex(index);
+      try {
+        await createAdventureHook.mutateAsync({
+          title: hook.title,
+          description: hook.description,
+          npcs: hook.npcs.length > 0 ? hook.npcs : null,
+          locations: hook.locations.length > 0 ? hook.locations : null,
+          factions: hook.factions.length > 0 ? hook.factions : null,
+          isGenerated: true,
+        });
+        toast.success("Hook saved to campaign");
+      } catch {
+        toast.error("Failed to save hook");
+      } finally {
+        setSavingHookIndex(null);
+      }
     },
-    [saveHook]
-  );
-
-  const handleUnsave = useCallback(
-    (hook: Parameters<typeof unsaveHook>[0]) => {
-      unsaveHook(hook);
-      toast.success("Hook removed from saved");
-    },
-    [unsaveHook]
+    [campaignId, createAdventureHook]
   );
 
   // ---- NPC Generation handlers ----
@@ -276,11 +284,10 @@ export function GeneratePage() {
             status={status}
             error={error}
             isStreaming={isStreaming}
-            savedHooks={savedHooks}
+            savingIndex={savingHookIndex}
             onRegenerate={handleRegenerate}
             onRegenerateOne={handleRegenerateOne}
-            onSave={handleSave}
-            onUnsave={handleUnsave}
+            onSave={handleSaveHook}
           />
         </div>
       ) : selectedType === "npcs" ? (

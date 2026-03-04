@@ -1,18 +1,18 @@
 // SPDX-License-Identifier: AGPL-3.0-or-later
 
 import { useState } from "react";
-import { RefreshCw, Users, MapPin, Shield, Copy, Check, Bookmark } from "lucide-react";
+import { RefreshCw, Users, MapPin, Shield, Copy, Check, Save } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
+import { Spinner } from "@/components/ui/spinner";
 import type { AdventureHook } from "@/types";
 
 interface HookCardProps {
   hook: AdventureHook;
   index: number;
-  isSaved: boolean;
-  onSave: (hook: AdventureHook) => void;
-  onUnsave: (hook: AdventureHook) => void;
+  isSaving: boolean;
+  onSave: (hook: AdventureHook, index: number) => void;
   onRegenerateOne?: (index: number) => void;
   isStreaming?: boolean;
 }
@@ -20,9 +20,8 @@ interface HookCardProps {
 export function HookCard({
   hook,
   index,
-  isSaved,
+  isSaving,
   onSave,
-  onUnsave,
   onRegenerateOne,
   isStreaming,
 }: HookCardProps) {
@@ -38,14 +37,6 @@ export function HookCard({
       setCopied(true);
       setTimeout(() => setCopied(false), 2000);
     });
-  }
-
-  function handleSaveToggle() {
-    if (isSaved) {
-      onUnsave(hook);
-    } else {
-      onSave(hook);
-    }
   }
 
   return (
@@ -71,10 +62,15 @@ export function HookCard({
               variant="ghost"
               size="icon"
               className="h-7 w-7"
-              onClick={handleSaveToggle}
-              title={isSaved ? "Remove from saved" : "Save hook"}
+              onClick={() => onSave(hook, index)}
+              disabled={isSaving}
+              title="Save to campaign"
             >
-              <Bookmark className={`h-3.5 w-3.5 ${isSaved ? "fill-primary text-primary" : ""}`} />
+              {isSaving ? (
+                <Spinner className="h-3.5 w-3.5" />
+              ) : (
+                <Save className="h-3.5 w-3.5" />
+              )}
             </Button>
             {onRegenerateOne && !isStreaming && (
               <Button

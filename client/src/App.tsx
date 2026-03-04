@@ -18,6 +18,7 @@ import { QueryPage } from "@/pages/campaign-query";
 import { GeneratePage } from "@/pages/campaign-generate";
 import { NpcsPage } from "@/pages/campaign-npcs";
 import { LocationsPage } from "@/pages/campaign-locations";
+import { AdventureHooksPage } from "@/pages/campaign-adventure-hooks";
 import { SessionsPage } from "@/pages/campaign-sessions";
 import { SettingsPage } from "@/pages/campaign-settings";
 import { LandingPage } from "@/pages/landing";
@@ -56,6 +57,7 @@ function App() {
                     <Route path="documents" element={<DocumentsPage />} />
                     <Route path="query" element={<QueryPage />} />
                     <Route path="generate" element={<GeneratePage />} />
+                    <Route path="adventure-hooks" element={<AdventureHooksPage />} />
                     <Route path="npcs" element={<NpcsPage />} />
                     <Route path="locations" element={<LocationsPage />} />
                     <Route path="sessions" element={<SessionsPage />} />
