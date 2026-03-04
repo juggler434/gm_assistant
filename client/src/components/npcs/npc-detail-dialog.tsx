@@ -38,13 +38,11 @@ export function NpcDetailDialog({
   onEdit,
   onDelete,
 }: NpcDetailDialogProps) {
-  if (!npc) return null;
-
-  const subtitle = [npc.race, npc.classRole].filter(Boolean).join(" · ");
+  const subtitle = npc ? [npc.race, npc.classRole].filter(Boolean).join(" · ") : "";
 
   return (
-    <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="max-h-[85vh] max-w-2xl overflow-y-auto">
+    <Dialog open={open && npc !== null} onOpenChange={onOpenChange}>
+      {npc && <DialogContent className="max-h-[85vh] max-w-2xl overflow-y-auto">
         <DialogHeader>
           <div className="flex items-start justify-between gap-2">
             <div>
@@ -110,7 +108,7 @@ export function NpcDetailDialog({
             Delete
           </Button>
         </div>
-      </DialogContent>
+      </DialogContent>}
     </Dialog>
   );
 }

@@ -71,6 +71,7 @@ export function HooksList({
             onSave={onSave}
             onRegenerateOne={onRegenerateOne}
             isStreaming={isStreaming}
+            sources={sources}
           />
         ))}
       </div>
@@ -81,12 +82,19 @@ export function HooksList({
             Sources ({sources.length})
           </h4>
           <ul className="space-y-1">
-            {sources.map((source, i) => (
-              <li key={i} className="text-xs text-muted-foreground">
-                {source.documentName}
-                {source.section && <span className="ml-1 opacity-70">- {source.section}</span>}
-              </li>
-            ))}
+            {sources.map((source, i) => {
+              const idx = source.index ?? i + 1;
+              return (
+                <li key={i} className="text-xs text-muted-foreground">
+                  <span className="font-medium text-primary">[{idx}]</span>{" "}
+                  {source.documentName}
+                  {source.section && <span className="ml-1 opacity-70">- {source.section}</span>}
+                  {source.pageNumber !== null && (
+                    <span className="ml-1 opacity-70">(p. {source.pageNumber})</span>
+                  )}
+                </li>
+              );
+            })}
           </ul>
         </div>
       )}

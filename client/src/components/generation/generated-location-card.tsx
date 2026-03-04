@@ -5,15 +5,17 @@ import { useState } from "react";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import type { GeneratedLocation } from "@/types";
+import { CitedText } from "@/components/ui/cited-text";
+import type { GeneratedLocation, AnswerSource } from "@/types";
 
 interface GeneratedLocationCardProps {
   location: GeneratedLocation;
   onSave?: (location: GeneratedLocation) => void;
   isSaving?: boolean;
+  sources?: AnswerSource[];
 }
 
-function ListSection({ title, items }: { title: string; items: string[] }) {
+function ListSection({ title, items, sources = [] }: { title: string; items: string[]; sources?: AnswerSource[] }) {
   if (items.length === 0) return null;
   return (
     <div>
@@ -22,14 +24,14 @@ function ListSection({ title, items }: { title: string; items: string[] }) {
       </h4>
       <ul className="mt-0.5 list-inside list-disc space-y-0.5 text-sm text-foreground">
         {items.map((item, i) => (
-          <li key={i}>{item}</li>
+          <li key={i}><CitedText text={item} sources={sources} /></li>
         ))}
       </ul>
     </div>
   );
 }
 
-export function GeneratedLocationCard({ location, onSave, isSaving }: GeneratedLocationCardProps) {
+export function GeneratedLocationCard({ location, onSave, isSaving, sources = [] }: GeneratedLocationCardProps) {
   const [copied, setCopied] = useState(false);
   const [showSecrets, setShowSecrets] = useState(false);
 
@@ -118,13 +120,15 @@ export function GeneratedLocationCard({ location, onSave, isSaving }: GeneratedL
             <h4 className="mb-1 text-xs font-semibold uppercase tracking-wider text-primary">
               Read Aloud
             </h4>
-            <p className="text-sm italic text-foreground">{location.readAloud}</p>
+            <p className="text-sm italic text-foreground">
+              <CitedText text={location.readAloud} sources={sources} />
+            </p>
           </div>
         )}
 
         {/* Key features & points of interest */}
-        <ListSection title="Key Features" items={location.keyFeatures} />
-        <ListSection title="Points of Interest" items={location.pointsOfInterest} />
+        <ListSection title="Key Features" items={location.keyFeatures} sources={sources} />
+        <ListSection title="Points of Interest" items={location.pointsOfInterest} sources={sources} />
 
         {/* Sensory details */}
         {(location.sensoryDetails.sights ||
@@ -140,7 +144,9 @@ export function GeneratedLocationCard({ location, onSave, isSaving }: GeneratedL
                   <span className="text-[10px] font-semibold uppercase text-muted-foreground">
                     Sights
                   </span>
-                  <p className="mt-0.5 text-xs text-foreground">{location.sensoryDetails.sights}</p>
+                  <p className="mt-0.5 text-xs text-foreground">
+                    <CitedText text={location.sensoryDetails.sights} sources={sources} />
+                  </p>
                 </div>
               )}
               {location.sensoryDetails.sounds && (
@@ -148,7 +154,9 @@ export function GeneratedLocationCard({ location, onSave, isSaving }: GeneratedL
                   <span className="text-[10px] font-semibold uppercase text-muted-foreground">
                     Sounds
                   </span>
-                  <p className="mt-0.5 text-xs text-foreground">{location.sensoryDetails.sounds}</p>
+                  <p className="mt-0.5 text-xs text-foreground">
+                    <CitedText text={location.sensoryDetails.sounds} sources={sources} />
+                  </p>
                 </div>
               )}
               {location.sensoryDetails.smells && (
@@ -156,7 +164,9 @@ export function GeneratedLocationCard({ location, onSave, isSaving }: GeneratedL
                   <span className="text-[10px] font-semibold uppercase text-muted-foreground">
                     Smells
                   </span>
-                  <p className="mt-0.5 text-xs text-foreground">{location.sensoryDetails.smells}</p>
+                  <p className="mt-0.5 text-xs text-foreground">
+                    <CitedText text={location.sensoryDetails.smells} sources={sources} />
+                  </p>
                 </div>
               )}
             </div>
@@ -164,7 +174,7 @@ export function GeneratedLocationCard({ location, onSave, isSaving }: GeneratedL
         )}
 
         {/* Encounters */}
-        <ListSection title="Potential Encounters" items={location.encounters} />
+        <ListSection title="Potential Encounters" items={location.encounters} sources={sources} />
 
         {/* Secrets - hidden by default */}
         {location.secrets.length > 0 && (
@@ -180,7 +190,7 @@ export function GeneratedLocationCard({ location, onSave, isSaving }: GeneratedL
             {showSecrets && (
               <ul className="mt-1 list-inside list-disc space-y-0.5 text-sm text-foreground">
                 {location.secrets.map((secret, i) => (
-                  <li key={i}>{secret}</li>
+                  <li key={i}><CitedText text={secret} sources={sources} /></li>
                 ))}
               </ul>
             )}

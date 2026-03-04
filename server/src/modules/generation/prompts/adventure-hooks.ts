@@ -45,6 +45,7 @@ Rules:
 - Each hook MUST reference specific NPCs, locations, or factions from the provided setting context when available.
 - Do not invent major setting elements (cities, rulers, pantheons) not present in the context. You may invent minor details (a tavern patron's name, a rumor) to flesh out hooks.
 - If a party level is provided, ensure hooks are appropriate for that level of experience.
+- When the description references information from the setting context, include the source number as [N] inline (e.g. "The cult of Vecna [1] has infiltrated the city [2]"). Only cite sources that are listed in the context.
 
 You MUST respond with valid JSON matching this exact schema:
 {

@@ -77,6 +77,7 @@ ${importanceInstruction ? `- ${importanceInstruction}` : ""}
 - Each NPC MUST reference specific setting elements (locations, factions, events) from the provided context when available.
 - Do not invent major setting elements (cities, rulers, pantheons) not present in the context. You may invent minor personal details.
 - Each NPC must be distinct from the others — vary their backgrounds, motivations, and roles.
+- When narrative text fields (appearance, personality, motivations, secrets, backstory) reference information from the setting context, include the source number as [N] inline (e.g. "A former knight of the Silver Order [1] who now serves the Thieves' Guild [2]"). Only cite sources that are listed in the context.
 ${statBlockInstruction}
 
 You MUST respond with valid JSON matching this exact schema:
