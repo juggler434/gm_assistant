@@ -4,27 +4,31 @@ import { Save, AlertTriangle } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import type { GeneratedNpc } from "@/types";
+import { CitedText } from "@/components/ui/cited-text";
+import type { GeneratedNpc, AnswerSource } from "@/types";
 
 interface GeneratedNpcCardProps {
   npc: GeneratedNpc;
   onSave: (npc: GeneratedNpc) => void;
   isSaving?: boolean;
+  sources?: AnswerSource[];
 }
 
-function Section({ title, content }: { title: string; content: string }) {
+function Section({ title, content, sources = [] }: { title: string; content: string; sources?: AnswerSource[] }) {
   if (!content) return null;
   return (
     <div>
       <h4 className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">
         {title}
       </h4>
-      <p className="mt-0.5 text-sm text-foreground">{content}</p>
+      <p className="mt-0.5 text-sm text-foreground">
+        <CitedText text={content} sources={sources} />
+      </p>
     </div>
   );
 }
 
-export function GeneratedNpcCard({ npc, onSave, isSaving }: GeneratedNpcCardProps) {
+export function GeneratedNpcCard({ npc, onSave, isSaving, sources = [] }: GeneratedNpcCardProps) {
   const subtitle = [npc.race, npc.classRole].filter(Boolean).join(" · ");
 
   return (
@@ -53,11 +57,11 @@ export function GeneratedNpcCard({ npc, onSave, isSaving }: GeneratedNpcCardProp
         </div>
       </CardHeader>
       <CardContent className="space-y-3">
-        <Section title="Appearance" content={npc.appearance} />
-        <Section title="Personality" content={npc.personality} />
-        <Section title="Motivations" content={npc.motivations} />
-        <Section title="Secrets" content={npc.secrets} />
-        <Section title="Backstory" content={npc.backstory} />
+        <Section title="Appearance" content={npc.appearance} sources={sources} />
+        <Section title="Personality" content={npc.personality} sources={sources} />
+        <Section title="Motivations" content={npc.motivations} sources={sources} />
+        <Section title="Secrets" content={npc.secrets} sources={sources} />
+        <Section title="Backstory" content={npc.backstory} sources={sources} />
 
         {npc.statBlock && Object.keys(npc.statBlock).length > 0 && (
           <div>

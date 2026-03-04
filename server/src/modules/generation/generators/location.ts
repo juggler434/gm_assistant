@@ -324,6 +324,7 @@ export async function generateLocations(
     pageNumber: s.pageNumber,
     section: s.section,
     relevanceScore: s.relevanceScore,
+    index: s.index,
   }));
 
   const result: LocationGenerationResult = {

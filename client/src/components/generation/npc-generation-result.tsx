@@ -1,8 +1,6 @@
 // SPDX-License-Identifier: AGPL-3.0-or-later
 
-import { FileText } from "lucide-react";
 import { Spinner } from "@/components/ui/spinner";
-import { Badge } from "@/components/ui/badge";
 import { GeneratedNpcCard } from "./generated-npc-card";
 import type { GeneratedNpc, AnswerSource } from "@/types";
 
@@ -55,6 +53,7 @@ export function NpcGenerationResult({
               npc={npc}
               onSave={(n) => onSave(n, index)}
               isSaving={savingIndex === index}
+              sources={sources}
             />
           ))}
         </div>
@@ -74,15 +73,21 @@ export function NpcGenerationResult({
           <h4 className="mb-2 text-xs font-semibold uppercase tracking-wider text-muted-foreground">
             Setting Sources Used
           </h4>
-          <div className="flex flex-wrap gap-2">
-            {sources.map((source, i) => (
-              <Badge key={i} variant="secondary" className="gap-1 text-xs">
-                <FileText className="h-3 w-3" />
-                {source.documentName}
-                {source.pageNumber !== null && ` (p. ${source.pageNumber})`}
-              </Badge>
-            ))}
-          </div>
+          <ul className="space-y-1">
+            {sources.map((source, i) => {
+              const idx = source.index ?? i + 1;
+              return (
+                <li key={i} className="text-xs text-muted-foreground">
+                  <span className="font-medium text-primary">[{idx}]</span>{" "}
+                  {source.documentName}
+                  {source.section && <span className="ml-1 opacity-70">- {source.section}</span>}
+                  {source.pageNumber !== null && (
+                    <span className="ml-1 opacity-70">(p. {source.pageNumber})</span>
+                  )}
+                </li>
+              );
+            })}
+          </ul>
         </div>
       )}
     </div>

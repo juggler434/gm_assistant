@@ -6,7 +6,8 @@ import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Spinner } from "@/components/ui/spinner";
-import type { AdventureHook } from "@/types";
+import { CitedText } from "@/components/ui/cited-text";
+import type { AdventureHook, AnswerSource } from "@/types";
 
 interface HookCardProps {
   hook: AdventureHook;
@@ -15,6 +16,7 @@ interface HookCardProps {
   onSave: (hook: AdventureHook, index: number) => void;
   onRegenerateOne?: (index: number) => void;
   isStreaming?: boolean;
+  sources?: AnswerSource[];
 }
 
 export function HookCard({
@@ -24,6 +26,7 @@ export function HookCard({
   onSave,
   onRegenerateOne,
   isStreaming,
+  sources = [],
 }: HookCardProps) {
   const [copied, setCopied] = useState(false);
 
@@ -87,7 +90,9 @@ export function HookCard({
         </div>
       </CardHeader>
       <CardContent className="space-y-3">
-        <p className="text-sm leading-relaxed text-muted-foreground">{hook.description}</p>
+        <p className="text-sm leading-relaxed text-muted-foreground">
+          <CitedText text={hook.description} sources={sources} />
+        </p>
         <div className="flex flex-wrap gap-2">
           {hook.npcs.length > 0 &&
             hook.npcs.map((npc, i) => (

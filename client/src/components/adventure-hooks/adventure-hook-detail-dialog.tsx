@@ -26,11 +26,9 @@ export function AdventureHookDetailDialog({
   onEdit,
   onDelete,
 }: AdventureHookDetailDialogProps) {
-  if (!hook) return null;
-
   return (
-    <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="max-h-[85vh] max-w-2xl overflow-y-auto">
+    <Dialog open={open && hook !== null} onOpenChange={onOpenChange}>
+      {hook && <DialogContent className="max-h-[85vh] max-w-2xl overflow-y-auto">
         <DialogHeader>
           <div className="flex items-start justify-between gap-2">
             <DialogTitle className="text-xl">{hook.title}</DialogTitle>
@@ -142,7 +140,7 @@ export function AdventureHookDetailDialog({
             Delete
           </Button>
         </div>
-      </DialogContent>
+      </DialogContent>}
     </Dialog>
   );
 }

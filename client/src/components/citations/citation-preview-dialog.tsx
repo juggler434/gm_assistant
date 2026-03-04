@@ -49,19 +49,17 @@ export function CitationPreviewDialog({
   onOpenChange,
   onOpenDocument,
 }: CitationPreviewDialogProps) {
-  if (!source) return null;
-
   const locationParts: string[] = [];
-  if (source.pageNumber != null) {
+  if (source?.pageNumber != null) {
     locationParts.push(`Page ${source.pageNumber}`);
   }
-  if (source.section) {
+  if (source?.section) {
     locationParts.push(source.section);
   }
 
   return (
-    <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="max-w-md">
+    <Dialog open={open && source !== null} onOpenChange={onOpenChange}>
+      {source && <DialogContent className="max-w-md">
         <DialogHeader>
           <div className="flex items-center gap-3">
             <span className="text-muted-foreground">{getDocumentIcon(source.documentType)}</span>
@@ -136,7 +134,7 @@ export function CitationPreviewDialog({
             Close
           </Button>
         </DialogFooter>
-      </DialogContent>
+      </DialogContent>}
     </Dialog>
   );
 }

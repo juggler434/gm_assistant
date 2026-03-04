@@ -30,6 +30,8 @@ export interface AnswerSource {
   pageNumber: number | null;
   section: string | null;
   relevanceScore: number;
+  /** Citation index used in generated text (e.g. [1], [2]) */
+  index?: number;
 }
 
 /** Alias for AnswerSource — used in query response contexts */

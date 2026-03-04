@@ -54,18 +54,16 @@ export function LocationDetailDialog({
   onEdit,
   onDelete,
 }: LocationDetailDialogProps) {
-  if (!location) return null;
+  const subtitle = location
+    ? [location.terrain, location.climate, location.size].filter(Boolean).join(" · ")
+    : "";
 
-  const subtitle = [location.terrain, location.climate, location.size]
-    .filter(Boolean)
-    .join(" · ");
-
-  const sensory = location.sensoryDetails;
+  const sensory = location?.sensoryDetails;
   const hasSensory = sensory && (sensory.sights || sensory.sounds || sensory.smells);
 
   return (
-    <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="max-h-[85vh] max-w-2xl overflow-y-auto">
+    <Dialog open={open && location !== null} onOpenChange={onOpenChange}>
+      {location && <DialogContent className="max-h-[85vh] max-w-2xl overflow-y-auto">
         <DialogHeader>
           <div className="flex items-start justify-between gap-2">
             <div>
@@ -190,7 +188,7 @@ export function LocationDetailDialog({
             Delete
           </Button>
         </div>
-      </DialogContent>
+      </DialogContent>}
     </Dialog>
   );
 }
