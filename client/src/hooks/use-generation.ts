@@ -51,9 +51,12 @@ export function useGenerateHooks() {
  * Yields hooks incrementally as they are generated.
  * Supports regenerating individual hooks at a specific index.
  */
-export function useGenerateHooksStream() {
-  const [hooks, setHooks] = useState<AdventureHook[]>([]);
-  const [sources, setSources] = useState<AnswerSource[]>([]);
+export function useGenerateHooksStream(initialState?: {
+  hooks?: AdventureHook[];
+  sources?: AnswerSource[];
+}) {
+  const [hooks, setHooks] = useState<AdventureHook[]>(initialState?.hooks ?? []);
+  const [sources, setSources] = useState<AnswerSource[]>(initialState?.sources ?? []);
   const [status, setStatus] = useState<string | null>(null);
   const [error, setError] = useState<Error | null>(null);
   const [isStreaming, setIsStreaming] = useState(false);
