@@ -3,13 +3,18 @@
 import { describe, it, expect, vi, beforeEach } from "vitest";
 
 // Hoist mock functions
-const { mockSearchChunksHybrid, mockFetch } = vi.hoisted(() => ({
+const { mockSearchChunksHybrid, mockSearchChunksByKeyword, mockFetch } = vi.hoisted(() => ({
   mockSearchChunksHybrid: vi.fn(),
+  mockSearchChunksByKeyword: vi.fn(),
   mockFetch: vi.fn(),
 }));
 
 vi.mock("@/modules/knowledge/retrieval/hybrid-search.js", () => ({
   searchChunksHybrid: mockSearchChunksHybrid,
+}));
+
+vi.mock("@/modules/knowledge/retrieval/keyword-search.js", () => ({
+  searchChunksByKeyword: mockSearchChunksByKeyword,
 }));
 
 vi.mock("@/config/index.js", () => ({
@@ -619,6 +624,140 @@ describe("Adventure Hook Generator", () => {
       if (result.ok) {
         expect(result.value.usage).toBeUndefined();
       }
+    });
+
+    it("should call entity search when includeNpcsLocations is provided", async () => {
+      const llm = makeMockLLMService();
+      const request: AdventureHookRequest = {
+        campaignId,
+        tone: "dark",
+        includeNpcsLocations: "The Society of the Crimson Whip",
+      };
+
+      mockEmbeddingResponse();
+      mockSearchChunksHybrid.mockResolvedValue({
+        ok: true,
+        value: [makeHybridResult("c1", "General setting content.", 0.8)],
+      });
+      mockSearchChunksByKeyword.mockResolvedValue({
+        ok: true,
+        value: [{
+          chunk: {
+            id: "entity-1",
+            content: "The Crimson Whip is a secret society of assassins.",
+            chunkIndex: 0,
+            tokenCount: 10,
+            pageNumber: 5,
+            section: "Factions",
+            createdAt: new Date("2024-01-01T00:00:00Z"),
+          },
+          rank: 0.9,
+          document: {
+            id: "doc-002",
+            name: "Campaign Notes",
+            documentType: "notes" as const,
+            metadata: {},
+          },
+        }],
+      });
+      mockChat.mockResolvedValue({
+        ok: true,
+        value: {
+          message: { role: "assistant", content: makeValidHooksJSON(3) },
+          model: "llama3",
+        },
+      });
+
+      const result = await generateAdventureHooks(request, llm);
+
+      expect(result.ok).toBe(true);
+      expect(mockSearchChunksByKeyword).toHaveBeenCalledWith(
+        "The Society of the Crimson Whip",
+        campaignId,
+        expect.objectContaining({
+          limit: 4,
+          documentTypes: ["setting", "notes"],
+        }),
+      );
+    });
+
+    it("should not call entity search when includeNpcsLocations is not provided", async () => {
+      const llm = makeMockLLMService();
+      const request: AdventureHookRequest = { campaignId, tone: "dark" };
+
+      mockEmbeddingResponse();
+      mockSearchChunksHybrid.mockResolvedValue({ ok: true, value: [] });
+      mockChat.mockResolvedValue({
+        ok: true,
+        value: {
+          message: { role: "assistant", content: makeValidHooksJSON(3) },
+          model: "llama3",
+        },
+      });
+
+      await generateAdventureHooks(request, llm);
+
+      expect(mockSearchChunksByKeyword).not.toHaveBeenCalled();
+    });
+
+    it("should gracefully degrade when entity search fails", async () => {
+      const llm = makeMockLLMService();
+      const request: AdventureHookRequest = {
+        campaignId,
+        tone: "dark",
+        includeNpcsLocations: "The Crimson Whip",
+      };
+
+      mockEmbeddingResponse();
+      mockSearchChunksHybrid.mockResolvedValue({
+        ok: true,
+        value: [makeHybridResult("c1", "General setting.", 0.8)],
+      });
+      mockSearchChunksByKeyword.mockResolvedValue({
+        ok: false,
+        error: { code: "DATABASE_ERROR", message: "Connection lost" },
+      });
+      mockChat.mockResolvedValue({
+        ok: true,
+        value: {
+          message: { role: "assistant", content: makeValidHooksJSON(3) },
+          model: "llama3",
+        },
+      });
+
+      const result = await generateAdventureHooks(request, llm);
+
+      // Should still succeed using general results only
+      expect(result.ok).toBe(true);
+      if (result.ok) {
+        expect(result.value.hooks).toHaveLength(3);
+      }
+    });
+
+    it("should not include includeNpcsLocations text in embedding query", async () => {
+      const llm = makeMockLLMService();
+      const request: AdventureHookRequest = {
+        campaignId,
+        tone: "dark",
+        includeNpcsLocations: "The Society of the Crimson Whip",
+      };
+
+      mockEmbeddingResponse();
+      mockSearchChunksHybrid.mockResolvedValue({ ok: true, value: [] });
+      mockSearchChunksByKeyword.mockResolvedValue({ ok: true, value: [] });
+      mockChat.mockResolvedValue({
+        ok: true,
+        value: {
+          message: { role: "assistant", content: makeValidHooksJSON(3) },
+          model: "llama3",
+        },
+      });
+
+      await generateAdventureHooks(request, llm);
+
+      // The hybrid search query should NOT contain entity text
+      const hybridQuery = mockSearchChunksHybrid.mock.calls[0]![0] as string;
+      expect(hybridQuery).not.toContain("Crimson Whip");
     });
 
     it("should filter non-string values from npcs/locations/factions arrays", async () => {

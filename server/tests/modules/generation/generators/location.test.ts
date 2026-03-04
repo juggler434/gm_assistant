@@ -3,13 +3,18 @@
 import { describe, it, expect, vi, beforeEach } from "vitest";
 
 // Hoist mock functions
-const { mockSearchChunksHybrid, mockFetch } = vi.hoisted(() => ({
+const { mockSearchChunksHybrid, mockSearchChunksByKeyword, mockFetch } = vi.hoisted(() => ({
   mockSearchChunksHybrid: vi.fn(),
+  mockSearchChunksByKeyword: vi.fn(),
   mockFetch: vi.fn(),
 }));
 
 vi.mock("@/modules/knowledge/retrieval/hybrid-search.js", () => ({
   searchChunksHybrid: mockSearchChunksHybrid,
+}));
+
+vi.mock("@/modules/knowledge/retrieval/keyword-search.js", () => ({
+  searchChunksByKeyword: mockSearchChunksByKeyword,
 }));
 
 vi.mock("@/config/index.js", () => ({
@@ -599,6 +604,113 @@ describe("Location Generator", () => {
       if (!result.ok) {
         expect(result.error.code).toBe("PARSE_ERROR");
         expect(result.error.message).toContain("no valid locations");
+      }
+    });
+
+    it("should call entity search when constraints are provided", async () => {
+      const llm = makeMockLLMService();
+      const request: LocationGenerationRequest = {
+        campaignId,
+        tone: "dark",
+        constraints: "near the Crimson Whip hideout",
+      };
+
+      mockEmbeddingResponse();
+      mockSearchChunksHybrid.mockResolvedValue({
+        ok: true,
+        value: [makeHybridResult("c1", "General setting.", 0.8)],
+      });
+      mockSearchChunksByKeyword.mockResolvedValue({
+        ok: true,
+        value: [{
+          chunk: {
+            id: "entity-1",
+            content: "The Crimson Whip hideout is in the sewers.",
+            chunkIndex: 0,
+            tokenCount: 10,
+            pageNumber: 5,
+            section: "Locations",
+            createdAt: new Date("2024-01-01T00:00:00Z"),
+          },
+          rank: 0.9,
+          document: {
+            id: "doc-002",
+            name: "Campaign Notes",
+            documentType: "notes" as const,
+            metadata: {},
+          },
+        }],
+      });
+      mockChat.mockResolvedValue({
+        ok: true,
+        value: {
+          message: { role: "assistant", content: makeValidLocationsJSON(2) },
+          model: "llama3",
+        },
+      });
+
+      const result = await generateLocations(request, llm);
+
+      expect(result.ok).toBe(true);
+      expect(mockSearchChunksByKeyword).toHaveBeenCalledWith(
+        "near the Crimson Whip hideout",
+        campaignId,
+        expect.objectContaining({
+          limit: 4,
+          documentTypes: ["setting", "notes"],
+        }),
+      );
+    });
+
+    it("should not call entity search when constraints not provided", async () => {
+      const llm = makeMockLLMService();
+      const request: LocationGenerationRequest = { campaignId, tone: "dark" };
+
+      mockEmbeddingResponse();
+      mockSearchChunksHybrid.mockResolvedValue({ ok: true, value: [] });
+      mockChat.mockResolvedValue({
+        ok: true,
+        value: {
+          message: { role: "assistant", content: makeValidLocationsJSON(2) },
+          model: "llama3",
+        },
+      });
+
+      await generateLocations(request, llm);
+
+      expect(mockSearchChunksByKeyword).not.toHaveBeenCalled();
+    });
+
+    it("should gracefully degrade when entity search fails", async () => {
+      const llm = makeMockLLMService();
+      const request: LocationGenerationRequest = {
+        campaignId,
+        tone: "dark",
+        constraints: "The Crimson Whip",
+      };
+
+      mockEmbeddingResponse();
+      mockSearchChunksHybrid.mockResolvedValue({
+        ok: true,
+        value: [makeHybridResult("c1", "General setting.", 0.8)],
+      });
+      mockSearchChunksByKeyword.mockResolvedValue({
+        ok: false,
+        error: { code: "DATABASE_ERROR", message: "Connection lost" },
+      });
+      mockChat.mockResolvedValue({
+        ok: true,
+        value: {
+          message: { role: "assistant", content: makeValidLocationsJSON(2) },
+          model: "llama3",
+        },
+      });
+
+      const result = await generateLocations(request, llm);
+
+      expect(result.ok).toBe(true);
+      if (result.ok) {
+        expect(result.value.locations).toHaveLength(2);
       }
     });
 

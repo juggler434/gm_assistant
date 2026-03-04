@@ -18,6 +18,7 @@ import {
 import { buildContext } from "@/modules/query/rag/context-builder.js";
 import type { AnswerSource } from "@/modules/query/rag/types.js";
 import { buildAdventureHookPrompt } from "../prompts/adventure-hooks.js";
+import { searchEntities, mergeEntityResults } from "./entity-search.js";
 import type {
   AdventureHookRequest,
   AdventureHook,
@@ -33,7 +34,7 @@ import type {
 const DEFAULT_MAX_CONTEXT_CHUNKS = 6;
 
 /** Maximum token budget for setting context */
-const MAX_CONTEXT_TOKENS = 2500;
+const MAX_CONTEXT_TOKENS = 3000;
 
 /** LLM temperature for creative generation */
 const GENERATION_TEMPERATURE = 0.8;
@@ -66,7 +67,7 @@ async function generateQueryEmbedding(
 /**
  * Builds a search query to retrieve setting-relevant context for hook generation.
  */
-function buildSettingQuery(tone: string, theme?: string, includeNpcsLocations?: string): string {
+function buildSettingQuery(tone: string, theme?: string): string {
   const parts = [
     "important NPCs characters factions locations places organizations",
     "setting world lore history conflicts",
@@ -74,10 +75,6 @@ function buildSettingQuery(tone: string, theme?: string, includeNpcsLocations?: 
 
   if (theme) {
     parts.push(theme);
-  }
-
-  if (includeNpcsLocations) {
-    parts.push(includeNpcsLocations);
   }
 
   parts.push(`${tone} themes and events`);
@@ -199,7 +196,7 @@ export async function generateAdventureHooks(
   }
 
   // ---- Step 1: Build setting-focused search query ----
-  const settingQuery = buildSettingQuery(tone, theme, includeNpcsLocations);
+  const settingQuery = buildSettingQuery(tone, theme);
 
   // ---- Step 2: Generate query embedding ----
   const embeddingResult = await generateQueryEmbedding(settingQuery);
@@ -228,8 +225,18 @@ export async function generateAdventureHooks(
     });
   }
 
+  // ---- Step 3b: Entity-specific search for referenced NPCs/locations ----
+  let mergedResults = searchResult.value;
+  if (includeNpcsLocations) {
+    const entityResults = await searchEntities(includeNpcsLocations, campaignId, {
+      limit: 4,
+      documentTypes: ["setting", "notes"],
+    });
+    mergedResults = mergeEntityResults(entityResults, searchResult.value);
+  }
+
   // ---- Step 4: Build context from search results ----
-  const context = buildContext(searchResult.value, {
+  const context = buildContext(mergedResults, {
     maxTokens: MAX_CONTEXT_TOKENS,
   });
 

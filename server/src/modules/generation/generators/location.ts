@@ -18,6 +18,7 @@ import {
 import { buildContext } from "@/modules/query/rag/context-builder.js";
 import type { AnswerSource } from "@/modules/query/rag/types.js";
 import { buildLocationPrompt } from "../prompts/locations.js";
+import { searchEntities, mergeEntityResults } from "./entity-search.js";
 import type {
   LocationGenerationRequest,
   GeneratedLocation,
@@ -30,7 +31,7 @@ import type {
 // ============================================================================
 
 const DEFAULT_MAX_CONTEXT_CHUNKS = 6;
-const MAX_CONTEXT_TOKENS = 2500;
+const MAX_CONTEXT_TOKENS = 3000;
 const GENERATION_TEMPERATURE = 0.8;
 const GENERATION_MAX_TOKENS = 8192;
 const GENERATION_CONTEXT_SIZE = 16384;
@@ -270,8 +271,18 @@ export async function generateLocations(
     });
   }
 
+  // ---- Step 3b: Entity-specific search for referenced entities in constraints ----
+  let mergedResults = searchResult.value;
+  if (constraints) {
+    const entityResults = await searchEntities(constraints, campaignId, {
+      limit: 4,
+      documentTypes: ["setting", "notes"],
+    });
+    mergedResults = mergeEntityResults(entityResults, searchResult.value);
+  }
+
   // ---- Step 4: Build context from search results ----
-  const context = buildContext(searchResult.value, {
+  const context = buildContext(mergedResults, {
     maxTokens: MAX_CONTEXT_TOKENS,
   });
 

@@ -3,3 +3,4 @@
 export { generateAdventureHooks } from "./adventure-hook.js";
 export { generateNpcs } from "./npc.js";
 export { generateLocations } from "./location.js";
+export { searchEntities, mergeEntityResults } from "./entity-search.js";
