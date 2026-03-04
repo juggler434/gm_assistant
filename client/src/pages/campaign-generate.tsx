@@ -1,6 +1,6 @@
 // SPDX-License-Identifier: AGPL-3.0-or-later
 
-import { useState, useCallback } from "react";
+import { useState, useCallback, useEffect } from "react";
 import { useParams } from "react-router-dom";
 import { Lock } from "lucide-react";
 import { toast } from "sonner";
@@ -30,7 +30,7 @@ import { useGenerateLocationsStream } from "@/hooks/use-generate-locations";
 import { useCreateNpc } from "@/hooks/use-npcs";
 import { useCreateLocation } from "@/hooks/use-locations";
 import { useSavedHooks } from "@/hooks/use-saved-hooks";
-import type { GeneratedNpc, GeneratedLocation } from "@/types";
+import type { GeneratedNpc, GeneratedLocation, AdventureHook, AnswerSource } from "@/types";
 
 const COMING_SOON_LABELS: Record<string, string> = {
   "adventure-outlines": "Adventure Outlines",
@@ -41,11 +41,43 @@ export function GeneratePage() {
   const { id: campaignId } = useParams<{ id: string }>();
   const [selectedType, setSelectedType] = useState<GenerationType>("adventure-hooks");
 
+  // Restore persisted adventure hooks state from sessionStorage on mount
+  const hooksStorageKey = campaignId ? `gm-assistant:gen-hooks-state:${campaignId}` : null;
+  const [restoredHooksState] = useState(() => {
+    if (!hooksStorageKey) return undefined;
+    try {
+      const raw = sessionStorage.getItem(hooksStorageKey);
+      return raw ? (JSON.parse(raw) as { hooks: AdventureHook[]; sources: AnswerSource[] }) : undefined;
+    } catch {
+      return undefined;
+    }
+  });
+
   // Adventure hooks state
   const { generate, regenerateOne, hooks, sources, status, error, isStreaming } =
-    useGenerateHooksStream();
-  const [lastFormValues, setLastFormValues] = useState<AdventureHookFormValues | null>(null);
+    useGenerateHooksStream(restoredHooksState);
+  const [lastFormValues, setLastFormValues] = useState<AdventureHookFormValues | null>(() => {
+    if (!hooksStorageKey) return null;
+    try {
+      const raw = sessionStorage.getItem(`${hooksStorageKey}:form`);
+      return raw ? (JSON.parse(raw) as AdventureHookFormValues) : null;
+    } catch {
+      return null;
+    }
+  });
   const { savedHooks, saveHook, unsaveHook } = useSavedHooks(campaignId ?? "");
+
+  // Persist generated hooks and sources to sessionStorage whenever they change
+  useEffect(() => {
+    if (!hooksStorageKey || hooks.length === 0) return;
+    sessionStorage.setItem(hooksStorageKey, JSON.stringify({ hooks, sources }));
+  }, [hooks, sources, hooksStorageKey]);
+
+  // Persist last form values to sessionStorage whenever they change
+  useEffect(() => {
+    if (!hooksStorageKey || !lastFormValues) return;
+    sessionStorage.setItem(`${hooksStorageKey}:form`, JSON.stringify(lastFormValues));
+  }, [lastFormValues, hooksStorageKey]);
 
   // NPC generation state
   const {
