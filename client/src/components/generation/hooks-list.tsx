@@ -13,11 +13,10 @@ interface HooksListProps {
   status: string | null;
   error: Error | null;
   isStreaming: boolean;
-  savedHooks: AdventureHook[];
+  savingIndex: number | null;
   onRegenerate: () => void;
   onRegenerateOne?: (index: number) => void;
-  onSave: (hook: AdventureHook) => void;
-  onUnsave: (hook: AdventureHook) => void;
+  onSave: (hook: AdventureHook, index: number) => void;
 }
 
 export function HooksList({
@@ -26,11 +25,10 @@ export function HooksList({
   status,
   error,
   isStreaming,
-  savedHooks,
+  savingIndex,
   onRegenerate,
   onRegenerateOne,
   onSave,
-  onUnsave,
 }: HooksListProps) {
   if (error) {
     return (
@@ -45,10 +43,6 @@ export function HooksList({
 
   if (hooks.length === 0 && !isStreaming) {
     return null;
-  }
-
-  function isHookSaved(hook: AdventureHook): boolean {
-    return savedHooks.some((s) => s.title === hook.title && s.description === hook.description);
   }
 
   return (
@@ -73,9 +67,8 @@ export function HooksList({
             key={index}
             hook={hook}
             index={index}
-            isSaved={isHookSaved(hook)}
+            isSaving={savingIndex === index}
             onSave={onSave}
-            onUnsave={onUnsave}
             onRegenerateOne={onRegenerateOne}
             isStreaming={isStreaming}
           />

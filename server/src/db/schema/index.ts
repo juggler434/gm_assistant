@@ -7,4 +7,5 @@ export * from "./documents.js";
 export * from "./chunks.js";
 export * from "./npcs.js";
 export * from "./locations.js";
+export * from "./adventure-hooks.js";
 export * from "./conversations.js";
