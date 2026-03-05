@@ -2,6 +2,9 @@
 
 export { generationRoutes } from "./routes.js";
 
+export { buildCampaignContentContext } from "./campaign-content.js";
+export type { CampaignContentOptions, CampaignContentResult } from "./campaign-content.js";
+
 export { generateAdventureHooks } from "./generators/index.js";
 export { generateNpcs } from "./generators/index.js";
 export { generateLocations } from "./generators/index.js";

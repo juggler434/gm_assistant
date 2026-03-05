@@ -18,6 +18,7 @@ import {
 import { buildContext } from "@/modules/query/rag/context-builder.js";
 import type { AnswerSource } from "@/modules/query/rag/types.js";
 import { buildNpcPrompt } from "../prompts/npcs.js";
+import { buildCampaignContentContext } from "../campaign-content.js";
 import type {
   NpcGenerationRequest,
   GeneratedNpc,
@@ -268,6 +269,9 @@ export async function generateNpcs(
     maxTokens: MAX_CONTEXT_TOKENS,
   });
 
+  // ---- Step 4b: Fetch saved campaign content ----
+  const campaignContent = await buildCampaignContentContext(campaignId);
+
   // ---- Step 5: Build prompt ----
   const promptOptions: {
     race?: string;
@@ -277,6 +281,7 @@ export async function generateNpcs(
     count?: number;
     includeStatBlock?: boolean;
     constraints?: string;
+    campaignContent?: typeof campaignContent;
   } = {};
   if (race !== undefined) promptOptions.race = race;
   if (classRole !== undefined) promptOptions.classRole = classRole;
@@ -285,6 +290,7 @@ export async function generateNpcs(
   if (count !== undefined) promptOptions.count = count;
   if (includeStatBlock !== undefined) promptOptions.includeStatBlock = includeStatBlock;
   if (constraints !== undefined) promptOptions.constraints = constraints;
+  if (campaignContent.contentText) promptOptions.campaignContent = campaignContent;
 
   const { system, user } = buildNpcPrompt(context, tone, promptOptions);
 

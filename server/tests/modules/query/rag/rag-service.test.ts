@@ -3,10 +3,11 @@
 import { describe, it, expect, vi, beforeEach } from "vitest";
 
 // Hoist mock functions
-const { mockSearchChunksHybrid, mockExpandNeighborChunks, mockFetch } = vi.hoisted(() => ({
+const { mockSearchChunksHybrid, mockExpandNeighborChunks, mockFetch, mockBuildCampaignContentContext } = vi.hoisted(() => ({
   mockSearchChunksHybrid: vi.fn(),
   mockExpandNeighborChunks: vi.fn(),
   mockFetch: vi.fn(),
+  mockBuildCampaignContentContext: vi.fn(),
 }));
 
 vi.mock("@/modules/knowledge/retrieval/hybrid-search.js", () => ({
@@ -15,6 +16,10 @@ vi.mock("@/modules/knowledge/retrieval/hybrid-search.js", () => ({
 
 vi.mock("@/modules/knowledge/retrieval/chunk-expansion.js", () => ({
   expandNeighborChunks: mockExpandNeighborChunks,
+}));
+
+vi.mock("@/modules/generation/campaign-content.js", () => ({
+  buildCampaignContentContext: mockBuildCampaignContentContext,
 }));
 
 vi.mock("@/config/index.js", () => ({
@@ -94,6 +99,12 @@ describe("RAG Service", () => {
     vi.clearAllMocks();
     // By default, expansion returns the input unchanged
     mockExpandNeighborChunks.mockImplementation((results: unknown[]) => Promise.resolve(results));
+    // Default: no saved campaign content
+    mockBuildCampaignContentContext.mockResolvedValue({
+      contentText: "",
+      estimatedTokens: 0,
+      counts: { npcs: 0, hooks: 0, locations: 0 },
+    });
   });
 
   describe("executeRAGPipeline", () => {

@@ -18,6 +18,7 @@ import {
 import { buildContext } from "@/modules/query/rag/context-builder.js";
 import type { AnswerSource } from "@/modules/query/rag/types.js";
 import { buildLocationPrompt } from "../prompts/locations.js";
+import { buildCampaignContentContext } from "../campaign-content.js";
 import type {
   LocationGenerationRequest,
   GeneratedLocation,
@@ -275,6 +276,9 @@ export async function generateLocations(
     maxTokens: MAX_CONTEXT_TOKENS,
   });
 
+  // ---- Step 4b: Fetch saved campaign content ----
+  const campaignContent = await buildCampaignContentContext(campaignId);
+
   // ---- Step 5: Build prompt ----
   const promptOptions: {
     terrain?: string;
@@ -282,12 +286,14 @@ export async function generateLocations(
     size?: string;
     count?: number;
     constraints?: string;
+    campaignContent?: typeof campaignContent;
   } = {};
   if (terrain !== undefined) promptOptions.terrain = terrain;
   if (climate !== undefined) promptOptions.climate = climate;
   if (size !== undefined) promptOptions.size = size;
   if (count !== undefined) promptOptions.count = count;
   if (constraints !== undefined) promptOptions.constraints = constraints;
+  if (campaignContent.contentText) promptOptions.campaignContent = campaignContent;
 
   const { system, user } = buildLocationPrompt(context, tone, promptOptions);
 

@@ -9,6 +9,7 @@
 
 import type { BuiltContext } from "@/modules/query/rag/types.js";
 import type { LocationTone } from "../types.js";
+import type { CampaignContentResult } from "../campaign-content.js";
 
 // ============================================================================
 // System Prompt
@@ -61,6 +62,7 @@ ${sizeInstruction ? `- ${sizeInstruction}` : ""}
 - Do not invent major setting elements (cities, rulers, pantheons) not present in the context. You may invent minor environmental details.
 - Each location must be distinct from the others — vary their terrain, purpose, and atmosphere.
 - When narrative text fields (readAloud, sensoryDetails, keyFeatures, pointsOfInterest, encounters, secrets) reference information from the setting context, include the source number as [N] inline (e.g. "The crumbling tower of Ashenmoor [1] overlooks the Blighted Marshes [2]"). Only cite sources that are listed in the context.
+- If saved campaign content is provided, ensure consistency with existing content and avoid creating duplicates. You may reference existing NPCs, locations, and hooks to create connections.
 - The "readAloud" field should be a vivid, atmospheric paragraph (3-5 sentences) suitable for reading aloud to players at the table.
 - "sensoryDetails" must include sights, sounds, and smells specific to this location.
 - "encounters" should list potential encounters or events players might experience here.
@@ -106,6 +108,7 @@ export function buildLocationPrompt(
     size?: string | undefined;
     count?: number | undefined;
     constraints?: string | undefined;
+    campaignContent?: CampaignContentResult | undefined;
   } = {},
 ): { system: string; user: string } {
   const parts: string[] = [];
@@ -128,6 +131,13 @@ export function buildLocationPrompt(
     parts.push("");
   } else {
     parts.push("No setting context is available. Generate generic fantasy locations appropriate for a tabletop RPG.");
+    parts.push("");
+  }
+
+  // Saved campaign content section
+  if (options.campaignContent && options.campaignContent.contentText) {
+    parts.push("=== SAVED CAMPAIGN CONTENT ===");
+    parts.push(options.campaignContent.contentText);
     parts.push("");
   }
 

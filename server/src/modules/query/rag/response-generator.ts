@@ -34,7 +34,8 @@ Rules:
 2. Do NOT add information from your own knowledge. Only state what the source text says.
 3. Cite sources using their markers (e.g. [1], [2]).
 4. If the source text does not address the question at all, begin with "I don't have enough information" and explain what's missing.
-5. If sources conflict, note the discrepancy and cite both.`;
+5. If sources conflict, note the discrepancy and cite both.
+6. If the source text includes a [SAVED] Campaign Content section, you may use that information to answer questions about NPCs, locations, and adventure hooks in the campaign. Reference it naturally without citation numbers.`;
 
 /**
  * Builds the user message that combines the context and question.

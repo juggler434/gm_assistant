@@ -9,6 +9,7 @@
 
 import type { BuiltContext } from "@/modules/query/rag/types.js";
 import type { NpcTone } from "../types.js";
+import type { CampaignContentResult } from "../campaign-content.js";
 
 // ============================================================================
 // System Prompt
@@ -78,6 +79,7 @@ ${importanceInstruction ? `- ${importanceInstruction}` : ""}
 - Do not invent major setting elements (cities, rulers, pantheons) not present in the context. You may invent minor personal details.
 - Each NPC must be distinct from the others — vary their backgrounds, motivations, and roles.
 - When narrative text fields (appearance, personality, motivations, secrets, backstory) reference information from the setting context, include the source number as [N] inline (e.g. "A former knight of the Silver Order [1] who now serves the Thieves' Guild [2]"). Only cite sources that are listed in the context.
+- If saved campaign content is provided, ensure consistency with existing content and avoid creating duplicates. You may reference existing NPCs, locations, and hooks to create connections.
 ${statBlockInstruction}
 
 You MUST respond with valid JSON matching this exact schema:
@@ -117,6 +119,7 @@ export function buildNpcPrompt(
     count?: number | undefined;
     includeStatBlock?: boolean | undefined;
     constraints?: string | undefined;
+    campaignContent?: CampaignContentResult | undefined;
   } = {},
 ): { system: string; user: string } {
   const parts: string[] = [];
@@ -139,6 +142,13 @@ export function buildNpcPrompt(
     parts.push("");
   } else {
     parts.push("No setting context is available. Generate generic fantasy NPCs appropriate for a tabletop RPG.");
+    parts.push("");
+  }
+
+  // Saved campaign content section
+  if (options.campaignContent && options.campaignContent.contentText) {
+    parts.push("=== SAVED CAMPAIGN CONTENT ===");
+    parts.push(options.campaignContent.contentText);
     parts.push("");
   }
 

@@ -3,13 +3,18 @@
 import { describe, it, expect, vi, beforeEach } from "vitest";
 
 // Hoist mock functions
-const { mockSearchChunksHybrid, mockFetch } = vi.hoisted(() => ({
+const { mockSearchChunksHybrid, mockFetch, mockBuildCampaignContentContext } = vi.hoisted(() => ({
   mockSearchChunksHybrid: vi.fn(),
   mockFetch: vi.fn(),
+  mockBuildCampaignContentContext: vi.fn(),
 }));
 
 vi.mock("@/modules/knowledge/retrieval/hybrid-search.js", () => ({
   searchChunksHybrid: mockSearchChunksHybrid,
+}));
+
+vi.mock("@/modules/generation/campaign-content.js", () => ({
+  buildCampaignContentContext: mockBuildCampaignContentContext,
 }));
 
 vi.mock("@/config/index.js", () => ({
@@ -110,6 +115,12 @@ describe("Location Generator", () => {
 
   beforeEach(() => {
     vi.clearAllMocks();
+    // Default: no saved campaign content
+    mockBuildCampaignContentContext.mockResolvedValue({
+      contentText: "",
+      estimatedTokens: 0,
+      counts: { npcs: 0, hooks: 0, locations: 0 },
+    });
   });
 
   describe("generateLocations", () => {
