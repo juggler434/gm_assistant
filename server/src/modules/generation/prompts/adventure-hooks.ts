@@ -9,6 +9,7 @@
 
 import type { BuiltContext } from "@/modules/query/rag/types.js";
 import type { HookTone } from "../types.js";
+import type { CampaignContentResult } from "../campaign-content.js";
 
 // ============================================================================
 // System Prompt
@@ -46,6 +47,7 @@ Rules:
 - Do not invent major setting elements (cities, rulers, pantheons) not present in the context. You may invent minor details (a tavern patron's name, a rumor) to flesh out hooks.
 - If a party level is provided, ensure hooks are appropriate for that level of experience.
 - When the description references information from the setting context, include the source number as [N] inline (e.g. "The cult of Vecna [1] has infiltrated the city [2]"). Only cite sources that are listed in the context.
+- If saved campaign content is provided, ensure consistency with existing content and avoid creating duplicates. You may reference existing NPCs, locations, and hooks to create connections.
 
 You MUST respond with valid JSON matching this exact schema:
 {
@@ -73,7 +75,7 @@ Respond ONLY with the JSON object. No markdown fencing, no commentary.`;
 export function buildAdventureHookPrompt(
   context: BuiltContext,
   tone: HookTone,
-  options: { theme?: string; partyLevel?: number; count?: number; includeNpcsLocations?: string } = {},
+  options: { theme?: string; partyLevel?: number; count?: number; includeNpcsLocations?: string; campaignContent?: CampaignContentResult } = {},
 ): { system: string; user: string } {
   const parts: string[] = [];
 
@@ -95,6 +97,13 @@ export function buildAdventureHookPrompt(
     parts.push("");
   } else {
     parts.push("No setting context is available. Generate generic fantasy adventure hooks.");
+    parts.push("");
+  }
+
+  // Saved campaign content section
+  if (options.campaignContent && options.campaignContent.contentText) {
+    parts.push("=== SAVED CAMPAIGN CONTENT ===");
+    parts.push(options.campaignContent.contentText);
     parts.push("");
   }
 

@@ -21,7 +21,8 @@ import {
   type HybridSearchOptions,
 } from "@/modules/knowledge/retrieval/hybrid-search.js";
 import { expandNeighborChunks } from "@/modules/knowledge/retrieval/chunk-expansion.js";
-import { buildContext } from "./context-builder.js";
+import { buildContext, estimateTokens } from "./context-builder.js";
+import { buildCampaignContentContext } from "@/modules/generation/campaign-content.js";
 import { generateResponse } from "./response-generator.js";
 import { rewriteQuery } from "./query-rewriter.js";
 import { rerankChunks } from "./reranker.js";
@@ -184,8 +185,17 @@ export async function executeRAGPipeline(
 
   console.log(`[RAG] Context built: ${context.chunksUsed} chunks used, ~${context.estimatedTokens} tokens`);
 
-  // ---- Step 4b: Early return when no relevant context was found ----
-  if (context.chunksUsed === 0) {
+  // ---- Step 4b: Fetch saved campaign content ----
+  const campaignContent = await buildCampaignContentContext(campaignId, { maxTokens: 1500 });
+  if (campaignContent.contentText) {
+    const savedSection = `\n\n---\n\n[SAVED] Campaign Content\n${campaignContent.contentText}`;
+    context.contextText += savedSection;
+    context.estimatedTokens += estimateTokens(savedSection);
+    console.log(`[RAG] Appended saved campaign content: ${campaignContent.counts.npcs} NPCs, ${campaignContent.counts.hooks} hooks, ${campaignContent.counts.locations} locations`);
+  }
+
+  // ---- Step 4c: Early return when no relevant context was found ----
+  if (context.chunksUsed === 0 && !campaignContent.contentText) {
     return ok({
       answer:
         "I don't have enough information in your campaign documents to answer this question.",

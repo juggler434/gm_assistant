@@ -18,6 +18,7 @@ import {
 import { buildContext } from "@/modules/query/rag/context-builder.js";
 import type { AnswerSource } from "@/modules/query/rag/types.js";
 import { buildAdventureHookPrompt } from "../prompts/adventure-hooks.js";
+import { buildCampaignContentContext } from "../campaign-content.js";
 import type {
   AdventureHookRequest,
   AdventureHook,
@@ -233,12 +234,16 @@ export async function generateAdventureHooks(
     maxTokens: MAX_CONTEXT_TOKENS,
   });
 
+  // ---- Step 4b: Fetch saved campaign content ----
+  const campaignContent = await buildCampaignContentContext(campaignId);
+
   // ---- Step 5: Build prompt ----
-  const promptOptions: { theme?: string; partyLevel?: number; count?: number; includeNpcsLocations?: string } = {};
+  const promptOptions: { theme?: string; partyLevel?: number; count?: number; includeNpcsLocations?: string; campaignContent?: typeof campaignContent } = {};
   if (theme !== undefined) promptOptions.theme = theme;
   if (partyLevel !== undefined) promptOptions.partyLevel = partyLevel;
   if (count !== undefined) promptOptions.count = count;
   if (includeNpcsLocations !== undefined) promptOptions.includeNpcsLocations = includeNpcsLocations;
+  if (campaignContent.contentText) promptOptions.campaignContent = campaignContent;
 
   const { system, user } = buildAdventureHookPrompt(context, tone, promptOptions);
 
