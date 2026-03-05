@@ -163,6 +163,7 @@ export async function generateResponse(
   const chatResult = await llmService.chat({
     messages,
     temperature: 0,
+    contextSize: 32768,
   });
 
   if (!chatResult.ok) {
