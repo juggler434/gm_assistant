@@ -154,39 +154,6 @@ describe("Adventure Hook Generator", () => {
       }
     });
 
-    it("should reject party level below 1", async () => {
-      const llm = makeMockLLMService();
-      const request: AdventureHookRequest = {
-        campaignId,
-        tone: "heroic",
-        partyLevel: 0,
-      };
-
-      const result = await generateAdventureHooks(request, llm);
-
-      expect(result.ok).toBe(false);
-      if (!result.ok) {
-        expect(result.error.code).toBe("INVALID_REQUEST");
-        expect(result.error.message).toContain("Party level");
-      }
-    });
-
-    it("should reject party level above 20", async () => {
-      const llm = makeMockLLMService();
-      const request: AdventureHookRequest = {
-        campaignId,
-        tone: "heroic",
-        partyLevel: 21,
-      };
-
-      const result = await generateAdventureHooks(request, llm);
-
-      expect(result.ok).toBe(false);
-      if (!result.ok) {
-        expect(result.error.code).toBe("INVALID_REQUEST");
-      }
-    });
-
     it("should return error when embedding fails", async () => {
       const llm = makeMockLLMService();
       const request: AdventureHookRequest = { campaignId, tone: "dark" };
@@ -480,7 +447,7 @@ describe("Adventure Hook Generator", () => {
       const request: AdventureHookRequest = {
         campaignId,
         tone: "heroic",
-        partyLevel: 12,
+        partyLevel: "12",
       };
 
       mockEmbeddingResponse();
@@ -496,7 +463,7 @@ describe("Adventure Hook Generator", () => {
       await generateAdventureHooks(request, llm);
 
       const callArgs = mockChat.mock.calls[0]![0]!;
-      expect(callArgs.messages[1].content).toContain("Party level: 12");
+      expect(callArgs.messages[1].content).toContain("Party level / CR: 12");
     });
 
     it("should call embedding API with correct model", async () => {

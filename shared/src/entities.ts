@@ -238,6 +238,25 @@ export interface AdventureHookEntity extends BaseEntity {
 }
 
 // ============================================================================
+// Adventure Outline
+// ============================================================================
+
+/** Adventure outline entity matching server/src/db/schema/adventure-outlines.ts */
+export interface AdventureOutlineEntity extends BaseEntity {
+  campaignId: Id;
+  createdBy: Id;
+  title: string;
+  description: string;
+  acts: { title: string; description: string; keyEvents: string[]; encounters: string[] }[];
+  npcs: string[] | null;
+  locations: string[] | null;
+  factions: string[] | null;
+  tags: string[] | null;
+  isGenerated: boolean;
+  notes: string | null;
+}
+
+// ============================================================================
 // Conversation
 // ============================================================================
 

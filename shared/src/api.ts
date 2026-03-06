@@ -7,6 +7,7 @@
 
 import type {
   AdventureHookEntity,
+  AdventureOutlineEntity,
   AuthUser,
   Campaign,
   Conversation,
@@ -294,6 +295,53 @@ export interface AdventureHookResponse {
 /** Response wrapping a list of adventure hooks */
 export interface AdventureHookListResponse {
   adventureHooks: AdventureHookEntity[];
+}
+
+// ============================================================================
+// Adventure Outline API
+// ============================================================================
+
+/** POST /api/campaigns/:campaignId/adventure-outlines - request body */
+export interface CreateAdventureOutlineRequest {
+  title: string;
+  description: string;
+  acts: { title: string; description: string; keyEvents: string[]; encounters: string[] }[];
+  npcs?: string[] | null;
+  locations?: string[] | null;
+  factions?: string[] | null;
+  tags?: string[] | null;
+  isGenerated?: boolean;
+  notes?: string | null;
+}
+
+/** PATCH /api/campaigns/:campaignId/adventure-outlines/:id - request body */
+export interface UpdateAdventureOutlineRequest {
+  title?: string;
+  description?: string;
+  acts?: { title: string; description: string; keyEvents: string[]; encounters: string[] }[];
+  npcs?: string[] | null;
+  locations?: string[] | null;
+  factions?: string[] | null;
+  tags?: string[] | null;
+  isGenerated?: boolean;
+  notes?: string | null;
+}
+
+/** Query parameters for GET /api/campaigns/:campaignId/adventure-outlines */
+export interface AdventureOutlineListQuery {
+  search?: string;
+  limit?: number;
+  offset?: number;
+}
+
+/** Response wrapping a single adventure outline */
+export interface AdventureOutlineResponse {
+  adventureOutline: AdventureOutlineEntity;
+}
+
+/** Response wrapping a list of adventure outlines */
+export interface AdventureOutlineListResponse {
+  adventureOutlines: AdventureOutlineEntity[];
 }
 
 // ============================================================================

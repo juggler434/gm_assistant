@@ -1,10 +1,10 @@
 // SPDX-License-Identifier: AGPL-3.0-or-later
 
 /**
- * Adventure Hooks Prompt
+ * Adventure Outlines Prompt
  *
- * Constructs the system and user prompts for generating adventure hooks
- * grounded in campaign setting context retrieved via RAG.
+ * Constructs the system and user prompts for generating adventure outlines
+ * with three-act structure, grounded in campaign setting context retrieved via RAG.
  */
 
 import type { BuiltContext } from "@/modules/query/rag/types.js";
@@ -20,8 +20,8 @@ function buildSystemPrompt(
   options: { theme?: string | undefined; count?: number | undefined },
 ): string {
   const countInstruction = options.count !== undefined
-    ? `Generate exactly ${options.count} adventure hooks.`
-    : "Generate between 3 and 5 adventure hooks.";
+    ? `Generate exactly ${options.count} adventure outline(s).`
+    : "Generate 1 adventure outline.";
 
   const toneDescriptions: Record<HookTone, string> = {
     dark: "grim, bleak, and ominous — emphasize dread, moral decay, and hopelessness",
@@ -34,27 +34,49 @@ function buildSystemPrompt(
   };
 
   const themeInstruction = options.theme
-    ? `\nThe theme "${options.theme}" is CENTRAL to this request. Every hook must directly incorporate this theme as a core element of its premise, not just a passing reference.`
+    ? `\nThe theme "${options.theme}" is CENTRAL to this request. Every outline must directly incorporate this theme as a core element of its premise, not just a passing reference.`
     : "";
 
   return `You are a creative tabletop RPG game master assistant. Your writing tone for this request is ${tone.toUpperCase()}: ${toneDescriptions[tone]}.
 
-EVERY hook you write must unmistakably reflect this ${tone} tone in its language, imagery, and narrative framing.${themeInstruction}
+EVERY outline you write must unmistakably reflect this ${tone} tone in its language, imagery, and narrative framing.${themeInstruction}
 
 Rules:
 - ${countInstruction}
-- Each hook MUST reference specific NPCs, locations, or factions from the provided setting context when available.
-- Do not invent major setting elements (cities, rulers, pantheons) not present in the context. You may invent minor details (a tavern patron's name, a rumor) to flesh out hooks.
-- If a party level is provided, ensure hooks are appropriate for that level of experience.
+- Each outline MUST follow a three-act structure: Beginning (setup and hook), Middle (rising action and complications), End (climax and resolution).
+- Each act MUST reference specific NPCs, locations, or factions from the provided setting context when available.
+- Do not invent major setting elements (cities, rulers, pantheons) not present in the context. You may invent minor details (a tavern patron's name, a rumor) to flesh out outlines.
+- If a party level is provided, ensure encounters and challenges are appropriate for that level.
 - When the description references information from the setting context, include the source number as [N] inline (e.g. "The cult of Vecna [1] has infiltrated the city [2]"). Only cite sources that are listed in the context.
 - If saved campaign content is provided, ensure consistency with existing content and avoid creating duplicates. You may reference existing NPCs, locations, and hooks to create connections.
+- Each act should have 2-4 key events and 1-3 encounters.
 
 You MUST respond with valid JSON matching this exact schema:
 {
-  "hooks": [
+  "outlines": [
     {
-      "title": "Short hook title",
-      "description": "2-4 sentence hook description incorporating setting details.",
+      "title": "Adventure title",
+      "description": "2-3 sentence adventure premise/overview.",
+      "acts": [
+        {
+          "title": "Act 1: Beginning",
+          "description": "2-4 sentences describing the setup, inciting incident, and initial hook.",
+          "keyEvents": ["Event 1 description", "Event 2 description"],
+          "encounters": ["Encounter 1 description"]
+        },
+        {
+          "title": "Act 2: Middle",
+          "description": "2-4 sentences describing rising action, complications, and twists.",
+          "keyEvents": ["Event 1 description", "Event 2 description"],
+          "encounters": ["Encounter 1 description"]
+        },
+        {
+          "title": "Act 3: End",
+          "description": "2-4 sentences describing the climax and resolution.",
+          "keyEvents": ["Event 1 description", "Event 2 description"],
+          "encounters": ["Encounter 1 description"]
+        }
+      ],
       "npcs": ["NPC Name 1"],
       "locations": ["Location Name 1"],
       "factions": ["Faction Name 1"]
@@ -72,7 +94,7 @@ Respond ONLY with the JSON object. No markdown fencing, no commentary.`;
 /**
  * Build the user message combining setting context and generation parameters.
  */
-export function buildAdventureHookPrompt(
+export function buildAdventureOutlinePrompt(
   context: BuiltContext,
   tone: HookTone,
   options: { theme?: string; partyLevel?: string; count?: number; includeNpcsLocations?: string; campaignContent?: CampaignContentResult } = {},
@@ -96,7 +118,7 @@ export function buildAdventureHookPrompt(
     parts.push(`\nSources:\n${sourceLegend}`);
     parts.push("");
   } else {
-    parts.push("No setting context is available. Generate generic fantasy adventure hooks.");
+    parts.push("No setting context is available. Generate generic fantasy adventure outlines.");
     parts.push("");
   }
 
@@ -124,7 +146,7 @@ export function buildAdventureHookPrompt(
     reminders.push(`centered on the theme "${options.theme}"`);
   }
   parts.push("");
-  parts.push(`Generate adventure hooks based on the setting context above. ${reminders.join(", ")}.`);
+  parts.push(`Generate adventure outlines based on the setting context above. ${reminders.join(", ")}.`);
 
   return {
     system: buildSystemPrompt(tone, { theme: options.theme, count: options.count }),

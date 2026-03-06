@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: AGPL-3.0-or-later
 
 import { useState } from "react";
-import { Sparkles } from "lucide-react";
+import { Route } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -14,9 +14,9 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { Spinner } from "@/components/ui/spinner";
-import type { HookTone } from "@/types";
+import type { OutlineTone } from "@/types";
 
-const TONE_OPTIONS: { value: HookTone; label: string }[] = [
+const TONE_OPTIONS: { value: OutlineTone; label: string }[] = [
   { value: "mysterious", label: "Mysterious" },
   { value: "dark", label: "Dark" },
   { value: "heroic", label: "Heroic" },
@@ -26,25 +26,25 @@ const TONE_OPTIONS: { value: HookTone; label: string }[] = [
   { value: "intrigue", label: "Intrigue" },
 ];
 
-const COUNT_OPTIONS = [3, 4, 5];
+const COUNT_OPTIONS = [1, 2, 3];
 
-export interface AdventureHookFormValues {
-  tone: HookTone;
+export interface AdventureOutlineFormValues {
+  tone: OutlineTone;
   theme?: string;
   count: number;
   partyLevel?: string;
   includeNpcsLocations?: string;
 }
 
-interface AdventureHookFormProps {
-  onSubmit: (values: AdventureHookFormValues) => void;
+interface AdventureOutlineFormProps {
+  onSubmit: (values: AdventureOutlineFormValues) => void;
   isLoading: boolean;
 }
 
-export function AdventureHookForm({ onSubmit, isLoading }: AdventureHookFormProps) {
-  const [tone, setTone] = useState<HookTone>("mysterious");
+export function AdventureOutlineForm({ onSubmit, isLoading }: AdventureOutlineFormProps) {
+  const [tone, setTone] = useState<OutlineTone>("mysterious");
   const [theme, setTheme] = useState("");
-  const [count, setCount] = useState("3");
+  const [count, setCount] = useState("1");
   const [partyLevel, setPartyLevel] = useState("");
   const [includeNpcsLocations, setIncludeNpcsLocations] = useState("");
 
@@ -63,9 +63,9 @@ export function AdventureHookForm({ onSubmit, isLoading }: AdventureHookFormProp
     <form onSubmit={handleSubmit} className="space-y-4">
       <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
         <div className="space-y-2">
-          <Label htmlFor="tone">Tone</Label>
-          <Select value={tone} onValueChange={(v: string) => setTone(v as HookTone)}>
-            <SelectTrigger id="tone">
+          <Label htmlFor="outline-tone">Tone</Label>
+          <Select value={tone} onValueChange={(v: string) => setTone(v as OutlineTone)}>
+            <SelectTrigger id="outline-tone">
               <SelectValue placeholder="Select tone" />
             </SelectTrigger>
             <SelectContent>
@@ -79,10 +79,10 @@ export function AdventureHookForm({ onSubmit, isLoading }: AdventureHookFormProp
         </div>
 
         <div className="space-y-2">
-          <Label htmlFor="theme">Theme (optional)</Label>
+          <Label htmlFor="outline-theme">Theme / Premise (optional)</Label>
           <Input
-            id="theme"
-            placeholder="e.g. undead uprising, dragon cult"
+            id="outline-theme"
+            placeholder="e.g. dragon slaying, heist, mystery"
             value={theme}
             onChange={(e) => setTheme(e.target.value)}
             maxLength={200}
@@ -91,9 +91,9 @@ export function AdventureHookForm({ onSubmit, isLoading }: AdventureHookFormProp
         </div>
 
         <div className="space-y-2">
-          <Label htmlFor="count">Number of hooks</Label>
+          <Label htmlFor="outline-count">Number of outlines</Label>
           <Select value={count} onValueChange={setCount}>
-            <SelectTrigger id="count">
+            <SelectTrigger id="outline-count">
               <SelectValue />
             </SelectTrigger>
             <SelectContent>
@@ -107,9 +107,9 @@ export function AdventureHookForm({ onSubmit, isLoading }: AdventureHookFormProp
         </div>
 
         <div className="space-y-2">
-          <Label htmlFor="partyLevel">Party level / CR (optional)</Label>
+          <Label htmlFor="outline-partyLevel">Party level / CR (optional)</Label>
           <Input
-            id="partyLevel"
+            id="outline-partyLevel"
             placeholder="Any"
             value={partyLevel}
             onChange={(e) => setPartyLevel(e.target.value)}
@@ -120,9 +120,11 @@ export function AdventureHookForm({ onSubmit, isLoading }: AdventureHookFormProp
       </div>
 
       <div className="space-y-2">
-        <Label htmlFor="includeNpcsLocations">Include specific NPCs/locations (optional)</Label>
+        <Label htmlFor="outline-includeNpcsLocations">
+          Include specific NPCs/locations (optional)
+        </Label>
         <Textarea
-          id="includeNpcsLocations"
+          id="outline-includeNpcsLocations"
           placeholder="e.g. Lord Varen, the Sunken Temple, Blackthorn Guild"
           value={includeNpcsLocations}
           onChange={(e) => setIncludeNpcsLocations(e.target.value)}
@@ -140,8 +142,8 @@ export function AdventureHookForm({ onSubmit, isLoading }: AdventureHookFormProp
           </>
         ) : (
           <>
-            <Sparkles className="h-4 w-4" />
-            Generate Hooks
+            <Route className="h-4 w-4" />
+            Generate Outlines
           </>
         )}
       </Button>

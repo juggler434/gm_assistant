@@ -15,9 +15,11 @@ import type {
   GeneratedNpc,
   LocationTone,
   GeneratedLocation,
+  OutlineTone,
+  GeneratedAdventureOutline,
 } from "@gm-assistant/shared";
 
-export type { AnswerSource, AdventureHook, HookTone, NpcTone, GeneratedNpc, LocationTone, GeneratedLocation };
+export type { AnswerSource, AdventureHook, HookTone, NpcTone, GeneratedNpc, LocationTone, GeneratedLocation, OutlineTone, GeneratedAdventureOutline };
 
 // ============================================================================
 // Adventure Hook Types
@@ -32,7 +34,7 @@ export interface AdventureHookRequest {
   /** Optional theme to focus hooks around (e.g. "undead", "trade war") */
   theme?: string;
   /** Optional party level to calibrate challenge appropriateness */
-  partyLevel?: number;
+  partyLevel?: string;
   /** Number of hooks to generate (1-10, default: 3-5 range) */
   count?: number;
   /** Maximum number of chunks to use for setting context (default: 6) */
@@ -129,6 +131,41 @@ export interface LocationGenerationResult {
 
 /** Error types for location generation */
 export interface LocationGenerationError {
+  code:
+    | "INVALID_REQUEST"
+    | "EMBEDDING_FAILED"
+    | "SEARCH_FAILED"
+    | "GENERATION_FAILED"
+    | "PARSE_ERROR";
+  message: string;
+  cause?: unknown;
+}
+
+// ============================================================================
+// Adventure Outline Types
+// ============================================================================
+
+/** Parameters for generating adventure outlines (server-internal) */
+export interface AdventureOutlineRequest {
+  campaignId: string;
+  tone: OutlineTone;
+  theme?: string;
+  partyLevel?: string;
+  count?: number;
+  maxContextChunks?: number;
+  includeNpcsLocations?: string;
+}
+
+/** Result of adventure outline generation */
+export interface AdventureOutlineResult {
+  outlines: GeneratedAdventureOutline[];
+  sources: AnswerSource[];
+  chunksUsed: number;
+  usage?: TokenUsage;
+}
+
+/** Error types for adventure outline generation */
+export interface AdventureOutlineError {
   code:
     | "INVALID_REQUEST"
     | "EMBEDDING_FAILED"

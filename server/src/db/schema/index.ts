@@ -8,4 +8,5 @@ export * from "./chunks.js";
 export * from "./npcs.js";
 export * from "./locations.js";
 export * from "./adventure-hooks.js";
+export * from "./adventure-outlines.js";
 export * from "./conversations.js";

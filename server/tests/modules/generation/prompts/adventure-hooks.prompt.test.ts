@@ -125,30 +125,30 @@ describe("Adventure Hooks Prompt", () => {
 
     it("should include party level when provided", () => {
       const context = makeContext();
-      const { user } = buildAdventureHookPrompt(context, "heroic", { partyLevel: 5 });
+      const { user } = buildAdventureHookPrompt(context, "heroic", { partyLevel: "5" });
 
-      expect(user).toContain("Party level: 5");
+      expect(user).toContain("Party level / CR: 5");
     });
 
     it("should not include party level when not provided", () => {
       const context = makeContext();
       const { user } = buildAdventureHookPrompt(context, "heroic");
 
-      expect(user).not.toContain("Party level:");
+      expect(user).not.toContain("Party level / CR:");
     });
 
     it("should include all optional parameters together", () => {
       const context = makeContext();
       const { system, user } = buildAdventureHookPrompt(context, "political", {
         theme: "trade war",
-        partyLevel: 10,
+        partyLevel: "10",
       });
 
       expect(system).toContain("POLITICAL");
       expect(system).toContain("trade war");
       expect(user).toContain("political tone");
       expect(user).toContain("trade war");
-      expect(user).toContain("Party level: 10");
+      expect(user).toContain("Party level / CR: 10");
     });
 
     it("should include exact count in system prompt when provided", () => {

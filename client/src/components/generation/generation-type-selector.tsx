@@ -32,7 +32,7 @@ const generationTypes: GenerationTypeOption[] = [
     label: "Adventure Outlines",
     description: "Structured adventure outlines with scenes and encounters",
     icon: Route,
-    available: false,
+    available: true,
   },
   {
     id: "full-adventures",
