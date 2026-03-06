@@ -18,6 +18,7 @@ import { queryRoutes } from "@/modules/query/index.js";
 import { npcRoutes } from "@/modules/npcs/index.js";
 import { locationRoutes } from "@/modules/locations/index.js";
 import { adventureHookRoutes } from "@/modules/adventure-hooks/index.js";
+import { adventureOutlineRoutes } from "@/modules/adventure-outlines/index.js";
 import { conversationRoutes } from "@/modules/conversations/index.js";
 import { metricsRoutes } from "@/modules/metrics/routes.js";
 
@@ -75,6 +76,7 @@ export async function buildApp(options: AppOptions = {}): Promise<FastifyInstanc
   await app.register(npcRoutes, { prefix: "/api/campaigns" });
   await app.register(locationRoutes, { prefix: "/api/campaigns" });
   await app.register(adventureHookRoutes, { prefix: "/api/campaigns" });
+  await app.register(adventureOutlineRoutes, { prefix: "/api/campaigns" });
   await app.register(queryRoutes, { prefix: "/api/campaigns" });
   await app.register(conversationRoutes, { prefix: "/api/campaigns" });
   await app.register(metricsRoutes, { prefix: "/api/admin/metrics" });

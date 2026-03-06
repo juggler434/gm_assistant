@@ -24,16 +24,22 @@ import {
   type LocationGenerationFormValues,
 } from "@/components/generation/location-generation-form";
 import { LocationGenerationResult } from "@/components/generation/location-generation-result";
+import {
+  AdventureOutlineForm,
+  type AdventureOutlineFormValues,
+} from "@/components/generation/adventure-outline-form";
+import { OutlineGenerationResult } from "@/components/generation/outline-generation-result";
 import { useGenerateHooksStream } from "@/hooks/use-generation";
 import { useGenerateNpcsStream } from "@/hooks/use-generate-npcs";
 import { useGenerateLocationsStream } from "@/hooks/use-generate-locations";
+import { useGenerateOutlinesStream } from "@/hooks/use-generate-outlines";
 import { useCreateNpc } from "@/hooks/use-npcs";
 import { useCreateLocation } from "@/hooks/use-locations";
 import { useCreateAdventureHook } from "@/hooks/use-adventure-hooks";
-import type { GeneratedNpc, GeneratedLocation, AdventureHook, AnswerSource } from "@/types";
+import { useCreateAdventureOutline } from "@/hooks/use-adventure-outlines";
+import type { GeneratedNpc, GeneratedLocation, GeneratedAdventureOutline, AdventureHook, AnswerSource } from "@/types";
 
 const COMING_SOON_LABELS: Record<string, string> = {
-  "adventure-outlines": "Adventure Outlines",
   "full-adventures": "Full Adventures",
 };
 
@@ -104,6 +110,20 @@ export function GeneratePage() {
   } = useGenerateLocationsStream();
   const createLocation = useCreateLocation(campaignId ?? "");
   const [savingLocationIndex, setSavingLocationIndex] = useState<number | null>(null);
+
+  // Adventure outline generation state
+  const {
+    generate: generateOutlines,
+    regenerateOne: regenerateOneOutline,
+    outlines: generatedOutlines,
+    sources: outlineSources,
+    status: outlineStatus,
+    error: outlineError,
+    isStreaming: outlineIsStreaming,
+  } = useGenerateOutlinesStream();
+  const createAdventureOutline = useCreateAdventureOutline(campaignId ?? "");
+  const [savingOutlineIndex, setSavingOutlineIndex] = useState<number | null>(null);
+  const [lastOutlineFormValues, setLastOutlineFormValues] = useState<AdventureOutlineFormValues | null>(null);
 
   // ---- Adventure Hooks handlers ----
 
@@ -265,6 +285,68 @@ export function GeneratePage() {
     [campaignId, createLocation]
   );
 
+  // ---- Adventure Outline handlers ----
+
+  const handleGenerateOutlines = useCallback(
+    (values: AdventureOutlineFormValues) => {
+      if (!campaignId) return;
+      setLastOutlineFormValues(values);
+      generateOutlines({
+        campaignId,
+        tone: values.tone,
+        theme: values.theme,
+        count: values.count,
+        partyLevel: values.partyLevel,
+        includeNpcsLocations: values.includeNpcsLocations,
+      });
+    },
+    [campaignId, generateOutlines]
+  );
+
+  const handleRegenerateOutlines = useCallback(() => {
+    if (lastOutlineFormValues) {
+      handleGenerateOutlines(lastOutlineFormValues);
+    }
+  }, [lastOutlineFormValues, handleGenerateOutlines]);
+
+  const handleRegenerateOneOutline = useCallback(
+    (index: number) => {
+      if (!campaignId || !lastOutlineFormValues) return;
+      regenerateOneOutline(index, {
+        campaignId,
+        tone: lastOutlineFormValues.tone,
+        theme: lastOutlineFormValues.theme,
+        partyLevel: lastOutlineFormValues.partyLevel,
+        includeNpcsLocations: lastOutlineFormValues.includeNpcsLocations,
+      });
+    },
+    [campaignId, lastOutlineFormValues, regenerateOneOutline]
+  );
+
+  const handleSaveOutline = useCallback(
+    async (outline: GeneratedAdventureOutline, index: number) => {
+      if (!campaignId) return;
+      setSavingOutlineIndex(index);
+      try {
+        await createAdventureOutline.mutateAsync({
+          title: outline.title,
+          description: outline.description,
+          acts: outline.acts,
+          npcs: outline.npcs.length > 0 ? outline.npcs : null,
+          locations: outline.locations.length > 0 ? outline.locations : null,
+          factions: outline.factions.length > 0 ? outline.factions : null,
+          isGenerated: true,
+        });
+        toast.success("Outline saved to campaign");
+      } catch {
+        toast.error("Failed to save outline");
+      } finally {
+        setSavingOutlineIndex(null);
+      }
+    },
+    [campaignId, createAdventureOutline]
+  );
+
   return (
     <div className="space-y-6">
       <GenerationTypeSelector selected={selectedType} onSelect={setSelectedType} />
@@ -325,6 +407,30 @@ export function GeneratePage() {
             isStreaming={locationIsStreaming}
             savingIndex={savingLocationIndex}
             onSave={handleSaveLocation}
+          />
+        </div>
+      ) : selectedType === "adventure-outlines" ? (
+        <div className="space-y-6">
+          <div className="rounded-[var(--radius)] border border-border bg-card p-5">
+            <h3 className="mb-4 text-base font-semibold text-foreground">
+              Generate Adventure Outlines
+            </h3>
+            <AdventureOutlineForm
+              onSubmit={handleGenerateOutlines}
+              isLoading={outlineIsStreaming}
+            />
+          </div>
+
+          <OutlineGenerationResult
+            outlines={generatedOutlines}
+            sources={outlineSources}
+            status={outlineStatus}
+            error={outlineError}
+            isStreaming={outlineIsStreaming}
+            savingIndex={savingOutlineIndex}
+            onRegenerate={handleRegenerateOutlines}
+            onRegenerateOne={handleRegenerateOneOutline}
+            onSave={handleSaveOutline}
           />
         </div>
       ) : (

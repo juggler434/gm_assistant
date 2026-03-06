@@ -26,7 +26,8 @@ export interface GenerateHooksRequest {
   tone: HookTone;
   theme?: string;
   count?: number;
-  partyLevel?: number;
+  /** Free-text party level / CR, e.g. "5", "10-12", "low", "any" */
+  partyLevel?: string;
   /** Comma-separated NPCs/locations to include in generated hooks */
   includeNpcsLocations?: string;
 }
@@ -148,6 +149,50 @@ export interface GenerateLocationsResponse {
 }
 
 // ============================================================================
+// Adventure Outline Generation
+// ============================================================================
+
+/** Supported tone options for adventure outline generation (same as hooks) */
+export type OutlineTone = HookTone;
+
+/** A single act in a three-act adventure outline structure */
+export interface OutlineAct {
+  title: string;
+  description: string;
+  keyEvents: string[];
+  encounters: string[];
+}
+
+/** Request body for POST /api/campaigns/:campaignId/generate/outlines */
+export interface GenerateOutlinesRequest {
+  tone: OutlineTone;
+  theme?: string;
+  count?: number;
+  /** Free-text party level / CR, e.g. "5", "10-12", "low", "any" */
+  partyLevel?: string;
+  /** Comma-separated NPCs/locations to include in generated outlines */
+  includeNpcsLocations?: string;
+}
+
+/** A single generated adventure outline */
+export interface GeneratedAdventureOutline {
+  title: string;
+  description: string;
+  acts: OutlineAct[];
+  npcs: string[];
+  locations: string[];
+  factions: string[];
+}
+
+/** Response from POST /api/campaigns/:campaignId/generate/outlines */
+export interface GenerateOutlinesResponse {
+  outlines: GeneratedAdventureOutline[];
+  sources: AnswerSource[];
+  chunksUsed: number;
+  usage?: TokenUsage;
+}
+
+// ============================================================================
 // SSE Streaming Events (for Accept: text/event-stream)
 // ============================================================================
 
@@ -173,6 +218,12 @@ export interface GenerationNpcEvent {
 export interface GenerationLocationEvent {
   type: "location";
   location: GeneratedLocation;
+}
+
+/** SSE event: a single generated adventure outline */
+export interface GenerationOutlineEvent {
+  type: "outline";
+  outline: GeneratedAdventureOutline;
 }
 
 /** SSE event: generation complete with metadata */
@@ -209,5 +260,12 @@ export type NpcGenerationSSEEvent =
 export type LocationGenerationSSEEvent =
   | GenerationStatusEvent
   | GenerationLocationEvent
+  | GenerationCompleteEvent
+  | GenerationErrorEvent;
+
+/** Union of all SSE event types for adventure outline generation */
+export type OutlineGenerationSSEEvent =
+  | GenerationStatusEvent
+  | GenerationOutlineEvent
   | GenerationCompleteEvent
   | GenerationErrorEvent;

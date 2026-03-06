@@ -1,11 +1,11 @@
 // SPDX-License-Identifier: AGPL-3.0-or-later
 
 /**
- * Adventure Hook Generator
+ * Adventure Outline Generator
  *
- * Generates 3-5 adventure hooks grounded in campaign setting context.
- * Uses the RAG pipeline to retrieve relevant setting details (NPCs,
- * locations, factions) and feeds them to the LLM for hook generation.
+ * Generates structured adventure outlines with three-act structure,
+ * grounded in campaign setting context. Uses the RAG pipeline to
+ * retrieve relevant setting details and feeds them to the LLM.
  */
 
 import { type Result, ok, err } from "@/types/index.js";
@@ -17,13 +17,13 @@ import {
 } from "@/modules/knowledge/retrieval/hybrid-search.js";
 import { buildContext } from "@/modules/query/rag/context-builder.js";
 import type { AnswerSource } from "@/modules/query/rag/types.js";
-import { buildAdventureHookPrompt } from "../prompts/adventure-hooks.js";
+import { buildAdventureOutlinePrompt } from "../prompts/adventure-outlines.js";
 import { buildCampaignContentContext } from "../campaign-content.js";
 import type {
-  AdventureHookRequest,
-  AdventureHook,
-  AdventureHookResult,
-  AdventureHookError,
+  AdventureOutlineRequest,
+  GeneratedAdventureOutline,
+  AdventureOutlineResult,
+  AdventureOutlineError,
 } from "../types.js";
 
 // ============================================================================
@@ -31,30 +31,30 @@ import type {
 // ============================================================================
 
 /** Default number of chunks to retrieve for setting context */
-const DEFAULT_MAX_CONTEXT_CHUNKS = 6;
+const DEFAULT_MAX_CONTEXT_CHUNKS = 8;
 
 /** Maximum token budget for setting context */
-const MAX_CONTEXT_TOKENS = 2500;
+const MAX_CONTEXT_TOKENS = 3000;
 
 /** LLM temperature for creative generation */
 const GENERATION_TEMPERATURE = 0.8;
 
-/** Max tokens for hook generation (needs more than default 2048 for 3-5 structured hooks) */
-const GENERATION_MAX_TOKENS = 4096;
+/** Max tokens for outline generation (outlines are more detailed than hooks) */
+const GENERATION_MAX_TOKENS = 8192;
 
 // ============================================================================
 // Embedding Helper
 // ============================================================================
 
-/** Map shared EmbeddingError to AdventureHookError */
-function mapEmbeddingError(e: EmbeddingError): AdventureHookError {
+/** Map shared EmbeddingError to AdventureOutlineError */
+function mapEmbeddingError(e: EmbeddingError): AdventureOutlineError {
   return { code: "EMBEDDING_FAILED", message: e.message, cause: e.cause };
 }
 
-/** Generate a query embedding, mapping errors to AdventureHookError */
+/** Generate a query embedding, mapping errors to AdventureOutlineError */
 async function generateQueryEmbedding(
   query: string,
-): Promise<Result<number[], AdventureHookError>> {
+): Promise<Result<number[], AdventureOutlineError>> {
   const result = await generateEmbedding(query);
   if (!result.ok) return err(mapEmbeddingError(result.error));
   return result;
@@ -65,12 +65,12 @@ async function generateQueryEmbedding(
 // ============================================================================
 
 /**
- * Builds a search query to retrieve setting-relevant context for hook generation.
+ * Builds a search query to retrieve setting-relevant context for outline generation.
  */
 function buildSettingQuery(tone: string, theme?: string, includeNpcsLocations?: string): string {
   const parts = [
     "important NPCs characters factions locations places organizations",
-    "setting world lore history conflicts",
+    "setting world lore history conflicts quests adventures",
   ];
 
   if (theme) {
@@ -90,12 +90,19 @@ function buildSettingQuery(tone: string, theme?: string, includeNpcsLocations?: 
 // Response Parser
 // ============================================================================
 
+interface OutlineAct {
+  title: string;
+  description: string;
+  keyEvents: string[];
+  encounters: string[];
+}
+
 /**
- * Parse the LLM JSON response into structured adventure hooks.
+ * Parse the LLM JSON response into structured adventure outlines.
  */
-function parseHooksResponse(
+function parseOutlinesResponse(
   content: string,
-): Result<AdventureHook[], AdventureHookError> {
+): Result<GeneratedAdventureOutline[], AdventureOutlineError> {
   // Strip markdown fencing if present
   let cleaned = content.trim();
   if (cleaned.startsWith("```")) {
@@ -116,45 +123,65 @@ function parseHooksResponse(
   if (
     typeof parsed !== "object" ||
     parsed === null ||
-    !("hooks" in parsed) ||
-    !Array.isArray((parsed as { hooks: unknown }).hooks)
+    !("outlines" in parsed) ||
+    !Array.isArray((parsed as { outlines: unknown }).outlines)
   ) {
     return err({
       code: "PARSE_ERROR",
-      message: "LLM response missing required 'hooks' array",
+      message: "LLM response missing required 'outlines' array",
     });
   }
 
-  const rawHooks = (parsed as { hooks: unknown[] }).hooks;
-  const hooks: AdventureHook[] = [];
+  const rawOutlines = (parsed as { outlines: unknown[] }).outlines;
+  const outlines: GeneratedAdventureOutline[] = [];
 
-  for (const raw of rawHooks) {
+  for (const raw of rawOutlines) {
     if (typeof raw !== "object" || raw === null) continue;
 
-    const h = raw as Record<string, unknown>;
-    hooks.push({
-      title: typeof h.title === "string" ? h.title : "Untitled Hook",
-      description: typeof h.description === "string" ? h.description : "",
-      npcs: Array.isArray(h.npcs)
-        ? h.npcs.filter((n): n is string => typeof n === "string")
+    const o = raw as Record<string, unknown>;
+    const acts: OutlineAct[] = [];
+
+    if (Array.isArray(o.acts)) {
+      for (const rawAct of o.acts) {
+        if (typeof rawAct !== "object" || rawAct === null) continue;
+        const a = rawAct as Record<string, unknown>;
+        acts.push({
+          title: typeof a.title === "string" ? a.title : "Untitled Act",
+          description: typeof a.description === "string" ? a.description : "",
+          keyEvents: Array.isArray(a.keyEvents)
+            ? a.keyEvents.filter((e): e is string => typeof e === "string")
+            : [],
+          encounters: Array.isArray(a.encounters)
+            ? a.encounters.filter((e): e is string => typeof e === "string")
+            : [],
+        });
+      }
+    }
+
+    outlines.push({
+      title: typeof o.title === "string" ? o.title : "Untitled Outline",
+      description: typeof o.description === "string" ? o.description : "",
+      acts,
+      npcs: Array.isArray(o.npcs)
+        ? o.npcs.filter((n): n is string => typeof n === "string")
         : [],
-      locations: Array.isArray(h.locations)
-        ? h.locations.filter((l): l is string => typeof l === "string")
+      locations: Array.isArray(o.locations)
+        ? o.locations.filter((l): l is string => typeof l === "string")
         : [],
-      factions: Array.isArray(h.factions)
-        ? h.factions.filter((f): f is string => typeof f === "string")
+      factions: Array.isArray(o.factions)
+        ? o.factions.filter((f): f is string => typeof f === "string")
         : [],
     });
   }
 
-  if (hooks.length === 0) {
+  if (outlines.length === 0) {
     return err({
       code: "PARSE_ERROR",
-      message: "LLM returned no valid hooks",
+      message: "LLM returned no valid outlines",
     });
   }
 
-  return ok(hooks);
+  return ok(outlines);
 }
 
 // ============================================================================
@@ -162,7 +189,7 @@ function parseHooksResponse(
 // ============================================================================
 
 /**
- * Generate adventure hooks grounded in campaign setting context.
+ * Generate adventure outlines grounded in campaign setting context.
  *
  * Pipeline:
  * 1. Build a setting-focused search query from the tone/theme
@@ -170,17 +197,13 @@ function parseHooksResponse(
  * 3. Hybrid search for relevant setting chunks
  * 4. Build context from search results
  * 5. Construct prompt with setting context + generation parameters
- * 6. Call LLM for structured hook generation
- * 7. Parse and return hooks
- *
- * @param request - The adventure hook generation parameters
- * @param llmService - The LLM service instance for generation
- * @returns 3-5 adventure hooks with setting references and source citations
+ * 6. Call LLM for structured outline generation
+ * 7. Parse and return outlines
  */
-export async function generateAdventureHooks(
-  request: AdventureHookRequest,
+export async function generateAdventureOutlines(
+  request: AdventureOutlineRequest,
   llmService: LLMService,
-): Promise<Result<AdventureHookResult, AdventureHookError>> {
+): Promise<Result<AdventureOutlineResult, AdventureOutlineError>> {
   const {
     campaignId,
     tone,
@@ -237,7 +260,7 @@ export async function generateAdventureHooks(
   if (includeNpcsLocations !== undefined) promptOptions.includeNpcsLocations = includeNpcsLocations;
   if (campaignContent.contentText) promptOptions.campaignContent = campaignContent;
 
-  const { system, user } = buildAdventureHookPrompt(context, tone, promptOptions);
+  const { system, user } = buildAdventureOutlinePrompt(context, tone, promptOptions);
 
   // ---- Step 6: Call LLM ----
   const chatResult = await llmService.chat({
@@ -258,7 +281,7 @@ export async function generateAdventureHooks(
   }
 
   // ---- Step 7: Parse response ----
-  const parseResult = parseHooksResponse(chatResult.value.message.content);
+  const parseResult = parseOutlinesResponse(chatResult.value.message.content);
   if (!parseResult.ok) {
     return err(parseResult.error);
   }
@@ -274,8 +297,8 @@ export async function generateAdventureHooks(
     index: s.index,
   }));
 
-  const result: AdventureHookResult = {
-    hooks: parseResult.value,
+  const result: AdventureOutlineResult = {
+    outlines: parseResult.value,
     sources,
     chunksUsed: context.chunksUsed,
   };

@@ -20,7 +20,7 @@ export const generateHooksBodySchema = z.object({
   ]),
   theme: z.string().max(200).optional(),
   count: z.number().int().min(1).max(10).optional(),
-  partyLevel: z.number().int().min(1).max(20).optional(),
+  partyLevel: z.string().max(50).optional(),
   includeNpcsLocations: z.string().max(500).optional(),
 });
 
@@ -61,3 +61,27 @@ export const generateLocationsBodySchema = z.object({
 });
 
 export type GenerateLocationsBody = z.infer<typeof generateLocationsBodySchema>;
+
+export const generateOutlinesParamSchema = z.object({
+  campaignId: z.string().uuid("Invalid campaign ID"),
+});
+
+export type GenerateOutlinesParam = z.infer<typeof generateOutlinesParamSchema>;
+
+export const generateOutlinesBodySchema = z.object({
+  tone: z.enum([
+    "dark",
+    "comedic",
+    "political",
+    "mysterious",
+    "heroic",
+    "horror",
+    "intrigue",
+  ]),
+  theme: z.string().max(200).optional(),
+  count: z.number().int().min(1).max(5).optional(),
+  partyLevel: z.string().max(50).optional(),
+  includeNpcsLocations: z.string().max(500).optional(),
+});
+
+export type GenerateOutlinesBody = z.infer<typeof generateOutlinesBodySchema>;

@@ -12,9 +12,11 @@
 import { findNpcsByCampaignId } from "@/modules/npcs/repository.js";
 import { findAdventureHooksByCampaignId } from "@/modules/adventure-hooks/repository.js";
 import { findLocationsByCampaignId } from "@/modules/locations/repository.js";
+import { findAdventureOutlinesByCampaignId } from "@/modules/adventure-outlines/repository.js";
 import { estimateTokens } from "@/modules/query/rag/context-builder.js";
 import type { Npc } from "@/db/schema/npcs.js";
 import type { AdventureHookRow } from "@/db/schema/adventure-hooks.js";
+import type { AdventureOutlineRow } from "@/db/schema/adventure-outlines.js";
 import type { Location } from "@/db/schema/locations.js";
 
 // ============================================================================
@@ -36,6 +38,7 @@ export interface CampaignContentResult {
     npcs: number;
     hooks: number;
     locations: number;
+    outlines: number;
   };
 }
 
@@ -108,6 +111,24 @@ export function serializeHook(hook: AdventureHookRow): string {
 }
 
 /**
+ * Serializes an adventure outline into a concise single-line bullet.
+ */
+export function serializeOutline(outline: AdventureOutlineRow): string {
+  const parts = [outline.title + ":"];
+  if (outline.description) parts.push(truncate(outline.description));
+
+  const actCount = Array.isArray(outline.acts) ? outline.acts.length : 0;
+  if (actCount > 0) parts.push(`(${actCount} acts)`);
+
+  const refs: string[] = [];
+  if (outline.npcs && outline.npcs.length > 0) refs.push(`NPCs: ${outline.npcs.join(", ")}`);
+  if (outline.locations && outline.locations.length > 0) refs.push(`Locations: ${outline.locations.join(", ")}`);
+  if (refs.length > 0) parts.push(refs.join(". ") + ".");
+
+  return `- ${parts.join(" ")}`;
+}
+
+/**
  * Serializes a location into a concise single-line bullet.
  */
 export function serializeLocation(location: Location): string {
@@ -144,30 +165,31 @@ export async function buildCampaignContentContext(
   const maxTokens = options.maxTokens ?? DEFAULT_MAX_TOKENS;
 
   // Fetch all entity types in parallel (already ordered by createdAt desc)
-  const [npcs, hooks, locations] = await Promise.all([
+  const [npcs, hooks, locations, outlines] = await Promise.all([
     findNpcsByCampaignId(campaignId),
     findAdventureHooksByCampaignId(campaignId),
     findLocationsByCampaignId(campaignId),
+    findAdventureOutlinesByCampaignId(campaignId),
   ]);
 
   // Early return if campaign has no saved content
-  if (npcs.length === 0 && hooks.length === 0 && locations.length === 0) {
+  if (npcs.length === 0 && hooks.length === 0 && locations.length === 0 && outlines.length === 0) {
     return {
       contentText: "",
       estimatedTokens: 0,
-      counts: { npcs: 0, hooks: 0, locations: 0 },
+      counts: { npcs: 0, hooks: 0, locations: 0, outlines: 0 },
     };
   }
 
   const sections: string[] = [];
   let totalTokens = 0;
-  const counts = { npcs: 0, hooks: 0, locations: 0 };
+  const counts = { npcs: 0, hooks: 0, locations: 0, outlines: 0 };
 
   // Helper to add lines from a section while respecting budget
   function addSection(
     heading: string,
     items: string[],
-    countKey: "npcs" | "hooks" | "locations",
+    countKey: "npcs" | "hooks" | "locations" | "outlines",
   ): void {
     if (items.length === 0) return;
 
@@ -197,10 +219,12 @@ export async function buildCampaignContentContext(
   const serializedNpcs = npcs.map(serializeNpc);
   const serializedHooks = hooks.map(serializeHook);
   const serializedLocations = locations.map(serializeLocation);
+  const serializedOutlines = outlines.map(serializeOutline);
 
   addSection("NPCs:", serializedNpcs, "npcs");
   addSection("Adventure Hooks:", serializedHooks, "hooks");
   addSection("Locations:", serializedLocations, "locations");
+  addSection("Adventure Outlines:", serializedOutlines, "outlines");
 
   const contentText = sections.join("\n\n");
 

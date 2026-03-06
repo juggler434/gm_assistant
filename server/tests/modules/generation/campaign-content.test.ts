@@ -3,10 +3,11 @@
 import { describe, it, expect, vi, beforeEach } from "vitest";
 
 // Hoist mock functions
-const { mockFindNpcs, mockFindHooks, mockFindLocations } = vi.hoisted(() => ({
+const { mockFindNpcs, mockFindHooks, mockFindLocations, mockFindOutlines } = vi.hoisted(() => ({
   mockFindNpcs: vi.fn(),
   mockFindHooks: vi.fn(),
   mockFindLocations: vi.fn(),
+  mockFindOutlines: vi.fn(),
 }));
 
 vi.mock("@/modules/npcs/repository.js", () => ({
@@ -19,6 +20,10 @@ vi.mock("@/modules/adventure-hooks/repository.js", () => ({
 
 vi.mock("@/modules/locations/repository.js", () => ({
   findLocationsByCampaignId: mockFindLocations,
+}));
+
+vi.mock("@/modules/adventure-outlines/repository.js", () => ({
+  findAdventureOutlinesByCampaignId: mockFindOutlines,
 }));
 
 import {
@@ -203,25 +208,27 @@ describe("Campaign Content Serializer", () => {
       mockFindNpcs.mockResolvedValue([]);
       mockFindHooks.mockResolvedValue([]);
       mockFindLocations.mockResolvedValue([]);
+      mockFindOutlines.mockResolvedValue([]);
 
       const result = await buildCampaignContentContext(campaignId);
 
       expect(result.contentText).toBe("");
       expect(result.estimatedTokens).toBe(0);
-      expect(result.counts).toEqual({ npcs: 0, hooks: 0, locations: 0 });
+      expect(result.counts).toEqual({ npcs: 0, hooks: 0, locations: 0, outlines: 0 });
     });
 
     it("should include all entity types when present", async () => {
       mockFindNpcs.mockResolvedValue([makeNpc()]);
       mockFindHooks.mockResolvedValue([makeHook()]);
       mockFindLocations.mockResolvedValue([makeLocation()]);
+      mockFindOutlines.mockResolvedValue([]);
 
       const result = await buildCampaignContentContext(campaignId);
 
       expect(result.contentText).toContain("NPCs:");
       expect(result.contentText).toContain("Adventure Hooks:");
       expect(result.contentText).toContain("Locations:");
-      expect(result.counts).toEqual({ npcs: 1, hooks: 1, locations: 1 });
+      expect(result.counts).toEqual({ npcs: 1, hooks: 1, locations: 1, outlines: 0 });
       expect(result.estimatedTokens).toBeGreaterThan(0);
     });
 
@@ -229,13 +236,14 @@ describe("Campaign Content Serializer", () => {
       mockFindNpcs.mockResolvedValue([makeNpc()]);
       mockFindHooks.mockResolvedValue([]);
       mockFindLocations.mockResolvedValue([]);
+      mockFindOutlines.mockResolvedValue([]);
 
       const result = await buildCampaignContentContext(campaignId);
 
       expect(result.contentText).toContain("NPCs:");
       expect(result.contentText).not.toContain("Adventure Hooks:");
       expect(result.contentText).not.toContain("Locations:");
-      expect(result.counts).toEqual({ npcs: 1, hooks: 0, locations: 0 });
+      expect(result.counts).toEqual({ npcs: 1, hooks: 0, locations: 0, outlines: 0 });
     });
 
     it("should respect token budget", async () => {
@@ -252,6 +260,7 @@ describe("Campaign Content Serializer", () => {
       mockFindNpcs.mockResolvedValue(manyNpcs);
       mockFindHooks.mockResolvedValue([makeHook()]);
       mockFindLocations.mockResolvedValue([makeLocation()]);
+      mockFindOutlines.mockResolvedValue([]);
 
       const result = await buildCampaignContentContext(campaignId, { maxTokens: 100 });
 
@@ -264,12 +273,14 @@ describe("Campaign Content Serializer", () => {
       mockFindNpcs.mockResolvedValue([]);
       mockFindHooks.mockResolvedValue([]);
       mockFindLocations.mockResolvedValue([]);
+      mockFindOutlines.mockResolvedValue([]);
 
       await buildCampaignContentContext(campaignId);
 
       expect(mockFindNpcs).toHaveBeenCalledWith(campaignId);
       expect(mockFindHooks).toHaveBeenCalledWith(campaignId);
       expect(mockFindLocations).toHaveBeenCalledWith(campaignId);
+      expect(mockFindOutlines).toHaveBeenCalledWith(campaignId);
     });
 
     it("should include multiple NPCs in order", async () => {
@@ -279,6 +290,7 @@ describe("Campaign Content Serializer", () => {
       mockFindNpcs.mockResolvedValue([npc1, npc2]);
       mockFindHooks.mockResolvedValue([]);
       mockFindLocations.mockResolvedValue([]);
+      mockFindOutlines.mockResolvedValue([]);
 
       const result = await buildCampaignContentContext(campaignId);
 

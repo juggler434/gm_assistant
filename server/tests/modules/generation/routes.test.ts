@@ -186,7 +186,7 @@ describe("Generation Routes", () => {
         payload: {
           tone: "dark",
           theme: "political intrigue",
-          partyLevel: 5,
+          partyLevel: "5",
         },
       });
 
@@ -195,7 +195,7 @@ describe("Generation Routes", () => {
           campaignId: mockCampaignId,
           tone: "dark",
           theme: "political intrigue",
-          partyLevel: 5,
+          partyLevel: "5",
         }),
         expect.anything(),
       );
@@ -247,21 +247,6 @@ describe("Generation Routes", () => {
         url: `/api/campaigns/${mockCampaignId}/generate/hooks`,
         headers: { cookie: getAuthCookie() },
         payload: { tone: "silly" },
-      });
-
-      expect(response.statusCode).toBe(400);
-
-      await app.close();
-    });
-
-    it("should return 400 for party level out of range", async () => {
-      const app = await buildTestApp();
-
-      const response = await app.inject({
-        method: "POST",
-        url: `/api/campaigns/${mockCampaignId}/generate/hooks`,
-        headers: { cookie: getAuthCookie() },
-        payload: { tone: "dark", partyLevel: 25 },
       });
 
       expect(response.statusCode).toBe(400);

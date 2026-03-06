@@ -8,10 +8,12 @@ export type { CampaignContentOptions, CampaignContentResult } from "./campaign-c
 export { generateAdventureHooks } from "./generators/index.js";
 export { generateNpcs } from "./generators/index.js";
 export { generateLocations } from "./generators/index.js";
+export { generateAdventureOutlines } from "./generators/index.js";
 
 export { buildAdventureHookPrompt } from "./prompts/index.js";
 export { buildNpcPrompt } from "./prompts/index.js";
 export { buildLocationPrompt } from "./prompts/index.js";
+export { buildAdventureOutlinePrompt } from "./prompts/index.js";
 
 export {
   generateHooksParamSchema,
@@ -26,6 +28,10 @@ export {
   generateLocationsBodySchema,
   type GenerateLocationsParam,
   type GenerateLocationsBody,
+  generateOutlinesParamSchema,
+  generateOutlinesBodySchema,
+  type GenerateOutlinesParam,
+  type GenerateOutlinesBody,
 } from "./schemas.js";
 
 export type {
@@ -44,4 +50,9 @@ export type {
   GeneratedLocation,
   LocationGenerationResult,
   LocationGenerationError,
+  OutlineTone,
+  AdventureOutlineRequest,
+  GeneratedAdventureOutline,
+  AdventureOutlineResult,
+  AdventureOutlineError,
 } from "./types.js";
