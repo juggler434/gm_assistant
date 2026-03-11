@@ -1,12 +1,9 @@
 // SPDX-License-Identifier: AGPL-3.0-or-later
 
-import { useState, useCallback, useEffect } from "react";
+import { useState, useCallback } from "react";
 import { useParams } from "react-router-dom";
 import { toast } from "sonner";
-import {
-  GenerationTypeSelector,
-  type GenerationType,
-} from "@/components/generation/generation-type-selector";
+import { GenerationTypeSelector } from "@/components/generation/generation-type-selector";
 import {
   AdventureHookForm,
   type AdventureHookFormValues,
@@ -32,63 +29,39 @@ import {
   type AdventureFormValues,
 } from "@/components/generation/adventure-form";
 import { AdventureGenerationResult } from "@/components/generation/adventure-generation-result";
-import { useGenerateHooksStream } from "@/hooks/use-generation";
-import { useGenerateNpcsStream } from "@/hooks/use-generate-npcs";
-import { useGenerateLocationsStream } from "@/hooks/use-generate-locations";
-import { useGenerateOutlinesStream } from "@/hooks/use-generate-outlines";
-import { useGenerateAdventureStream } from "@/hooks/use-generate-adventures";
+import { useGenerationContext } from "@/hooks/use-generation-context";
 import { useCreateNpc } from "@/hooks/use-npcs";
 import { useCreateLocation } from "@/hooks/use-locations";
 import { useCreateAdventureHook } from "@/hooks/use-adventure-hooks";
 import { useCreateAdventureOutline } from "@/hooks/use-adventure-outlines";
 import { useAdventureOutlines } from "@/hooks/use-adventure-outlines";
 import { useCreateAdventure } from "@/hooks/use-adventures";
-import type { GeneratedNpc, GeneratedLocation, GeneratedAdventureOutline, GeneratedAdventure, AdventureHook, AnswerSource } from "@/types";
+import type { GeneratedNpc, GeneratedLocation, GeneratedAdventureOutline, GeneratedAdventure, AdventureHook } from "@/types";
 
 export function GeneratePage() {
   const { id: campaignId } = useParams<{ id: string }>();
-  const [selectedType, setSelectedType] = useState<GenerationType>("adventure-hooks");
 
-  // Restore persisted adventure hooks state from sessionStorage on mount
-  const hooksStorageKey = campaignId ? `gm-assistant:gen-hooks-state:${campaignId}` : null;
-  const [restoredHooksState] = useState(() => {
-    if (!hooksStorageKey) return undefined;
-    try {
-      const raw = sessionStorage.getItem(hooksStorageKey);
-      return raw ? (JSON.parse(raw) as { hooks: AdventureHook[]; sources: AnswerSource[] }) : undefined;
-    } catch {
-      return undefined;
-    }
-  });
+  // Pull all streaming state from the layout-level context so it survives navigation
+  const {
+    selectedType,
+    setSelectedType,
+    hooksStream,
+    npcsStream,
+    locationsStream,
+    outlinesStream,
+    adventuresStream,
+    hooksFormValues: lastFormValues,
+    setHooksFormValues: setLastFormValues,
+    npcsFormValues: lastNpcFormValues,
+    setNpcsFormValues: setLastNpcFormValues,
+    outlinesFormValues: lastOutlineFormValues,
+    setOutlinesFormValues: setLastOutlineFormValues,
+    adventuresFormValues: lastAdventureFormValues,
+    setAdventuresFormValues: setLastAdventureFormValues,
+  } = useGenerationContext();
 
-  // Adventure hooks state
-  const { generate, regenerateOne, hooks, sources, status, error, isStreaming } =
-    useGenerateHooksStream(restoredHooksState);
-  const [lastFormValues, setLastFormValues] = useState<AdventureHookFormValues | null>(() => {
-    if (!hooksStorageKey) return null;
-    try {
-      const raw = sessionStorage.getItem(`${hooksStorageKey}:form`);
-      return raw ? (JSON.parse(raw) as AdventureHookFormValues) : null;
-    } catch {
-      return null;
-    }
-  });
-  const createAdventureHook = useCreateAdventureHook(campaignId ?? "");
-  const [savingHookIndex, setSavingHookIndex] = useState<number | null>(null);
-
-  // Persist generated hooks and sources to sessionStorage whenever they change
-  useEffect(() => {
-    if (!hooksStorageKey || hooks.length === 0) return;
-    sessionStorage.setItem(hooksStorageKey, JSON.stringify({ hooks, sources }));
-  }, [hooks, sources, hooksStorageKey]);
-
-  // Persist last form values to sessionStorage whenever they change
-  useEffect(() => {
-    if (!hooksStorageKey || !lastFormValues) return;
-    sessionStorage.setItem(`${hooksStorageKey}:form`, JSON.stringify(lastFormValues));
-  }, [lastFormValues, hooksStorageKey]);
-
-  // NPC generation state
+  // Destructure streaming hooks
+  const { generate, regenerateOne, hooks, sources, status, error, isStreaming } = hooksStream;
   const {
     generate: generateNpcs,
     npcs: generatedNpcs,
@@ -96,12 +69,7 @@ export function GeneratePage() {
     status: npcStatus,
     error: npcError,
     isStreaming: npcIsStreaming,
-  } = useGenerateNpcsStream();
-  const createNpc = useCreateNpc(campaignId ?? "");
-  const [savingNpcIndex, setSavingNpcIndex] = useState<number | null>(null);
-  const [lastNpcFormValues, setLastNpcFormValues] = useState<NpcGenerationFormValues | null>(null);
-
-  // Location generation state
+  } = npcsStream;
   const {
     generate: generateLocs,
     locations: generatedLocations,
@@ -109,11 +77,7 @@ export function GeneratePage() {
     status: locationStatus,
     error: locationError,
     isStreaming: locationIsStreaming,
-  } = useGenerateLocationsStream();
-  const createLocation = useCreateLocation(campaignId ?? "");
-  const [savingLocationIndex, setSavingLocationIndex] = useState<number | null>(null);
-
-  // Adventure outline generation state
+  } = locationsStream;
   const {
     generate: generateOutlines,
     regenerateOne: regenerateOneOutline,
@@ -122,12 +86,7 @@ export function GeneratePage() {
     status: outlineStatus,
     error: outlineError,
     isStreaming: outlineIsStreaming,
-  } = useGenerateOutlinesStream();
-  const createAdventureOutline = useCreateAdventureOutline(campaignId ?? "");
-  const [savingOutlineIndex, setSavingOutlineIndex] = useState<number | null>(null);
-  const [lastOutlineFormValues, setLastOutlineFormValues] = useState<AdventureOutlineFormValues | null>(null);
-
-  // Full adventure generation state
+  } = outlinesStream;
   const {
     generate: generateAdventure,
     adventure: generatedAdventure,
@@ -135,10 +94,23 @@ export function GeneratePage() {
     status: adventureStatus,
     error: adventureError,
     isStreaming: adventureIsStreaming,
-  } = useGenerateAdventureStream();
+  } = adventuresStream;
+
+  // Save-in-progress indicators (page-local, no need to persist across nav)
+  const createAdventureHook = useCreateAdventureHook(campaignId ?? "");
+  const [savingHookIndex, setSavingHookIndex] = useState<number | null>(null);
+
+  const createNpc = useCreateNpc(campaignId ?? "");
+  const [savingNpcIndex, setSavingNpcIndex] = useState<number | null>(null);
+
+  const createLocation = useCreateLocation(campaignId ?? "");
+  const [savingLocationIndex, setSavingLocationIndex] = useState<number | null>(null);
+
+  const createAdventureOutline = useCreateAdventureOutline(campaignId ?? "");
+  const [savingOutlineIndex, setSavingOutlineIndex] = useState<number | null>(null);
+
   const createAdventure = useCreateAdventure(campaignId ?? "");
   const [savingAdventure, setSavingAdventure] = useState(false);
-  const [lastAdventureFormValues, setLastAdventureFormValues] = useState<AdventureFormValues | null>(null);
 
   // Fetch outlines for the adventure form's "expand from outline" dropdown
   const { data: outlinesList } = useAdventureOutlines(campaignId ?? "");
@@ -158,7 +130,7 @@ export function GeneratePage() {
         includeNpcsLocations: values.includeNpcsLocations,
       });
     },
-    [campaignId, generate]
+    [campaignId, generate, setLastFormValues]
   );
 
   const handleRegenerate = useCallback(() => {
@@ -222,7 +194,7 @@ export function GeneratePage() {
         constraints: values.constraints,
       });
     },
-    [campaignId, generateNpcs]
+    [campaignId, generateNpcs, setLastNpcFormValues]
   );
 
   const handleSaveNpc = useCallback(
@@ -318,7 +290,7 @@ export function GeneratePage() {
         includeNpcsLocations: values.includeNpcsLocations,
       });
     },
-    [campaignId, generateOutlines]
+    [campaignId, generateOutlines, setLastOutlineFormValues]
   );
 
   const handleRegenerateOutlines = useCallback(() => {
@@ -380,7 +352,7 @@ export function GeneratePage() {
         includeStatBlocks: values.includeStatBlocks,
       });
     },
-    [campaignId, generateAdventure]
+    [campaignId, generateAdventure, setLastAdventureFormValues]
   );
 
   const handleRegenerateAdventure = useCallback(() => {

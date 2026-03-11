@@ -5,6 +5,7 @@ import { ArrowLeft } from "lucide-react";
 import { useCampaign } from "@/hooks/use-campaigns";
 import { Skeleton } from "@/components/ui/skeleton";
 import { ErrorState } from "@/components/ui/error-state";
+import { GenerationProvider } from "@/hooks/use-generation-context";
 
 export function CampaignLayout() {
   const { id } = useParams<{ id: string }>();
@@ -41,9 +42,11 @@ export function CampaignLayout() {
           />
         </div>
       ) : (
-        <div className="p-6">
-          <Outlet />
-        </div>
+        <GenerationProvider>
+          <div className="p-6">
+            <Outlet />
+          </div>
+        </GenerationProvider>
       )}
     </div>
   );

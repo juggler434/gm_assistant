@@ -183,6 +183,64 @@ function safeParse(content: string): Result<unknown, AdventureGenerationError> {
   }
 }
 
+/**
+ * Attempt to recover a truncated JSON array response.
+ * When the LLM runs out of tokens mid-JSON, we try to salvage any complete
+ * array elements by finding the last complete `}` before the truncation point,
+ * then closing the array and outer wrapper object.
+ *
+ * @param content - raw (possibly truncated) LLM output
+ * @param arrayKey - the key of the array in the wrapper object (e.g. "encounters")
+ * @returns parsed object or null if recovery fails
+ */
+function recoverTruncatedArray(content: string, arrayKey: string): unknown | null {
+  const cleaned = cleanJson(content);
+
+  // Find the opening of the array
+  const arrayPattern = new RegExp(`"${arrayKey}"\\s*:\\s*\\[`);
+  const arrayMatch = arrayPattern.exec(cleaned);
+  if (!arrayMatch) return null;
+
+  const arrayStart = arrayMatch.index + arrayMatch[0].length;
+
+  // Walk backwards from end to find the last complete object closing brace
+  // that could be the end of an array element
+  let braceDepth = 0;
+  let lastCompleteEnd = -1;
+
+  for (let i = cleaned.length - 1; i >= arrayStart; i--) {
+    const ch = cleaned[i];
+    if (ch === "}") {
+      if (braceDepth === 0) {
+        // Potential end of a complete object — verify by trying to parse
+        // from array start to here
+        const candidate = `{${arrayMatch[0]}${cleaned.slice(arrayStart, i + 1)}]}`;
+        try {
+          JSON.parse(candidate);
+          lastCompleteEnd = i;
+          break;
+        } catch {
+          // Not a valid boundary, keep scanning
+          braceDepth++;
+        }
+      } else {
+        braceDepth++;
+      }
+    } else if (ch === "{") {
+      braceDepth = Math.max(0, braceDepth - 1);
+    }
+  }
+
+  if (lastCompleteEnd === -1) return null;
+
+  const repaired = `{${arrayMatch[0]}${cleaned.slice(arrayStart, lastCompleteEnd + 1)}]}`;
+  try {
+    return JSON.parse(repaired);
+  } catch {
+    return null;
+  }
+}
+
 function asRecord(val: unknown): Record<string, unknown> | null {
   if (typeof val === "object" && val !== null && !Array.isArray(val)) {
     return val as Record<string, unknown>;
@@ -319,9 +377,18 @@ function parseEncountersResponse(
   content: string,
 ): Result<PipelineEncounter[], AdventureGenerationError> {
   const parseResult = safeParse(content);
-  if (!parseResult.ok) return parseResult;
 
-  const root = asRecord(parseResult.value);
+  // If parsing failed (e.g. truncated output), try to recover partial encounters
+  const parsed = parseResult.ok
+    ? parseResult.value
+    : recoverTruncatedArray(content, "encounters");
+  if (parsed == null) {
+    return parseResult.ok
+      ? err({ code: "PARSE_ERROR", message: "LLM response missing 'encounters' array" })
+      : parseResult;
+  }
+
+  const root = asRecord(parsed);
   if (!root || !Array.isArray(root.encounters)) {
     return err({ code: "PARSE_ERROR", message: "LLM response missing 'encounters' array" });
   }
@@ -344,6 +411,10 @@ function parseEncountersResponse(
     });
   }
 
+  if (encounters.length === 0) {
+    return err({ code: "PARSE_ERROR", message: "No valid encounters could be parsed from LLM response" });
+  }
+
   return ok(encounters);
 }
 
@@ -352,9 +423,18 @@ function parseScenesResponse(
   actNumber: number,
 ): Result<AdventureScene[], AdventureGenerationError> {
   const parseResult = safeParse(content);
-  if (!parseResult.ok) return parseResult;
 
-  const root = asRecord(parseResult.value);
+  // If parsing failed (e.g. truncated output), try to recover partial scenes
+  const parsed = parseResult.ok
+    ? parseResult.value
+    : recoverTruncatedArray(content, "scenes");
+  if (parsed == null) {
+    return parseResult.ok
+      ? err({ code: "PARSE_ERROR", message: "LLM response missing 'scenes' array" })
+      : parseResult;
+  }
+
+  const root = asRecord(parsed);
   if (!root || !Array.isArray(root.scenes)) {
     return err({ code: "PARSE_ERROR", message: "LLM response missing 'scenes' array" });
   }
@@ -411,6 +491,95 @@ function parseScenesResponse(
   }
 
   return ok(scenes);
+}
+
+// ============================================================================
+// NPC Name Deduplication
+// ============================================================================
+
+/**
+ * Find NPC names that collide with already-used names or are duplicated
+ * within the batch itself (case-insensitive first-name match).
+ */
+function findDuplicateNpcNames(
+  npcs: PipelineNpc[],
+  usedNames: Set<string>,
+): Set<number> {
+  const dupeIndices = new Set<number>();
+  const usedLower = new Set([...usedNames].map((n) => n.toLowerCase()));
+  const batchSeen = new Map<string, number>(); // lowercase name → first index
+
+  for (let i = 0; i < npcs.length; i++) {
+    const npc = npcs[i];
+    if (!npc) continue;
+    const lower = npc.name.toLowerCase();
+    // Also check just the first name (before space) for partial matches like
+    // "Kaelen" vs "Kaelen Ashford"
+    const firstName = lower.split(/\s+/)[0] ?? lower;
+
+    if (usedLower.has(lower) || usedLower.has(firstName)) {
+      dupeIndices.add(i);
+    } else if (batchSeen.has(lower) || batchSeen.has(firstName)) {
+      // Duplicate within the same batch — flag the later one
+      dupeIndices.add(i);
+    } else {
+      batchSeen.set(lower, i);
+      if (firstName !== lower) {
+        batchSeen.set(firstName, i);
+      }
+    }
+  }
+
+  return dupeIndices;
+}
+
+/**
+ * Deterministic rename for NPCs that still have duplicate names after retry.
+ * Appends a role-based surname to make the name unique.
+ */
+function renameDuplicateNpcs(
+  npcs: PipelineNpc[],
+  dupeIndices: Set<number>,
+  usedNames: Set<string>,
+): void {
+  const usedLower = new Set([...usedNames].map((n) => n.toLowerCase()));
+  // Also include non-duplicate names from this batch
+  for (let i = 0; i < npcs.length; i++) {
+    if (!dupeIndices.has(i)) {
+      usedLower.add(npcs[i]!.name.toLowerCase());
+    }
+  }
+
+  for (const idx of dupeIndices) {
+    const npc = npcs[idx];
+    if (!npc) continue;
+    // Try appending role-derived words to make the name unique
+    const roleWords = npc.role
+      .split(/[\s,]+/)
+      .filter((w) => w.length > 2)
+      .map((w) => w.charAt(0).toUpperCase() + w.slice(1).toLowerCase());
+
+    let renamed = false;
+    for (const word of roleWords) {
+      const candidate = `${npc.name} "${word}"`;
+      if (!usedLower.has(candidate.toLowerCase())) {
+        npc.name = candidate;
+        usedLower.add(candidate.toLowerCase());
+        renamed = true;
+        break;
+      }
+    }
+
+    // Fallback: append numeric suffix
+    if (!renamed) {
+      let suffix = 2;
+      while (usedLower.has(`${npc.name} ${suffix}`.toLowerCase())) {
+        suffix++;
+      }
+      npc.name = `${npc.name} ${suffix}`;
+      usedLower.add(npc.name.toLowerCase());
+    }
+  }
 }
 
 // ============================================================================
@@ -493,7 +662,7 @@ async function generateNpcsStep(
   tone: string,
   act: ActDescription,
   locations: PipelineLocation[],
-  options: { theme?: string | undefined },
+  options: { theme?: string | undefined; previousNpcNames?: string[] | undefined },
   llmService: LLMService,
 ): Promise<
   Result<{ npcs: PipelineNpc[]; usage?: TokenUsage | undefined }, AdventureGenerationError>
@@ -631,7 +800,7 @@ export async function generateAdventure(
 
   const searchOptions: HybridSearchOptions = {
     limit: maxContextChunks,
-    documentTypes: ["setting", "notes", "rulebook"],
+    documentTypes: ["setting", "notes"],
   };
 
   const searchResult = await searchChunksHybrid(
@@ -668,7 +837,9 @@ export async function generateAdventure(
     campaignContentText: campaignContent.contentText,
   };
 
-  // If stat blocks are requested, do a targeted rulebook search for creature/mechanic content
+  // If stat blocks are requested, do a targeted rulebook-only search for mechanics/creature stats.
+  // This is kept separate from setting context so the LLM can distinguish game rules from lore
+  // (setting books may be from a different game system than the rulebook).
   let encounterPromptCtx = promptCtx;
   if (includeStatBlocks !== false) {
     const rulebookQuery =
@@ -686,13 +857,9 @@ export async function generateAdventure(
           maxTokens: 3000,
         });
         if (rulebookContext.contextText) {
-          // Merge rulebook context with setting context for encounters
           encounterPromptCtx = {
-            settingText: context.contextText
-              + "\n\n=== RULEBOOK / STAT BLOCK REFERENCE ===\n"
-              + rulebookContext.contextText,
-            sourceLegend,
-            campaignContentText: campaignContent.contentText,
+            ...promptCtx,
+            rulebookText: rulebookContext.contextText,
           };
         }
       }
@@ -779,22 +946,47 @@ export async function generateAdventure(
     const locations = locResult.value.locations;
     totalUsage = mergeUsage(totalUsage, locResult.value.usage);
 
-    // 3b: Generate NPCs (with location context)
+    // 3b: Generate NPCs (with location context + deduplication)
     emit({
       type: "status",
       message: `Act ${act.actNumber}: Generating NPCs...`,
     });
-    const npcResult = await generateNpcsStep(
+    const previousNpcNames = allNpcNames.size > 0 ? [...allNpcNames] : undefined;
+    let npcResult = await generateNpcsStep(
       promptCtx,
       tone,
       act,
       locations,
-      { theme },
+      { theme, previousNpcNames },
       llmService,
     );
     if (!npcResult.ok) return npcResult;
-    const npcs = npcResult.value.npcs;
+    let npcs = npcResult.value.npcs;
     totalUsage = mergeUsage(totalUsage, npcResult.value.usage);
+
+    // Check for duplicate names and retry once if found
+    let dupeIndices = findDuplicateNpcNames(npcs, allNpcNames);
+    if (dupeIndices.size > 0) {
+      const dupeNames = [...dupeIndices].map((i) => npcs[i]!.name);
+      const forbiddenNames = [...(previousNpcNames ?? []), ...dupeNames];
+      const retryResult = await generateNpcsStep(
+        promptCtx,
+        tone,
+        act,
+        locations,
+        { theme, previousNpcNames: forbiddenNames },
+        llmService,
+      );
+      if (retryResult.ok) {
+        npcs = retryResult.value.npcs;
+        totalUsage = mergeUsage(totalUsage, retryResult.value.usage);
+      }
+      // If retry still has duplicates, rename deterministically
+      dupeIndices = findDuplicateNpcNames(npcs, allNpcNames);
+      if (dupeIndices.size > 0) {
+        renameDuplicateNpcs(npcs, dupeIndices, allNpcNames);
+      }
+    }
 
     // 3c: Generate encounters (with location + NPC + rulebook context)
     emit({
