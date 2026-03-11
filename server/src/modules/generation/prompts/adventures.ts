@@ -32,6 +32,9 @@ export interface PipelinePromptContext {
   settingText: string;
   sourceLegend: string;
   campaignContentText: string;
+  /** Rulebook-only context for stat blocks / game mechanics. Kept separate
+   *  from settingText so the LLM can distinguish narrative lore from rules. */
+  rulebookText?: string | undefined;
 }
 
 export interface ActDescription {
@@ -206,14 +209,20 @@ export function buildActNpcsPrompt(
   locations: PipelineLocationSummary[],
   options: {
     theme?: string | undefined;
+    previousNpcNames?: string[] | undefined;
   } = {},
 ): { system: string; user: string } {
+  const avoidNamesRule = options.previousNpcNames && options.previousNpcNames.length > 0
+    ? `\n- The following NPC names have ALREADY been used in earlier acts. Do NOT reuse any of them: ${options.previousNpcNames.join(", ")}.`
+    : "";
+
   const system = `You are a creative tabletop RPG game master assistant. Your tone is ${tone.toUpperCase()}: ${toneDescriptions[tone]}.
 
 Generate 2-4 NPCs who appear in a specific act of an adventure. Each NPC should have a distinct personality and useful dialogue for the GM.
 
 Rules:
 - Each NPC needs a clear role in this act's events
+- When creating each NPC's name, generate it as if inventing a fresh identity, not recalling one. Choose time- and setting-appropriate first and last names that sound natural yet distinctive. Use diverse phonetics, syllable counts, cultural origins, and naming styles to create variety. Each name should feel individual and grounded only in the setting and character's origin. Aim for names that could belong to anyone, not just an archetype.${avoidNamesRule}
 - Dialogue should be practical — things the NPC would actually say to the party
 - Include context for when/why each dialogue line would be used
 - Do not invent major NPCs contradicting the setting context
@@ -300,13 +309,30 @@ export function buildActEncountersPrompt(
   } = {},
 ): { system: string; user: string } {
   const wantStatBlocks = options.includeStatBlocks !== false;
-  const statBlockInstruction = wantStatBlocks
-    ? `\n- You MUST include a "statBlock" object for EVERY encounter. Use creature stats from the setting/rulebook context when available. For creatures not in the context, generate appropriate stat blocks scaled to the party level. Each statBlock must include at minimum: "ac" (number), "hp" (string like "45 (6d10+12)"), "speed" (string), "abilities" (object with "str","dex","con","int","wis","cha" as numbers), and "actions" (array of {"name","description"} objects). You may also include "size", "type", "cr", "savingThrows", "skills", "damageResistances", "senses", "languages", and "traits" (array of {"name","description"}).`
-    : "\n- Set statBlock to null for all encounters.";
+  const hasRulebook = !!ctx.rulebookText;
+  let statBlockInstruction: string;
+  let statBlockExample: string;
 
-  const statBlockExample = wantStatBlocks
-    ? `"statBlock": { "ac": 15, "hp": "45 (6d10+12)", "speed": "30 ft.", "abilities": { "str": 16, "dex": 12, "con": 14, "int": 8, "wis": 10, "cha": 6 }, "actions": [{ "name": "Multiattack", "description": "Makes two claw attacks." }, { "name": "Claw", "description": "+5 to hit, reach 5 ft., 1d8+3 slashing damage." }] }`
-    : `"statBlock": null`;
+  if (!wantStatBlocks) {
+    statBlockInstruction = "\n- Set statBlock to null for all encounters.";
+    statBlockExample = `"statBlock": null`;
+  } else if (hasRulebook) {
+    statBlockInstruction =
+      "\n- You MUST include a \"statBlock\" object for EVERY encounter." +
+      " Derive the stat block FORMAT, ATTRIBUTES, and MECHANICS **exclusively** from the RULEBOOK section below." +
+      " Do NOT assume D&D / d20 attributes (no str/dex/con/int/wis/cha unless that is what the RULEBOOK uses)." +
+      " Do NOT borrow mechanics from the setting context — setting documents may be from a different game system." +
+      " Study the RULEBOOK section carefully: identify which attributes, defenses, skills, and action formats it uses, then replicate that structure in your statBlock JSON." +
+      " For creatures not found in the rulebook, invent stats that are consistent with the rulebook's system and scaled to the party level.";
+    statBlockExample =
+      `"statBlock": { "...keys and structure derived from the RULEBOOK's game system..." }`;
+  } else {
+    statBlockInstruction =
+      "\n- Include a \"statBlock\" object for each encounter with stats appropriate for the game system described in the context." +
+      " If no game system is evident, use a generic format with attributes, hit points, defenses, and actions.";
+    statBlockExample =
+      `"statBlock": { "...system-appropriate stats..." }`;
+  }
 
   const system = `You are a creative tabletop RPG game master assistant. Your tone is ${tone.toUpperCase()}: ${toneDescriptions[tone]}.
 
@@ -339,11 +365,17 @@ Respond ONLY with JSON.`;
   const parts: string[] = [];
 
   if (ctx.settingText) {
-    parts.push("=== SETTING CONTEXT ===");
+    parts.push("=== SETTING CONTEXT (narrative / lore only) ===");
     parts.push(ctx.settingText);
     if (ctx.sourceLegend) {
       parts.push(`\nSources:\n${ctx.sourceLegend}`);
     }
+    parts.push("");
+  }
+
+  if (ctx.rulebookText) {
+    parts.push("=== RULEBOOK (use ONLY this section for stat block rules, mechanics, and creature stats) ===");
+    parts.push(ctx.rulebookText);
     parts.push("");
   }
 
