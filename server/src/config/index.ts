@@ -30,6 +30,9 @@ export const config = {
   googleAi: {
     apiKey: env.GOOGLE_AI_API_KEY,
   },
+  anthropic: {
+    apiKey: env.ANTHROPIC_API_KEY,
+  },
   auth: {
     jwtSecret: env.JWT_SECRET ?? "dev-secret-change-in-production",
     jwtExpiresIn: env.JWT_EXPIRES_IN,

@@ -7,3 +7,4 @@
 export type { LLMProvider } from "./interface.js";
 export { OllamaProvider } from "./ollama.js";
 export { GeminiProvider } from "./gemini.js";
+export { AnthropicProvider } from "./anthropic.js";
