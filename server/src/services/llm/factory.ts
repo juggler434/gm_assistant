@@ -9,6 +9,7 @@
 import { config } from "@/config/index.js";
 import { OllamaProvider } from "./providers/ollama.js";
 import { GeminiProvider } from "./providers/gemini.js";
+import { AnthropicProvider } from "./providers/anthropic.js";
 import { LLMService, type LLMServiceOptions } from "./service.js";
 import type { LLMConfig } from "./types.js";
 import type { LLMProvider } from "./providers/interface.js";
@@ -72,6 +73,16 @@ function createProvider(llmConfig: LLMConfig): LLMProvider {
       );
     }
     return new GeminiProvider(llmConfig, apiKey);
+  }
+
+  if (config.llm.provider === "anthropic") {
+    const apiKey = config.anthropic.apiKey;
+    if (!apiKey) {
+      throw new Error(
+        "ANTHROPIC_API_KEY is required when LLM_PROVIDER is set to 'anthropic'"
+      );
+    }
+    return new AnthropicProvider(llmConfig, apiKey);
   }
 
   return new OllamaProvider(llmConfig);
