@@ -9,6 +9,7 @@ import { generateAdventureHooks } from "./generators/adventure-hook.js";
 import { generateNpcs } from "./generators/npc.js";
 import { generateLocations } from "./generators/location.js";
 import { generateAdventureOutlines } from "./generators/adventure-outline.js";
+import { generateAdventure } from "./generators/adventure.js";
 import {
   generateHooksParamSchema,
   generateHooksBodySchema,
@@ -18,8 +19,10 @@ import {
   generateLocationsBodySchema,
   generateOutlinesParamSchema,
   generateOutlinesBodySchema,
+  generateAdventureParamSchema,
+  generateAdventureBodySchema,
 } from "./schemas.js";
-import type { AdventureHookRequest, NpcGenerationRequest, LocationGenerationRequest, AdventureOutlineRequest } from "./types.js";
+import type { AdventureHookRequest, NpcGenerationRequest, LocationGenerationRequest, AdventureOutlineRequest, AdventureGenerationRequest } from "./types.js";
 
 export async function generationRoutes(app: FastifyInstance): Promise<void> {
   // All generation routes require authentication
@@ -438,6 +441,135 @@ export async function generationRoutes(app: FastifyInstance): Promise<void> {
 
     return reply.status(200).send({
       outlines: result.value.outlines,
+      sources: result.value.sources,
+      chunksUsed: result.value.chunksUsed,
+      usage: result.value.usage,
+    });
+  });
+  // POST /api/campaigns/:campaignId/generate/adventures - Generate a full adventure
+  app.post("/:campaignId/generate/adventures", async (request, reply) => {
+    const paramResult = generateAdventureParamSchema.safeParse(request.params);
+    if (!paramResult.success) {
+      return reply.status(400).send({
+        statusCode: 400,
+        error: "Bad Request",
+        message: paramResult.error.issues[0]?.message ?? "Invalid campaign ID",
+      });
+    }
+
+    const bodyResult = generateAdventureBodySchema.safeParse(request.body);
+    if (!bodyResult.success) {
+      return reply.status(400).send({
+        statusCode: 400,
+        error: "Bad Request",
+        message: bodyResult.error.issues[0]?.message ?? "Validation failed",
+      });
+    }
+
+    const { campaignId } = paramResult.data;
+    const { tone, theme, partyLevel, sourceOutlineId, includeStatBlocks } = bodyResult.data;
+    const userId = request.userId!;
+
+    const campaign = await findCampaignByIdAndUserId(campaignId, userId);
+    if (!campaign) {
+      return reply.status(404).send({
+        statusCode: 404,
+        error: "Not Found",
+        message: "Campaign not found",
+      });
+    }
+
+    const acceptHeader = request.headers.accept ?? "";
+    const wantsStream = acceptHeader.includes("text/event-stream");
+
+    const adventureRequest: AdventureGenerationRequest = {
+      campaignId,
+      tone,
+      ...(theme !== undefined && { theme }),
+      ...(partyLevel !== undefined && { partyLevel }),
+      ...(sourceOutlineId !== undefined && { sourceOutlineId }),
+      ...(includeStatBlocks !== undefined && { includeStatBlocks }),
+      maxContextChunks: 10,
+    };
+
+    const llmService = createLLMService();
+
+    if (wantsStream) {
+      // SSE streaming: stream progress events as the pipeline runs
+      reply.raw.writeHead(200, {
+        "Content-Type": "text/event-stream",
+        "Cache-Control": "no-cache",
+        Connection: "keep-alive",
+      });
+
+      const onProgress = (event: { type: string; [key: string]: unknown }) => {
+        reply.raw.write(`data: ${JSON.stringify(event)}\n\n`);
+      };
+
+      const result = await generateAdventure(adventureRequest, llmService, onProgress);
+
+      if (!result.ok) {
+        request.log.error(
+          { error: result.error, campaignId },
+          "Full adventure generation failed"
+        );
+        reply.raw.write(`data: ${JSON.stringify({
+          type: "error",
+          statusCode: errorCodeToStatus(result.error.code),
+          error: result.error.code,
+          message: result.error.message,
+        })}\n\n`);
+        reply.raw.end();
+        return reply;
+      }
+
+      trackEvent(userId, "adventure_generated", {
+        campaign_id: campaignId,
+        tone,
+        theme: theme ?? null,
+        scene_count: result.value.adventure.scenes.length,
+        source_outline_id: sourceOutlineId ?? null,
+      });
+
+      // Send final adventure and complete events
+      reply.raw.write(`data: ${JSON.stringify({ type: "adventure", adventure: result.value.adventure })}\n\n`);
+      reply.raw.write(`data: ${JSON.stringify({
+        type: "complete",
+        sources: result.value.sources,
+        chunksUsed: result.value.chunksUsed,
+        usage: result.value.usage,
+      })}\n\n`);
+
+      reply.raw.end();
+      return reply;
+    }
+
+    // Non-streaming: run pipeline and return final result
+    const result = await generateAdventure(adventureRequest, llmService);
+
+    if (!result.ok) {
+      request.log.error(
+        { error: result.error, campaignId },
+        "Full adventure generation failed"
+      );
+      const statusCode = errorCodeToStatus(result.error.code);
+      return reply.status(statusCode).send({
+        statusCode,
+        error: result.error.code,
+        message: result.error.message,
+      });
+    }
+
+    trackEvent(userId, "adventure_generated", {
+      campaign_id: campaignId,
+      tone,
+      theme: theme ?? null,
+      scene_count: result.value.adventure.scenes.length,
+      source_outline_id: sourceOutlineId ?? null,
+    });
+
+    return reply.status(200).send({
+      adventure: result.value.adventure,
       sources: result.value.sources,
       chunksUsed: result.value.chunksUsed,
       usage: result.value.usage,

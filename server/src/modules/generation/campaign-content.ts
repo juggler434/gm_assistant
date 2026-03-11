@@ -13,10 +13,12 @@ import { findNpcsByCampaignId } from "@/modules/npcs/repository.js";
 import { findAdventureHooksByCampaignId } from "@/modules/adventure-hooks/repository.js";
 import { findLocationsByCampaignId } from "@/modules/locations/repository.js";
 import { findAdventureOutlinesByCampaignId } from "@/modules/adventure-outlines/repository.js";
+import { findAdventuresByCampaignId } from "@/modules/adventures/repository.js";
 import { estimateTokens } from "@/modules/query/rag/context-builder.js";
 import type { Npc } from "@/db/schema/npcs.js";
 import type { AdventureHookRow } from "@/db/schema/adventure-hooks.js";
 import type { AdventureOutlineRow } from "@/db/schema/adventure-outlines.js";
+import type { AdventureRow } from "@/db/schema/adventures.js";
 import type { Location } from "@/db/schema/locations.js";
 
 // ============================================================================
@@ -39,6 +41,7 @@ export interface CampaignContentResult {
     hooks: number;
     locations: number;
     outlines: number;
+    adventures: number;
   };
 }
 
@@ -129,6 +132,24 @@ export function serializeOutline(outline: AdventureOutlineRow): string {
 }
 
 /**
+ * Serializes an adventure into a concise single-line bullet.
+ */
+export function serializeAdventure(adventure: AdventureRow): string {
+  const parts = [adventure.title + ":"];
+  if (adventure.synopsis) parts.push(truncate(adventure.synopsis));
+
+  const sceneCount = Array.isArray(adventure.scenes) ? adventure.scenes.length : 0;
+  if (sceneCount > 0) parts.push(`(${sceneCount} scenes)`);
+
+  const refs: string[] = [];
+  if (adventure.npcs && adventure.npcs.length > 0) refs.push(`NPCs: ${adventure.npcs.join(", ")}`);
+  if (adventure.locations && adventure.locations.length > 0) refs.push(`Locations: ${adventure.locations.join(", ")}`);
+  if (refs.length > 0) parts.push(refs.join(". ") + ".");
+
+  return `- ${parts.join(" ")}`;
+}
+
+/**
  * Serializes a location into a concise single-line bullet.
  */
 export function serializeLocation(location: Location): string {
@@ -165,31 +186,32 @@ export async function buildCampaignContentContext(
   const maxTokens = options.maxTokens ?? DEFAULT_MAX_TOKENS;
 
   // Fetch all entity types in parallel (already ordered by createdAt desc)
-  const [npcs, hooks, locations, outlines] = await Promise.all([
+  const [npcs, hooks, locations, outlines, adventures] = await Promise.all([
     findNpcsByCampaignId(campaignId),
     findAdventureHooksByCampaignId(campaignId),
     findLocationsByCampaignId(campaignId),
     findAdventureOutlinesByCampaignId(campaignId),
+    findAdventuresByCampaignId(campaignId),
   ]);
 
   // Early return if campaign has no saved content
-  if (npcs.length === 0 && hooks.length === 0 && locations.length === 0 && outlines.length === 0) {
+  if (npcs.length === 0 && hooks.length === 0 && locations.length === 0 && outlines.length === 0 && adventures.length === 0) {
     return {
       contentText: "",
       estimatedTokens: 0,
-      counts: { npcs: 0, hooks: 0, locations: 0, outlines: 0 },
+      counts: { npcs: 0, hooks: 0, locations: 0, outlines: 0, adventures: 0 },
     };
   }
 
   const sections: string[] = [];
   let totalTokens = 0;
-  const counts = { npcs: 0, hooks: 0, locations: 0, outlines: 0 };
+  const counts = { npcs: 0, hooks: 0, locations: 0, outlines: 0, adventures: 0 };
 
   // Helper to add lines from a section while respecting budget
   function addSection(
     heading: string,
     items: string[],
-    countKey: "npcs" | "hooks" | "locations" | "outlines",
+    countKey: "npcs" | "hooks" | "locations" | "outlines" | "adventures",
   ): void {
     if (items.length === 0) return;
 
@@ -225,6 +247,9 @@ export async function buildCampaignContentContext(
   addSection("Adventure Hooks:", serializedHooks, "hooks");
   addSection("Locations:", serializedLocations, "locations");
   addSection("Adventure Outlines:", serializedOutlines, "outlines");
+
+  const serializedAdventures = adventures.map(serializeAdventure);
+  addSection("Adventures:", serializedAdventures, "adventures");
 
   const contentText = sections.join("\n\n");
 

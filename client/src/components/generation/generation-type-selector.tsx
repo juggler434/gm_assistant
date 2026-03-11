@@ -39,7 +39,7 @@ const generationTypes: GenerationTypeOption[] = [
     label: "Full Adventures",
     description: "Complete adventures with detailed scenes and dialogue",
     icon: BookOpen,
-    available: false,
+    available: true,
   },
   {
     id: "npcs",

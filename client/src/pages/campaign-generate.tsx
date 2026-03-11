@@ -2,9 +2,7 @@
 
 import { useState, useCallback, useEffect } from "react";
 import { useParams } from "react-router-dom";
-import { Lock } from "lucide-react";
 import { toast } from "sonner";
-import { EmptyState } from "@/components/ui/empty-state";
 import {
   GenerationTypeSelector,
   type GenerationType,
@@ -29,19 +27,23 @@ import {
   type AdventureOutlineFormValues,
 } from "@/components/generation/adventure-outline-form";
 import { OutlineGenerationResult } from "@/components/generation/outline-generation-result";
+import {
+  AdventureForm,
+  type AdventureFormValues,
+} from "@/components/generation/adventure-form";
+import { AdventureGenerationResult } from "@/components/generation/adventure-generation-result";
 import { useGenerateHooksStream } from "@/hooks/use-generation";
 import { useGenerateNpcsStream } from "@/hooks/use-generate-npcs";
 import { useGenerateLocationsStream } from "@/hooks/use-generate-locations";
 import { useGenerateOutlinesStream } from "@/hooks/use-generate-outlines";
+import { useGenerateAdventureStream } from "@/hooks/use-generate-adventures";
 import { useCreateNpc } from "@/hooks/use-npcs";
 import { useCreateLocation } from "@/hooks/use-locations";
 import { useCreateAdventureHook } from "@/hooks/use-adventure-hooks";
 import { useCreateAdventureOutline } from "@/hooks/use-adventure-outlines";
-import type { GeneratedNpc, GeneratedLocation, GeneratedAdventureOutline, AdventureHook, AnswerSource } from "@/types";
-
-const COMING_SOON_LABELS: Record<string, string> = {
-  "full-adventures": "Full Adventures",
-};
+import { useAdventureOutlines } from "@/hooks/use-adventure-outlines";
+import { useCreateAdventure } from "@/hooks/use-adventures";
+import type { GeneratedNpc, GeneratedLocation, GeneratedAdventureOutline, GeneratedAdventure, AdventureHook, AnswerSource } from "@/types";
 
 export function GeneratePage() {
   const { id: campaignId } = useParams<{ id: string }>();
@@ -124,6 +126,22 @@ export function GeneratePage() {
   const createAdventureOutline = useCreateAdventureOutline(campaignId ?? "");
   const [savingOutlineIndex, setSavingOutlineIndex] = useState<number | null>(null);
   const [lastOutlineFormValues, setLastOutlineFormValues] = useState<AdventureOutlineFormValues | null>(null);
+
+  // Full adventure generation state
+  const {
+    generate: generateAdventure,
+    adventure: generatedAdventure,
+    sources: adventureSources,
+    status: adventureStatus,
+    error: adventureError,
+    isStreaming: adventureIsStreaming,
+  } = useGenerateAdventureStream();
+  const createAdventure = useCreateAdventure(campaignId ?? "");
+  const [savingAdventure, setSavingAdventure] = useState(false);
+  const [lastAdventureFormValues, setLastAdventureFormValues] = useState<AdventureFormValues | null>(null);
+
+  // Fetch outlines for the adventure form's "expand from outline" dropdown
+  const { data: outlinesList } = useAdventureOutlines(campaignId ?? "");
 
   // ---- Adventure Hooks handlers ----
 
@@ -347,6 +365,56 @@ export function GeneratePage() {
     [campaignId, createAdventureOutline]
   );
 
+  // ---- Full Adventure handlers ----
+
+  const handleGenerateAdventure = useCallback(
+    (values: AdventureFormValues) => {
+      if (!campaignId) return;
+      setLastAdventureFormValues(values);
+      generateAdventure({
+        campaignId,
+        tone: values.tone,
+        theme: values.theme,
+        partyLevel: values.partyLevel,
+        sourceOutlineId: values.sourceOutlineId,
+        includeStatBlocks: values.includeStatBlocks,
+      });
+    },
+    [campaignId, generateAdventure]
+  );
+
+  const handleRegenerateAdventure = useCallback(() => {
+    if (lastAdventureFormValues) {
+      handleGenerateAdventure(lastAdventureFormValues);
+    }
+  }, [lastAdventureFormValues, handleGenerateAdventure]);
+
+  const handleSaveAdventure = useCallback(
+    async (adventure: GeneratedAdventure) => {
+      if (!campaignId) return;
+      setSavingAdventure(true);
+      try {
+        await createAdventure.mutateAsync({
+          title: adventure.title,
+          synopsis: adventure.synopsis,
+          estimatedDuration: adventure.estimatedDuration || null,
+          scenes: adventure.scenes,
+          npcs: adventure.npcs.length > 0 ? adventure.npcs : null,
+          locations: adventure.locations.length > 0 ? adventure.locations : null,
+          factions: adventure.factions.length > 0 ? adventure.factions : null,
+          isGenerated: true,
+          sourceOutlineId: lastAdventureFormValues?.sourceOutlineId ?? null,
+        });
+        toast.success("Adventure saved to campaign");
+      } catch {
+        toast.error("Failed to save adventure");
+      } finally {
+        setSavingAdventure(false);
+      }
+    },
+    [campaignId, createAdventure, lastAdventureFormValues]
+  );
+
   return (
     <div className="space-y-6">
       <GenerationTypeSelector selected={selectedType} onSelect={setSelectedType} />
@@ -433,13 +501,31 @@ export function GeneratePage() {
             onSave={handleSaveOutline}
           />
         </div>
-      ) : (
-        <EmptyState
-          icon={<Lock />}
-          heading={`${COMING_SOON_LABELS[selectedType]} - Coming Soon`}
-          description="This generation type is not yet available. Check back later for updates."
-        />
-      )}
+      ) : selectedType === "full-adventures" ? (
+        <div className="space-y-6">
+          <div className="rounded-[var(--radius)] border border-border bg-card p-5">
+            <h3 className="mb-4 text-base font-semibold text-foreground">
+              Generate Full Adventure
+            </h3>
+            <AdventureForm
+              onSubmit={handleGenerateAdventure}
+              isLoading={adventureIsStreaming}
+              outlines={outlinesList?.map((o) => ({ id: o.id, title: o.title })) ?? []}
+            />
+          </div>
+
+          <AdventureGenerationResult
+            adventure={generatedAdventure}
+            sources={adventureSources}
+            status={adventureStatus}
+            error={adventureError}
+            isStreaming={adventureIsStreaming}
+            isSaving={savingAdventure}
+            onRegenerate={handleRegenerateAdventure}
+            onSave={handleSaveAdventure}
+          />
+        </div>
+      ) : null}
     </div>
   );
 }

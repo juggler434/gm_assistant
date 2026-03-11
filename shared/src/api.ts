@@ -6,6 +6,7 @@
  */
 
 import type {
+  AdventureEntity,
   AdventureHookEntity,
   AdventureOutlineEntity,
   AuthUser,
@@ -20,6 +21,7 @@ import type {
   NpcStatus,
   NpcImportance,
 } from "./entities.js";
+import type { AdventureScene } from "./generation.js";
 
 // ============================================================================
 // Shared API Error Response
@@ -342,6 +344,56 @@ export interface AdventureOutlineResponse {
 /** Response wrapping a list of adventure outlines */
 export interface AdventureOutlineListResponse {
   adventureOutlines: AdventureOutlineEntity[];
+}
+
+// ============================================================================
+// Adventure (Full) API
+// ============================================================================
+
+/** POST /api/campaigns/:campaignId/adventures - request body */
+export interface CreateAdventureRequest {
+  title: string;
+  synopsis: string;
+  estimatedDuration?: string | null;
+  scenes: AdventureScene[];
+  npcs?: string[] | null;
+  locations?: string[] | null;
+  factions?: string[] | null;
+  tags?: string[] | null;
+  isGenerated?: boolean;
+  sourceOutlineId?: string | null;
+  notes?: string | null;
+}
+
+/** PATCH /api/campaigns/:campaignId/adventures/:id - request body */
+export interface UpdateAdventureRequest {
+  title?: string;
+  synopsis?: string;
+  estimatedDuration?: string | null;
+  scenes?: AdventureScene[];
+  npcs?: string[] | null;
+  locations?: string[] | null;
+  factions?: string[] | null;
+  tags?: string[] | null;
+  isGenerated?: boolean;
+  notes?: string | null;
+}
+
+/** Query parameters for GET /api/campaigns/:campaignId/adventures */
+export interface AdventureListQuery {
+  search?: string;
+  limit?: number;
+  offset?: number;
+}
+
+/** Response wrapping a single adventure */
+export interface AdventureResponse {
+  adventure: AdventureEntity;
+}
+
+/** Response wrapping a list of adventures */
+export interface AdventureListResponse {
+  adventures: AdventureEntity[];
 }
 
 // ============================================================================

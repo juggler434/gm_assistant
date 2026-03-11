@@ -269,3 +269,80 @@ export type OutlineGenerationSSEEvent =
   | GenerationOutlineEvent
   | GenerationCompleteEvent
   | GenerationErrorEvent;
+
+// ============================================================================
+// Full Adventure Generation
+// ============================================================================
+
+/** Supported tone options for full adventure generation (same as hooks/outlines) */
+export type AdventureTone = HookTone;
+
+/** A line of NPC dialogue within a scene */
+export interface NpcDialogueLine {
+  npcName: string;
+  dialogue: string;
+  context: string;
+}
+
+/** An encounter within a scene */
+export interface SceneEncounter {
+  name: string;
+  description: string;
+  difficulty: string;
+  creatures: string[];
+  tactics: string;
+  statBlock: Record<string, unknown> | null;
+}
+
+/** A single scene in a full adventure */
+export interface AdventureScene {
+  title: string;
+  actNumber: number;
+  description: string;
+  readAloud: string;
+  npcDialogue: NpcDialogueLine[];
+  encounters: SceneEncounter[];
+  treasure: string[];
+  mapSuggestion: string;
+}
+
+/** Request body for POST /api/campaigns/:campaignId/generate/adventures */
+export interface GenerateAdventureRequest {
+  tone: AdventureTone;
+  theme?: string;
+  partyLevel?: string;
+  sourceOutlineId?: string;
+  includeStatBlocks?: boolean;
+}
+
+/** A single generated full adventure */
+export interface GeneratedAdventure {
+  title: string;
+  synopsis: string;
+  estimatedDuration: string;
+  scenes: AdventureScene[];
+  npcs: string[];
+  locations: string[];
+  factions: string[];
+}
+
+/** Response from POST /api/campaigns/:campaignId/generate/adventures */
+export interface GenerateAdventureResponse {
+  adventure: GeneratedAdventure;
+  sources: AnswerSource[];
+  chunksUsed: number;
+  usage?: TokenUsage;
+}
+
+/** SSE event: a generated adventure */
+export interface GenerationAdventureEvent {
+  type: "adventure";
+  adventure: GeneratedAdventure;
+}
+
+/** Union of all SSE event types for adventure generation */
+export type AdventureGenerationSSEEvent =
+  | GenerationStatusEvent
+  | GenerationAdventureEvent
+  | GenerationCompleteEvent
+  | GenerationErrorEvent;
