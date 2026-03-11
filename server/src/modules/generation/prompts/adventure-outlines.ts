@@ -47,7 +47,7 @@ Rules:
 - Each act MUST reference specific NPCs, locations, or factions from the provided setting context when available.
 - Do not invent major setting elements (cities, rulers, pantheons) not present in the context. You may invent minor details (a tavern patron's name, a rumor) to flesh out outlines.
 - If a party level is provided, ensure encounters and challenges are appropriate for that level.
-- When the description references information from the setting context, include the source number as [N] inline (e.g. "The cult of Vecna [1] has infiltrated the city [2]"). Only cite sources that are listed in the context.
+- ONLY add [N] citations when you mention a specific named person, place, faction, or organization that appears in the setting context (e.g. "The Zhentarim [1] have agents in Waterdeep [2]"). Do not cite general themes, tone, or ideas you invented. Only cite sources listed in the context.
 - If saved campaign content is provided, ensure consistency with existing content and avoid creating duplicates. You may reference existing NPCs, locations, and hooks to create connections.
 - Each act should have 2-4 key events and 1-3 encounters.
 

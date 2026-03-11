@@ -17,9 +17,11 @@ import type {
   GeneratedLocation,
   OutlineTone,
   GeneratedAdventureOutline,
+  AdventureTone,
+  GeneratedAdventure,
 } from "@gm-assistant/shared";
 
-export type { AnswerSource, AdventureHook, HookTone, NpcTone, GeneratedNpc, LocationTone, GeneratedLocation, OutlineTone, GeneratedAdventureOutline };
+export type { AnswerSource, AdventureHook, HookTone, NpcTone, GeneratedNpc, LocationTone, GeneratedLocation, OutlineTone, GeneratedAdventureOutline, AdventureTone, GeneratedAdventure };
 
 // ============================================================================
 // Adventure Hook Types
@@ -175,3 +177,43 @@ export interface AdventureOutlineError {
   message: string;
   cause?: unknown;
 }
+
+// ============================================================================
+// Full Adventure Generation Types
+// ============================================================================
+
+/** Parameters for generating a full adventure (server-internal) */
+export interface AdventureGenerationRequest {
+  campaignId: string;
+  tone: AdventureTone;
+  theme?: string;
+  partyLevel?: string;
+  sourceOutlineId?: string;
+  includeStatBlocks?: boolean;
+  maxContextChunks?: number;
+}
+
+/** Result of full adventure generation */
+export interface AdventureGenerationResult {
+  adventure: GeneratedAdventure;
+  sources: AnswerSource[];
+  chunksUsed: number;
+  usage?: TokenUsage;
+}
+
+/** Error types for full adventure generation */
+export interface AdventureGenerationError {
+  code:
+    | "INVALID_REQUEST"
+    | "EMBEDDING_FAILED"
+    | "SEARCH_FAILED"
+    | "GENERATION_FAILED"
+    | "PARSE_ERROR";
+  message: string;
+  cause?: unknown;
+}
+
+/** Progress event emitted during the multi-step adventure generation pipeline */
+export type AdventurePipelineEvent =
+  | { type: "status"; message: string }
+  | { type: "adventure"; adventure: GeneratedAdventure };

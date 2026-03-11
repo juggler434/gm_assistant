@@ -3,6 +3,11 @@
 import { useMemo } from "react";
 import type { AnswerSource } from "@/types";
 
+/** Remove [N] citation markers from a string */
+export function stripCitations(text: string): string {
+  return text.replace(/\s*\[\d+\]/g, "");
+}
+
 interface CitedTextProps {
   text: string;
   sources: AnswerSource[];
@@ -31,8 +36,14 @@ export function CitedText({ text, sources }: CitedTextProps) {
     while ((match = regex.exec(text)) !== null) {
       const citationIndex = parseInt(match[1], 10);
 
-      // Only treat as citation if we have a matching source
-      if (!sourceMap.has(citationIndex)) continue;
+      if (!sourceMap.has(citationIndex)) {
+        // Strip unmatched citation markers instead of leaving them as plain text
+        if (match.index > lastIndex) {
+          result.push({ type: "text", value: text.slice(lastIndex, match.index) });
+        }
+        lastIndex = regex.lastIndex;
+        continue;
+      }
 
       if (match.index > lastIndex) {
         result.push({ type: "text", value: text.slice(lastIndex, match.index) });

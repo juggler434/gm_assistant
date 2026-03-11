@@ -27,6 +27,7 @@ export type {
   Location,
   AdventureHookEntity,
   AdventureOutlineEntity,
+  AdventureEntity,
   GameSessionStatus,
   GameSession,
   Transcript,
@@ -79,6 +80,15 @@ export type {
   GenerateOutlinesResponse,
   GenerationOutlineEvent,
   OutlineGenerationSSEEvent,
+  AdventureTone,
+  NpcDialogueLine,
+  SceneEncounter,
+  AdventureScene,
+  GenerateAdventureRequest,
+  GeneratedAdventure,
+  GenerateAdventureResponse,
+  GenerationAdventureEvent,
+  AdventureGenerationSSEEvent,
 } from "./generation.js";
 
 // API request/response types
@@ -119,6 +129,11 @@ export type {
   ConversationDetailResponse,
   CreateConversationRequest,
   CreateConversationResponse,
+  CreateAdventureRequest,
+  UpdateAdventureRequest,
+  AdventureListQuery,
+  AdventureResponse,
+  AdventureListResponse,
   SupportedMimeType,
 } from "./api.js";
 

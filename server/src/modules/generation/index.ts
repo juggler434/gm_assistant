@@ -9,11 +9,19 @@ export { generateAdventureHooks } from "./generators/index.js";
 export { generateNpcs } from "./generators/index.js";
 export { generateLocations } from "./generators/index.js";
 export { generateAdventureOutlines } from "./generators/index.js";
+export { generateAdventure } from "./generators/index.js";
 
 export { buildAdventureHookPrompt } from "./prompts/index.js";
 export { buildNpcPrompt } from "./prompts/index.js";
 export { buildLocationPrompt } from "./prompts/index.js";
 export { buildAdventureOutlinePrompt } from "./prompts/index.js";
+export {
+  buildOutlineStepPrompt,
+  buildActLocationsPrompt,
+  buildActNpcsPrompt,
+  buildActEncountersPrompt,
+  buildActScenesPrompt,
+} from "./prompts/index.js";
 
 export {
   generateHooksParamSchema,
@@ -32,6 +40,10 @@ export {
   generateOutlinesBodySchema,
   type GenerateOutlinesParam,
   type GenerateOutlinesBody,
+  generateAdventureParamSchema,
+  generateAdventureBodySchema,
+  type GenerateAdventureParam,
+  type GenerateAdventureBody,
 } from "./schemas.js";
 
 export type {
@@ -55,4 +67,10 @@ export type {
   GeneratedAdventureOutline,
   AdventureOutlineResult,
   AdventureOutlineError,
+  AdventureTone,
+  AdventureGenerationRequest,
+  GeneratedAdventure,
+  AdventureGenerationResult,
+  AdventureGenerationError,
+  AdventurePipelineEvent,
 } from "./types.js";

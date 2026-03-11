@@ -257,6 +257,27 @@ export interface AdventureOutlineEntity extends BaseEntity {
 }
 
 // ============================================================================
+// Adventure (Full)
+// ============================================================================
+
+/** Adventure entity matching server/src/db/schema/adventures.ts */
+export interface AdventureEntity extends BaseEntity {
+  campaignId: Id;
+  createdBy: Id;
+  title: string;
+  synopsis: string;
+  estimatedDuration: string | null;
+  scenes: import("./generation.js").AdventureScene[];
+  npcs: string[] | null;
+  locations: string[] | null;
+  factions: string[] | null;
+  tags: string[] | null;
+  isGenerated: boolean;
+  sourceOutlineId: Id | null;
+  notes: string | null;
+}
+
+// ============================================================================
 // Conversation
 // ============================================================================
 

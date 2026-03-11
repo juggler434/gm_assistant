@@ -85,3 +85,27 @@ export const generateOutlinesBodySchema = z.object({
 });
 
 export type GenerateOutlinesBody = z.infer<typeof generateOutlinesBodySchema>;
+
+export const generateAdventureParamSchema = z.object({
+  campaignId: z.string().uuid("Invalid campaign ID"),
+});
+
+export type GenerateAdventureParam = z.infer<typeof generateAdventureParamSchema>;
+
+export const generateAdventureBodySchema = z.object({
+  tone: z.enum([
+    "dark",
+    "comedic",
+    "political",
+    "mysterious",
+    "heroic",
+    "horror",
+    "intrigue",
+  ]),
+  theme: z.string().max(200).optional(),
+  partyLevel: z.string().max(50).optional(),
+  sourceOutlineId: z.string().uuid().optional(),
+  includeStatBlocks: z.boolean().optional(),
+});
+
+export type GenerateAdventureBody = z.infer<typeof generateAdventureBodySchema>;

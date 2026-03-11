@@ -80,6 +80,7 @@ ${importanceInstruction ? `- ${importanceInstruction}` : ""}
 - Each NPC must be distinct from the others — vary their backgrounds, motivations, and roles.
 - When creating each NPC's name, generate it as if inventing a fresh identity, not recalling one. Choose time- and setting-appropriate first and last names that sound natural yet distinctive. Use diverse phonetics, syllable counts, cultural origins, and naming eras to create variety. Each name should feel individual and grounded only in the setting and character's origin, never tied to a specific role, trope, or profession common for an archetype in your dataset. Aim for names that could belong to anyone, not just a type.
 - When narrative text fields (appearance, personality, motivations, secrets, backstory) reference information from the setting context, include the source number as [N] inline (e.g. "A former knight of the Silver Order [1] who now serves the Thieves' Guild [2]"). Only cite sources that are listed in the context.
+- ONLY add [N] citations when you mention a specific named person, place, faction, or organization that appears in the setting context (e.g. "A former knight of the Silver Order [1]"). Do not cite personality traits, motivations, or details you invented. Only cite sources listed in the context.
 - If saved campaign content is provided, ensure consistency with existing content and avoid creating duplicates. You may reference existing NPCs, locations, and hooks to create connections.
 ${statBlockInstruction}
 

@@ -61,7 +61,7 @@ ${sizeInstruction ? `- ${sizeInstruction}` : ""}
 - Each location MUST reference specific setting elements (regions, factions, history) from the provided context when available.
 - Do not invent major setting elements (cities, rulers, pantheons) not present in the context. You may invent minor environmental details.
 - Each location must be distinct from the others — vary their terrain, purpose, and atmosphere.
-- When narrative text fields (readAloud, sensoryDetails, keyFeatures, pointsOfInterest, encounters, secrets) reference information from the setting context, include the source number as [N] inline (e.g. "The crumbling tower of Ashenmoor [1] overlooks the Blighted Marshes [2]"). Only cite sources that are listed in the context.
+- ONLY add [N] citations when you mention a specific named place, landmark, faction, or person that appears in the setting context (e.g. "The crumbling tower of Ashenmoor [1]"). Do not cite sensory details, atmosphere, or features you invented. Only cite sources listed in the context.
 - If saved campaign content is provided, ensure consistency with existing content and avoid creating duplicates. You may reference existing NPCs, locations, and hooks to create connections.
 - The "readAloud" field should be a vivid, atmospheric paragraph (3-5 sentences) suitable for reading aloud to players at the table.
 - "sensoryDetails" must include sights, sounds, and smells specific to this location.

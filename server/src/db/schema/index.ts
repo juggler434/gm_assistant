@@ -9,4 +9,5 @@ export * from "./npcs.js";
 export * from "./locations.js";
 export * from "./adventure-hooks.js";
 export * from "./adventure-outlines.js";
+export * from "./adventures.js";
 export * from "./conversations.js";
