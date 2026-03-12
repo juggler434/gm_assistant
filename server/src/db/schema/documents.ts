@@ -24,6 +24,7 @@ export const documentTypeEnum = pgEnum("document_type", [
   "notes",
   "map",
   "image",
+  "character",
 ]);
 
 // Enum for document processing status

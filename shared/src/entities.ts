@@ -57,7 +57,7 @@ export interface Campaign extends BaseEntity {
 // ============================================================================
 
 /** Supported document types matching server documentTypeEnum */
-export type DocumentType = "rulebook" | "setting" | "notes" | "map" | "image";
+export type DocumentType = "rulebook" | "setting" | "notes" | "map" | "image" | "character";
 
 /** Document processing status matching server documentStatusEnum */
 export type DocumentStatus = "pending" | "processing" | "ready" | "failed";

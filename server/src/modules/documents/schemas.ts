@@ -79,6 +79,7 @@ const documentTypeValues = [
   "notes",
   "map",
   "image",
+  "character",
 ] as const;
 
 // Schema for URL params with campaignId
@@ -121,6 +122,18 @@ export const uploadMetadataSchema = z.object({
 });
 
 export type UploadMetadata = z.infer<typeof uploadMetadataSchema>;
+
+// Schema for document update (PATCH) body
+export const updateDocumentSchema = z.object({
+  name: z.string().min(1).max(255).optional(),
+  documentType: z.enum(documentTypeValues).optional(),
+  tags: z
+    .array(z.string())
+    .nullable()
+    .optional(),
+});
+
+export type UpdateDocumentInput = z.infer<typeof updateDocumentSchema>;
 
 // Schema for document list query params
 export const documentListQuerySchema = z.object({

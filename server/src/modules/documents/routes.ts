@@ -12,6 +12,7 @@ import {
   documentParamsSchema,
   uploadMetadataSchema,
   documentListQuerySchema,
+  updateDocumentSchema,
   isSupportedMimeType,
   inferDocumentType,
   SUPPORTED_MIME_TYPES,
@@ -20,6 +21,7 @@ import {
   createDocument,
   findDocumentsByCampaignId,
   findDocumentByIdAndCampaignId,
+  updateDocument,
   deleteDocument,
 } from "./repository.js";
 
@@ -329,6 +331,63 @@ export async function documentRoutes(app: FastifyInstance): Promise<void> {
       url: urlResult.value.url,
       expiresAt: urlResult.value.expiresAt.toISOString(),
     });
+  });
+
+  // PATCH /api/campaigns/:campaignId/documents/:id - Update document
+  app.patch("/:campaignId/documents/:id", async (request, reply) => {
+    const paramResult = documentParamsSchema.safeParse(request.params);
+    if (!paramResult.success) {
+      return reply.status(400).send({
+        statusCode: 400,
+        error: "Bad Request",
+        message: paramResult.error.issues[0]?.message ?? "Invalid parameters",
+      });
+    }
+
+    const { campaignId, id } = paramResult.data;
+    const userId = request.userId!;
+
+    // Verify user owns the campaign
+    const campaign = await findCampaignByIdAndUserId(campaignId, userId);
+    if (!campaign) {
+      return reply.status(404).send({
+        statusCode: 404,
+        error: "Not Found",
+        message: "Campaign not found",
+      });
+    }
+
+    // Validate request body
+    const bodyResult = updateDocumentSchema.safeParse(request.body);
+    if (!bodyResult.success) {
+      return reply.status(400).send({
+        statusCode: 400,
+        error: "Bad Request",
+        message: bodyResult.error.issues[0]?.message ?? "Invalid request body",
+      });
+    }
+
+    const updates = bodyResult.data;
+
+    // Ensure at least one field is being updated
+    if (!updates.name && !updates.documentType && updates.tags === undefined) {
+      return reply.status(400).send({
+        statusCode: 400,
+        error: "Bad Request",
+        message: "No fields to update",
+      });
+    }
+
+    const document = await updateDocument(id, campaignId, updates);
+    if (!document) {
+      return reply.status(404).send({
+        statusCode: 404,
+        error: "Not Found",
+        message: "Document not found",
+      });
+    }
+
+    return reply.status(200).send({ document });
   });
 
   // DELETE /api/campaigns/:campaignId/documents/:id - Delete document

@@ -6,6 +6,7 @@ import {
   Map,
   BookOpen,
   Scroll,
+  User,
   Download,
   AlertCircle,
   Loader2,
@@ -24,6 +25,7 @@ const typeIcons: Record<DocumentType, React.ReactNode> = {
   notes: <FileText className="h-5 w-5" />,
   map: <Map className="h-5 w-5" />,
   image: <Image className="h-5 w-5" />,
+  character: <User className="h-5 w-5" />,
 };
 
 const statusConfig: Record<

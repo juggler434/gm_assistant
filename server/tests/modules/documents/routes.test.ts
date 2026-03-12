@@ -13,6 +13,7 @@ vi.mock("@/modules/documents/repository.js", () => ({
   createDocument: vi.fn(),
   findDocumentsByCampaignId: vi.fn(),
   findDocumentByIdAndCampaignId: vi.fn(),
+  updateDocument: vi.fn(),
   deleteDocument: vi.fn(),
 }));
 
@@ -58,6 +59,7 @@ import {
   createDocument,
   findDocumentsByCampaignId,
   findDocumentByIdAndCampaignId,
+  updateDocument,
   deleteDocument,
 } from "@/modules/documents/repository.js";
 import { findCampaignByIdAndUserId } from "@/modules/campaigns/repository.js";
@@ -947,6 +949,219 @@ describe("Document Routes", () => {
       expect(response.statusCode).toBe(500);
       const body = JSON.parse(response.body);
       expect(body.message).toBe("Failed to generate download URL");
+
+      await app.close();
+    });
+  });
+
+  describe("PATCH /api/campaigns/:campaignId/documents/:id", () => {
+    it("should return 200 and updated document when updating name", async () => {
+      const updatedDoc = { ...mockDocument, name: "Renamed Document" };
+      vi.mocked(updateDocument).mockResolvedValue(updatedDoc);
+
+      const app = await buildTestApp();
+
+      const response = await app.inject({
+        method: "PATCH",
+        url: `/api/campaigns/${mockCampaignId}/documents/${mockDocumentId}`,
+        headers: { cookie: getAuthCookie() },
+        payload: { name: "Renamed Document" },
+      });
+
+      expect(response.statusCode).toBe(200);
+      const body = JSON.parse(response.body);
+      expect(body.document.name).toBe("Renamed Document");
+      expect(vi.mocked(updateDocument)).toHaveBeenCalledWith(
+        mockDocumentId,
+        mockCampaignId,
+        { name: "Renamed Document" }
+      );
+
+      await app.close();
+    });
+
+    it("should return 200 when updating documentType", async () => {
+      const updatedDoc = { ...mockDocument, documentType: "rulebook" as const };
+      vi.mocked(updateDocument).mockResolvedValue(updatedDoc);
+
+      const app = await buildTestApp();
+
+      const response = await app.inject({
+        method: "PATCH",
+        url: `/api/campaigns/${mockCampaignId}/documents/${mockDocumentId}`,
+        headers: { cookie: getAuthCookie() },
+        payload: { documentType: "rulebook" },
+      });
+
+      expect(response.statusCode).toBe(200);
+      const body = JSON.parse(response.body);
+      expect(body.document.documentType).toBe("rulebook");
+
+      await app.close();
+    });
+
+    it("should return 200 when updating tags", async () => {
+      const updatedDoc = { ...mockDocument, tags: ["combat", "lore"] };
+      vi.mocked(updateDocument).mockResolvedValue(updatedDoc);
+
+      const app = await buildTestApp();
+
+      const response = await app.inject({
+        method: "PATCH",
+        url: `/api/campaigns/${mockCampaignId}/documents/${mockDocumentId}`,
+        headers: { cookie: getAuthCookie() },
+        payload: { tags: ["combat", "lore"] },
+      });
+
+      expect(response.statusCode).toBe(200);
+      const body = JSON.parse(response.body);
+      expect(body.document.tags).toEqual(["combat", "lore"]);
+
+      await app.close();
+    });
+
+    it("should return 200 when setting tags to null", async () => {
+      const updatedDoc = { ...mockDocument, tags: null };
+      vi.mocked(updateDocument).mockResolvedValue(updatedDoc);
+
+      const app = await buildTestApp();
+
+      const response = await app.inject({
+        method: "PATCH",
+        url: `/api/campaigns/${mockCampaignId}/documents/${mockDocumentId}`,
+        headers: { cookie: getAuthCookie() },
+        payload: { tags: null },
+      });
+
+      expect(response.statusCode).toBe(200);
+      const body = JSON.parse(response.body);
+      expect(body.document.tags).toBeNull();
+
+      await app.close();
+    });
+
+    it("should return 200 when updating multiple fields", async () => {
+      const updatedDoc = {
+        ...mockDocument,
+        name: "New Name",
+        documentType: "setting" as const,
+        tags: ["world"],
+      };
+      vi.mocked(updateDocument).mockResolvedValue(updatedDoc);
+
+      const app = await buildTestApp();
+
+      const response = await app.inject({
+        method: "PATCH",
+        url: `/api/campaigns/${mockCampaignId}/documents/${mockDocumentId}`,
+        headers: { cookie: getAuthCookie() },
+        payload: { name: "New Name", documentType: "setting", tags: ["world"] },
+      });
+
+      expect(response.statusCode).toBe(200);
+      const body = JSON.parse(response.body);
+      expect(body.document.name).toBe("New Name");
+      expect(body.document.documentType).toBe("setting");
+      expect(body.document.tags).toEqual(["world"]);
+
+      await app.close();
+    });
+
+    it("should return 400 when no fields to update", async () => {
+      const app = await buildTestApp();
+
+      const response = await app.inject({
+        method: "PATCH",
+        url: `/api/campaigns/${mockCampaignId}/documents/${mockDocumentId}`,
+        headers: { cookie: getAuthCookie() },
+        payload: {},
+      });
+
+      expect(response.statusCode).toBe(400);
+      const body = JSON.parse(response.body);
+      expect(body.message).toBe("No fields to update");
+
+      await app.close();
+    });
+
+    it("should return 400 for invalid documentType", async () => {
+      const app = await buildTestApp();
+
+      const response = await app.inject({
+        method: "PATCH",
+        url: `/api/campaigns/${mockCampaignId}/documents/${mockDocumentId}`,
+        headers: { cookie: getAuthCookie() },
+        payload: { documentType: "invalid" },
+      });
+
+      expect(response.statusCode).toBe(400);
+
+      await app.close();
+    });
+
+    it("should return 400 for empty name", async () => {
+      const app = await buildTestApp();
+
+      const response = await app.inject({
+        method: "PATCH",
+        url: `/api/campaigns/${mockCampaignId}/documents/${mockDocumentId}`,
+        headers: { cookie: getAuthCookie() },
+        payload: { name: "" },
+      });
+
+      expect(response.statusCode).toBe(400);
+
+      await app.close();
+    });
+
+    it("should return 404 when document not found", async () => {
+      vi.mocked(updateDocument).mockResolvedValue(null);
+
+      const app = await buildTestApp();
+
+      const response = await app.inject({
+        method: "PATCH",
+        url: `/api/campaigns/${mockCampaignId}/documents/${mockDocumentId}`,
+        headers: { cookie: getAuthCookie() },
+        payload: { name: "New Name" },
+      });
+
+      expect(response.statusCode).toBe(404);
+
+      await app.close();
+    });
+
+    it("should return 404 when campaign not found", async () => {
+      vi.mocked(findCampaignByIdAndUserId).mockResolvedValue(null);
+
+      const app = await buildTestApp();
+
+      const response = await app.inject({
+        method: "PATCH",
+        url: `/api/campaigns/${mockCampaignId}/documents/${mockDocumentId}`,
+        headers: { cookie: getAuthCookie() },
+        payload: { name: "New Name" },
+      });
+
+      expect(response.statusCode).toBe(404);
+
+      await app.close();
+    });
+
+    it("should return 401 without authentication", async () => {
+      vi.mocked(validateSessionToken).mockResolvedValue({
+        ok: false,
+        error: { code: "INVALID_TOKEN" },
+      });
+
+      const app = await buildTestApp();
+
+      const response = await app.inject({
+        method: "PATCH",
+        url: `/api/campaigns/${mockCampaignId}/documents/${mockDocumentId}`,
+      });
+
+      expect(response.statusCode).toBe(401);
 
       await app.close();
     });

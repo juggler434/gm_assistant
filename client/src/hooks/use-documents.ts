@@ -100,6 +100,29 @@ export function useUploadDocument() {
   });
 }
 
+interface UpdateDocumentParams {
+  campaignId: string;
+  id: string;
+  data: {
+    name?: string;
+    documentType?: DocumentType;
+    tags?: string[] | null;
+  };
+}
+
+export function useUpdateDocument() {
+  const queryClient = useQueryClient();
+
+  return useMutation({
+    mutationFn: ({ campaignId, id, data }: UpdateDocumentParams) =>
+      api.patch<DocumentResponse>(`/api/campaigns/${campaignId}/documents/${id}`, data),
+    onSuccess: (result, { campaignId, id }) => {
+      queryClient.setQueryData<DocumentResponse>(documentKeys.detail(campaignId, id), result);
+      queryClient.invalidateQueries({ queryKey: documentKeys.all(campaignId) });
+    },
+  });
+}
+
 interface DeleteDocumentParams {
   campaignId: string;
   id: string;

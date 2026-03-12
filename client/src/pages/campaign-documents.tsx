@@ -4,7 +4,7 @@ import { useState, useMemo, useCallback } from "react";
 import { useParams } from "react-router-dom";
 import { FileText, Plus, LayoutGrid, List } from "lucide-react";
 import { toast } from "sonner";
-import { useDocuments, useDeleteDocument } from "@/hooks/use-documents";
+import { useDocuments, useDeleteDocument, useUpdateDocument } from "@/hooks/use-documents";
 import { TableRowSkeleton, CardSkeleton } from "@/components/ui/skeleton";
 import { EmptyState } from "@/components/ui/empty-state";
 import { ErrorState } from "@/components/ui/error-state";
@@ -14,8 +14,9 @@ import { DocumentCard } from "@/components/documents/document-card";
 import { DocumentList } from "@/components/documents/document-list";
 import { FilterBar, type FilterState } from "@/components/documents/filter-bar";
 import { DocumentDetails } from "@/components/documents/document-details";
+import { DocumentEditForm } from "@/components/documents/document-edit-form";
 import { cn } from "@/lib/utils";
-import type { Document } from "@/types";
+import type { Document, UpdateDocumentRequest } from "@/types";
 
 type ViewMode = "grid" | "list";
 
@@ -43,8 +44,11 @@ export function DocumentsPage() {
   const { id: campaignId } = useParams<{ id: string }>();
   const { data: documents, isLoading, isError, refetch } = useDocuments(campaignId!);
   const deleteDocument = useDeleteDocument();
+  const updateDocument = useUpdateDocument();
 
   const [uploadOpen, setUploadOpen] = useState(false);
+  const [editOpen, setEditOpen] = useState(false);
+  const [editingDoc, setEditingDoc] = useState<Document | null>(null);
   const [viewMode, setViewMode] = useState<ViewMode>(getStoredViewMode);
   const [selectedDoc, setSelectedDoc] = useState<Document | null>(null);
   const [filters, setFilters] = useState<FilterState>({
@@ -111,6 +115,33 @@ export function DocumentsPage() {
       );
     },
     [campaignId, deleteDocument, selectedDoc]
+  );
+
+  const handleEdit = useCallback((doc: Document) => {
+    setEditingDoc(doc);
+    setEditOpen(true);
+  }, []);
+
+  const handleEditSubmit = useCallback(
+    (data: UpdateDocumentRequest) => {
+      if (!editingDoc) return;
+      updateDocument.mutate(
+        { campaignId: campaignId!, id: editingDoc.id, data },
+        {
+          onSuccess: (result) => {
+            toast.success("Document updated");
+            setEditOpen(false);
+            setEditingDoc(null);
+            // Update the selected doc if it was the one edited
+            if (selectedDoc?.id === editingDoc.id) {
+              setSelectedDoc(result.document);
+            }
+          },
+          onError: () => toast.error("Failed to update document"),
+        }
+      );
+    },
+    [campaignId, editingDoc, updateDocument, selectedDoc]
   );
 
   const hasDocuments = documents && documents.length > 0;
@@ -268,6 +299,7 @@ export function DocumentsPage() {
           <DocumentDetails
             doc={selectedDoc}
             onClose={() => setSelectedDoc(null)}
+            onEdit={handleEdit}
             onDownload={handleDownload}
             onDelete={handleDelete}
           />
@@ -275,6 +307,19 @@ export function DocumentsPage() {
       )}
 
       <UploadDialog campaignId={campaignId!} open={uploadOpen} onOpenChange={setUploadOpen} />
+
+      {editingDoc && (
+        <DocumentEditForm
+          open={editOpen}
+          onOpenChange={(open) => {
+            setEditOpen(open);
+            if (!open) setEditingDoc(null);
+          }}
+          onSubmit={handleEditSubmit}
+          isLoading={updateDocument.isPending}
+          doc={editingDoc}
+        />
+      )}
     </div>
   );
 }

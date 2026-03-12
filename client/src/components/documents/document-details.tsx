@@ -4,11 +4,13 @@ import {
   X,
   Download,
   Trash2,
+  Pencil,
   FileText,
   Image,
   Map,
   BookOpen,
   Scroll,
+  User,
   AlertCircle,
   Loader2,
   Clock,
@@ -25,6 +27,7 @@ const typeIcons: Record<DocumentType, React.ReactNode> = {
   notes: <FileText className="h-5 w-5" />,
   map: <Map className="h-5 w-5" />,
   image: <Image className="h-5 w-5" />,
+  character: <User className="h-5 w-5" />,
 };
 
 const statusConfig: Record<
@@ -64,6 +67,7 @@ function formatDateTime(dateString: string): string {
 interface DocumentDetailsProps {
   doc: Document;
   onClose: () => void;
+  onEdit?: (doc: Document) => void;
   onDownload?: (doc: Document) => void;
   onDelete?: (doc: Document) => void;
   onRetry?: (doc: Document) => void;
@@ -81,6 +85,7 @@ function DetailRow({ label, children }: { label: string; children: React.ReactNo
 export function DocumentDetails({
   doc,
   onClose,
+  onEdit,
   onDownload,
   onDelete,
   onRetry,
@@ -195,6 +200,17 @@ export function DocumentDetails({
 
       {/* Footer actions */}
       <div className="border-t border-border px-4 py-3 flex items-center gap-2">
+        {onEdit && (
+          <Button
+            variant="secondary"
+            size="sm"
+            className="gap-1.5"
+            onClick={() => onEdit(doc)}
+          >
+            <Pencil className="h-3.5 w-3.5" />
+            Edit
+          </Button>
+        )}
         {doc.status === "ready" && onDownload && (
           <Button
             variant="secondary"
