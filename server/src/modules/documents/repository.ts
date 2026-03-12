@@ -105,6 +105,25 @@ export async function updateDocumentChunkCount(
   return result[0] ?? null;
 }
 
+export interface UpdateDocumentData {
+  name?: string | undefined;
+  documentType?: DocumentType | undefined;
+  tags?: string[] | null | undefined;
+}
+
+export async function updateDocument(
+  id: string,
+  campaignId: string,
+  data: UpdateDocumentData
+): Promise<Document | null> {
+  const result = await db
+    .update(documents)
+    .set(data)
+    .where(and(eq(documents.id, id), eq(documents.campaignId, campaignId)))
+    .returning();
+  return result[0] ?? null;
+}
+
 export async function deleteDocument(
   id: string,
   campaignId: string

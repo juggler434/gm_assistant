@@ -104,6 +104,13 @@ export interface DocumentListResponse {
   documents: Document[];
 }
 
+/** PATCH /api/campaigns/:campaignId/documents/:id - request body */
+export interface UpdateDocumentRequest {
+  name?: string;
+  documentType?: DocumentType;
+  tags?: string[] | null;
+}
+
 /** Response from GET /api/campaigns/:campaignId/documents/:id/download */
 export interface DocumentDownloadResponse {
   url: string;

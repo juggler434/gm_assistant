@@ -34,6 +34,7 @@ const DOCUMENT_TYPES: { value: DocumentType; label: string }[] = [
   { value: "rulebook", label: "Rulebook" },
   { value: "setting", label: "Setting" },
   { value: "notes", label: "Notes" },
+  { value: "character", label: "Character" },
   { value: "map", label: "Map" },
   { value: "image", label: "Image" },
 ];

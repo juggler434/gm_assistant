@@ -9,6 +9,7 @@ export {
   documentParamsSchema,
   uploadMetadataSchema,
   documentListQuerySchema,
+  updateDocumentSchema,
   isSupportedMimeType,
   inferDocumentType,
   SUPPORTED_MIME_TYPES,
@@ -19,6 +20,7 @@ export {
   type DocumentParams,
   type UploadMetadata,
   type DocumentListQuery,
+  type UpdateDocumentInput,
   type SupportedMimeType,
 } from "./schemas.js";
 
@@ -30,8 +32,10 @@ export {
   findDocumentsByCampaignId,
   updateDocumentStatus,
   updateDocumentChunkCount,
+  updateDocument,
   deleteDocument,
   type FindDocumentsOptions,
+  type UpdateDocumentData,
 } from "./repository.js";
 
 // Processors
