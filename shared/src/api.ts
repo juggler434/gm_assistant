@@ -16,6 +16,8 @@ import type {
   Document,
   DocumentType,
   DocumentStatus,
+  GameSession,
+  GameSessionStatus,
   Location,
   Npc,
   NpcStatus,
@@ -402,6 +404,46 @@ export interface AdventureResponse {
 export interface AdventureListResponse {
   adventures: AdventureEntity[];
 }
+
+// ============================================================================
+// Game Session API
+// ============================================================================
+
+/** Query parameters for GET /api/campaigns/:campaignId/sessions */
+export interface GameSessionListQuery {
+  status?: GameSessionStatus;
+  limit?: number;
+  offset?: number;
+}
+
+/** Response wrapping a single game session */
+export interface GameSessionResponse {
+  session: GameSession;
+}
+
+/** Response wrapping a list of game sessions */
+export interface GameSessionListResponse {
+  sessions: GameSession[];
+}
+
+/** MIME types accepted for audio upload */
+export type SupportedAudioMimeType =
+  | "audio/mpeg"
+  | "audio/wav"
+  | "audio/wave"
+  | "audio/x-wav"
+  | "audio/mp4"
+  | "audio/x-m4a";
+
+/** Mapping of audio MIME types to file extensions */
+export const SUPPORTED_AUDIO_MIME_TYPES: Record<SupportedAudioMimeType, string> = {
+  "audio/mpeg": "mp3",
+  "audio/wav": "wav",
+  "audio/wave": "wav",
+  "audio/x-wav": "wav",
+  "audio/mp4": "m4a",
+  "audio/x-m4a": "m4a",
+} as const;
 
 // ============================================================================
 // Supported File Types

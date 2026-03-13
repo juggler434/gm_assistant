@@ -103,6 +103,52 @@ export class StorageService {
   }
 
   /**
+   * Upload a file by explicit key.
+   */
+  async uploadByKey(
+    key: string,
+    content: Buffer | Readable,
+    metadata?: FileMetadata
+  ): Promise<Result<UploadResponse, StorageError>> {
+    const startTime = Date.now();
+
+    this.logger?.debug?.("Starting upload by key", {
+      key,
+      contentType: metadata?.contentType,
+    });
+
+    const request: UploadRequest = {
+      campaignId: "",
+      documentId: "",
+      key,
+      content,
+    };
+
+    if (metadata !== undefined) {
+      request.metadata = metadata;
+    }
+
+    const result = await this.provider.upload(request);
+
+    const durationMs = Date.now() - startTime;
+
+    if (result.ok) {
+      this.logger?.info?.("Upload by key completed", {
+        key: result.value.key,
+        durationMs,
+      });
+    } else {
+      this.logger?.error?.("Upload by key failed", {
+        key,
+        error: result.error.message,
+        code: result.error.code,
+      });
+    }
+
+    return result;
+  }
+
+  /**
    * Download a file from storage.
    */
   async download(

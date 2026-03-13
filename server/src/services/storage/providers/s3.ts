@@ -91,7 +91,7 @@ export class S3Provider implements StorageProvider {
   async upload(
     request: UploadRequest
   ): Promise<Result<UploadResponse, StorageError>> {
-    const key = this.buildKey(request.campaignId, request.documentId);
+    const key = request.key ?? this.buildKey(request.campaignId, request.documentId);
 
     try {
       // Convert NodeJS.ReadableStream to a format the SDK accepts

@@ -38,6 +38,8 @@ export interface UploadRequest {
   campaignId: string;
   /** Document ID for path organization */
   documentId: string;
+  /** Optional explicit key (overrides campaignId/documentId path) */
+  key?: string | undefined;
   /** File content as Buffer or stream */
   content: Buffer | Readable;
   /** File metadata */
