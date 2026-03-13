@@ -21,6 +21,7 @@ import { adventureHookRoutes } from "@/modules/adventure-hooks/index.js";
 import { adventureOutlineRoutes } from "@/modules/adventure-outlines/index.js";
 import { adventureRoutes } from "@/modules/adventures/index.js";
 import { conversationRoutes } from "@/modules/conversations/index.js";
+import { sessionRoutes } from "@/modules/sessions/index.js";
 import { metricsRoutes } from "@/modules/metrics/routes.js";
 
 export interface AppOptions {
@@ -81,6 +82,7 @@ export async function buildApp(options: AppOptions = {}): Promise<FastifyInstanc
   await app.register(adventureRoutes, { prefix: "/api/campaigns" });
   await app.register(queryRoutes, { prefix: "/api/campaigns" });
   await app.register(conversationRoutes, { prefix: "/api/campaigns" });
+  await app.register(sessionRoutes, { prefix: "/api/campaigns" });
   await app.register(metricsRoutes, { prefix: "/api/admin/metrics" });
 
   // Health check endpoint

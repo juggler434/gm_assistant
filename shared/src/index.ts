@@ -136,8 +136,12 @@ export type {
   AdventureListQuery,
   AdventureResponse,
   AdventureListResponse,
+  GameSessionListQuery,
+  GameSessionResponse,
+  GameSessionListResponse,
+  SupportedAudioMimeType,
   SupportedMimeType,
 } from "./api.js";
 
 // Runtime values
-export { SUPPORTED_MIME_TYPES } from "./api.js";
+export { SUPPORTED_MIME_TYPES, SUPPORTED_AUDIO_MIME_TYPES } from "./api.js";
