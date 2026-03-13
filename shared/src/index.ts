@@ -30,6 +30,8 @@ export type {
   AdventureEntity,
   GameSessionStatus,
   GameSession,
+  TranscriptSegment,
+  TranscriptMarker,
   Transcript,
   Conversation,
   MessageRole,

@@ -126,37 +126,48 @@ export interface Chunk {
 }
 
 // ============================================================================
-// Game Session & Transcript (planned features)
+// Game Session & Transcript
 // ============================================================================
 
-/** Status of a game session */
-export type GameSessionStatus =
-  | "scheduled"
-  | "active"
-  | "completed"
-  | "cancelled";
+/** Status of a game session (audio recording lifecycle) */
+export type GameSessionStatus = "recording" | "processing" | "ready";
 
-/** A game session within a campaign */
+/** A game session (audio recording container) within a campaign */
 export interface GameSession extends BaseEntity {
   campaignId: Id;
+  createdBy: Id;
   title: string;
-  description: string | null;
-  sessionNumber: number;
-  scheduledAt: ISOTimestamp | null;
-  startedAt: ISOTimestamp | null;
-  endedAt: ISOTimestamp | null;
+  date: ISOTimestamp;
   status: GameSessionStatus;
-  summary: string | null;
+  audioPath: string | null;
+  duration: number | null;
 }
 
-/** A transcript entry within a game session */
+/** A single speaker segment within a transcript */
+export interface TranscriptSegment {
+  startTime: number;
+  endTime: number;
+  speaker: string;
+  text: string;
+}
+
+/** A marker/bookmark within a transcript */
+export interface TranscriptMarker {
+  time: number;
+  label: string;
+  type: string;
+  notes: string | null;
+}
+
+/** A transcript linked 1:1 to a game session */
 export interface Transcript {
   id: Id;
-  gameSessionId: Id;
-  speaker: string;
+  sessionId: Id;
   content: string;
-  timestamp: ISOTimestamp;
-  type: "narration" | "dialogue" | "action" | "ooc" | "system";
+  segments: TranscriptSegment[];
+  markers: TranscriptMarker[];
+  createdAt: ISOTimestamp;
+  updatedAt: ISOTimestamp;
 }
 
 // ============================================================================
