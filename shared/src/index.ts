@@ -104,6 +104,7 @@ export type {
   CampaignResponse,
   CampaignListResponse,
   DocumentListQuery,
+  UpdateDocumentRequest,
   DocumentResponse,
   DocumentListResponse,
   DocumentDownloadResponse,
