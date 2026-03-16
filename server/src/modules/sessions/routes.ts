@@ -19,6 +19,7 @@ import {
   createSession,
   findSessionsByCampaignId,
   findSessionByIdAndCampaignId,
+  findTranscriptBySessionId,
 } from "./repository.js";
 
 const storage = createStorageService();
@@ -265,5 +266,50 @@ export async function sessionRoutes(app: FastifyInstance): Promise<void> {
     }
 
     return reply.status(200).send({ session });
+  });
+
+  // GET /api/campaigns/:campaignId/sessions/:id/transcript - Get session transcript
+  app.get("/:campaignId/sessions/:id/transcript", async (request, reply) => {
+    const paramResult = sessionParamsSchema.safeParse(request.params);
+    if (!paramResult.success) {
+      return reply.status(400).send({
+        statusCode: 400,
+        error: "Bad Request",
+        message:
+          paramResult.error.issues[0]?.message ?? "Invalid parameters",
+      });
+    }
+
+    const { campaignId, id } = paramResult.data;
+    const userId = request.userId!;
+
+    const campaign = await findCampaignByIdAndUserId(campaignId, userId);
+    if (!campaign) {
+      return reply.status(404).send({
+        statusCode: 404,
+        error: "Not Found",
+        message: "Campaign not found",
+      });
+    }
+
+    const session = await findSessionByIdAndCampaignId(id, campaignId);
+    if (!session) {
+      return reply.status(404).send({
+        statusCode: 404,
+        error: "Not Found",
+        message: "Session not found",
+      });
+    }
+
+    const transcript = await findTranscriptBySessionId(id);
+    if (!transcript) {
+      return reply.status(404).send({
+        statusCode: 404,
+        error: "Not Found",
+        message: "Transcript not found",
+      });
+    }
+
+    return reply.status(200).send({ transcript });
   });
 }

@@ -22,6 +22,7 @@ import type {
   Npc,
   NpcStatus,
   NpcImportance,
+  Transcript,
 } from "./entities.js";
 import type { AdventureScene } from "./generation.js";
 
@@ -424,6 +425,11 @@ export interface GameSessionResponse {
 /** Response wrapping a list of game sessions */
 export interface GameSessionListResponse {
   sessions: GameSession[];
+}
+
+/** Response wrapping a session transcript */
+export interface TranscriptResponse {
+  transcript: Transcript;
 }
 
 /** MIME types accepted for audio upload */

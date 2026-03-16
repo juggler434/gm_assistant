@@ -140,6 +140,7 @@ export type {
   GameSessionListQuery,
   GameSessionResponse,
   GameSessionListResponse,
+  TranscriptResponse,
   SupportedAudioMimeType,
   SupportedMimeType,
 } from "./api.js";
