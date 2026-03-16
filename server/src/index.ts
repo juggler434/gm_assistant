@@ -5,6 +5,7 @@ import { buildApp } from "./app.js";
 import { shutdownMetrics } from "@/services/metrics/index.js";
 import { createWorker } from "@/jobs/index.js";
 import { handleDocumentIndexing, type DocumentIndexingJobData } from "@/jobs/document-indexing.js";
+import { closeActiveSessions } from "@/modules/transcription/index.js";
 
 async function main(): Promise<void> {
   const app = await buildApp();
@@ -28,6 +29,7 @@ async function main(): Promise<void> {
   // Graceful shutdown handler
   const shutdown = async (signal: string): Promise<void> => {
     app.log.info(`Received ${signal}, shutting down gracefully...`);
+    await closeActiveSessions();
     await worker.shutdown();
     await shutdownMetrics();
     await app.close();

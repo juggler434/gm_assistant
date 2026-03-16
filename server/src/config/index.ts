@@ -47,6 +47,11 @@ export const config = {
     serviceUrl: env.OCR_SERVICE_URL,
     timeout: env.OCR_TIMEOUT,
   },
+  whisper: {
+    baseUrl: env.WHISPER_BASE_URL,
+    model: env.WHISPER_MODEL,
+    timeout: env.WHISPER_TIMEOUT,
+  },
   posthog: {
     apiKey: env.POSTHOG_API_KEY,
     host: env.POSTHOG_HOST,

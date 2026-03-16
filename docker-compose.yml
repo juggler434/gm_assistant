@@ -63,6 +63,21 @@ services:
       retries: 3
       start_period: 10s
 
+  whisper:
+    image: fedirz/faster-whisper-server:latest
+    container_name: gm_assistant_whisper
+    profiles: ["with-whisper"]
+    ports:
+      - "8001:8000"
+    environment:
+      WHISPER__MODEL: "Systran/faster-whisper-base.en"
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8000/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 30s
+
   ollama:
     image: ollama/ollama:latest
     container_name: gm_assistant_ollama
