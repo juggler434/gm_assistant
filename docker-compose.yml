@@ -64,7 +64,7 @@ services:
       start_period: 10s
 
   whisper:
-    image: fedirz/faster-whisper-server:latest
+    image: fedirz/faster-whisper-server:latest-cpu
     container_name: gm_assistant_whisper
     profiles: ["with-whisper"]
     ports:
