@@ -63,6 +63,9 @@ export function UploadSessionDialog({ open, onOpenChange, campaignId }: UploadSe
     accept: acceptConfig,
     maxFiles: 1,
     multiple: false,
+    onDragEnter: undefined,
+    onDragOver: undefined,
+    onDragLeave: undefined,
   });
 
   const handleSubmit = async () => {
@@ -105,7 +108,7 @@ export function UploadSessionDialog({ open, onOpenChange, campaignId }: UploadSe
                   : "border-border hover:border-primary/50"
               }`}
             >
-              <input {...getInputProps()} />
+              <input {...(getInputProps() as React.InputHTMLAttributes<HTMLInputElement>)} />
               <Upload className="mb-2 h-8 w-8 text-muted-foreground" />
               <p className="text-sm text-muted-foreground">
                 Drag & drop an audio file, or click to browse
