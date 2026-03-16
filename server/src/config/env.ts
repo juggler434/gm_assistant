@@ -64,6 +64,11 @@ const envSchema = z
     OCR_SERVICE_URL: z.string().url().optional(),
     OCR_TIMEOUT: z.coerce.number().int().positive().default(300000),
 
+    // Whisper (speech-to-text)
+    WHISPER_BASE_URL: z.string().url().optional(),
+    WHISPER_MODEL: z.string().default("base"),
+    WHISPER_TIMEOUT: z.coerce.number().int().positive().default(30000),
+
     // PostHog Analytics
     POSTHOG_API_KEY: z.string().optional(),
     POSTHOG_HOST: z.string().url().optional(),

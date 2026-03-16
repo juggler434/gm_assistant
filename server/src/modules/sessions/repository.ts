@@ -4,9 +4,12 @@ import { eq, and, desc } from "drizzle-orm";
 import { db } from "@/db/index.js";
 import {
   gameSessions,
+  transcripts,
   type GameSessionRow,
   type NewGameSession,
   type GameSessionStatus,
+  type TranscriptRow,
+  type NewTranscript,
 } from "@/db/schema/index.js";
 
 export async function createSession(
@@ -65,5 +68,24 @@ export async function updateSessionStatus(
     .set({ status })
     .where(eq(gameSessions.id, id))
     .returning();
+  return result[0] ?? null;
+}
+
+export async function updateSession(
+  id: string,
+  data: Partial<Pick<GameSessionRow, "status" | "audioPath" | "duration">>
+): Promise<GameSessionRow | null> {
+  const result = await db
+    .update(gameSessions)
+    .set(data)
+    .where(eq(gameSessions.id, id))
+    .returning();
+  return result[0] ?? null;
+}
+
+export async function createTranscript(
+  data: NewTranscript
+): Promise<TranscriptRow | null> {
+  const result = await db.insert(transcripts).values(data).returning();
   return result[0] ?? null;
 }

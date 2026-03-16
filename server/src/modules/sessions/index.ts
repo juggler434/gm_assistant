@@ -6,6 +6,8 @@ export {
   findSessionByIdAndCampaignId,
   findSessionsByCampaignId,
   updateSessionStatus,
+  updateSession,
+  createTranscript,
 } from "./repository.js";
 export {
   SUPPORTED_AUDIO_MIME_TYPES,
