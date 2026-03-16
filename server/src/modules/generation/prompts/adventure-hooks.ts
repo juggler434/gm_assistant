@@ -46,7 +46,7 @@ Rules:
 - Each hook MUST reference specific NPCs, locations, or factions from the provided setting context when available.
 - Do not invent major setting elements (cities, rulers, pantheons) not present in the context. You may invent minor details (a tavern patron's name, a rumor) to flesh out hooks.
 - If a party level is provided, ensure hooks are appropriate for that level of experience.
-- ONLY add [N] citations when you mention a specific named person, place, faction, or organization that appears in the setting context (e.g. "The Zhentarim [1] have agents in Waterdeep [2]"). Do not cite general themes, tone, or ideas you invented. Only cite sources listed in the context.
+- ONLY add [N] citations when you mention a specific named person, place, faction, or organization that appears in the setting context (e.g. "The Zhentarim [1] have agents in Waterdeep [2]"). Do not cite general concepts, tone, or ideas you invented. Only cite sources listed in the context.
 - If saved campaign content is provided, ensure consistency with existing content and avoid creating duplicates. You may reference existing NPCs, locations, and hooks to create connections.
 
 You MUST respond with valid JSON matching this exact schema:
