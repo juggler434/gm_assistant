@@ -22,6 +22,7 @@ import { AdventureHooksPage } from "@/pages/campaign-adventure-hooks";
 import { AdventureOutlinesPage } from "@/pages/campaign-adventure-outlines";
 import { AdventuresPage } from "@/pages/campaign-adventures";
 import { SessionsPage } from "@/pages/campaign-sessions";
+import { SessionDetailPage } from "@/pages/campaign-session-detail";
 import { SettingsPage } from "@/pages/campaign-settings";
 import { LandingPage } from "@/pages/landing";
 
@@ -65,6 +66,7 @@ function App() {
                     <Route path="npcs" element={<NpcsPage />} />
                     <Route path="locations" element={<LocationsPage />} />
                     <Route path="sessions" element={<SessionsPage />} />
+                    <Route path="sessions/:sessionId" element={<SessionDetailPage />} />
                     <Route path="settings" element={<SettingsPage />} />
                   </Route>
                 </Route>

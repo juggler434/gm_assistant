@@ -83,6 +83,17 @@ export async function updateSession(
   return result[0] ?? null;
 }
 
+export async function findTranscriptBySessionId(
+  sessionId: string
+): Promise<TranscriptRow | null> {
+  const result = await db
+    .select()
+    .from(transcripts)
+    .where(eq(transcripts.sessionId, sessionId))
+    .limit(1);
+  return result[0] ?? null;
+}
+
 export async function createTranscript(
   data: NewTranscript
 ): Promise<TranscriptRow | null> {

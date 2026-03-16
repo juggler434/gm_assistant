@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: AGPL-3.0-or-later
 
 import { useState } from "react";
-import { useParams } from "react-router-dom";
+import { useParams, useNavigate } from "react-router-dom";
 import { Plus } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { SessionList } from "@/components/sessions/session-list";
@@ -10,6 +10,7 @@ import { useSessions } from "@/hooks/use-sessions";
 
 export function SessionsPage() {
   const { id: campaignId } = useParams<{ id: string }>();
+  const navigate = useNavigate();
   const { data: sessions, isLoading, error, refetch } = useSessions(campaignId ?? "");
   const [uploadOpen, setUploadOpen] = useState(false);
 
@@ -30,7 +31,7 @@ export function SessionsPage() {
         sessions={sessions}
         isLoading={isLoading}
         error={error}
-        onSelectSession={() => {}}
+        onSelectSession={(session) => navigate(session.id)}
         onRetry={() => refetch()}
       />
 

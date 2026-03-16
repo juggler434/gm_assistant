@@ -7,6 +7,7 @@ export {
   findSessionsByCampaignId,
   updateSessionStatus,
   updateSession,
+  findTranscriptBySessionId,
   createTranscript,
 } from "./repository.js";
 export {
