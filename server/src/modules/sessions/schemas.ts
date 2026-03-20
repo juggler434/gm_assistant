@@ -47,6 +47,29 @@ export const sessionListQuerySchema = z.object({
   offset: z.coerce.number().int().min(0).default(0),
 });
 
+// Schema for creating a marker on an existing transcript
+export const createMarkerSchema = z.object({
+  label: z.string().min(1).max(255),
+  time: z.number().min(0),
+  type: z.string().max(100).optional(),
+  notes: z.string().max(1000).optional(),
+});
+
+// Schema for marker query params
+export const markersQuerySchema = z.object({
+  context: z
+    .enum(["true", "false"])
+    .default("false")
+    .transform((v) => v === "true"),
+  window: z.coerce.number().int().min(1).max(120).default(30),
+});
+
+// Schema for deleting a marker via query params
+export const deleteMarkerQuerySchema = z.object({
+  time: z.coerce.number().min(0),
+  label: z.string().min(1).max(255),
+});
+
 // Schema for updating a session summary
 export const updateSummarySchema = z.object({
   content: z.string().optional(),

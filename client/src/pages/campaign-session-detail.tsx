@@ -1,5 +1,6 @@
 // SPDX-License-Identifier: AGPL-3.0-or-later
 
+import { useRef, useCallback } from "react";
 import { useParams, useNavigate } from "react-router-dom";
 import {
   ArrowLeft,
@@ -18,6 +19,7 @@ import { ErrorState } from "@/components/ui/error-state";
 import { EmptyState } from "@/components/ui/empty-state";
 import { TranscriptViewer } from "@/components/sessions/transcript-viewer";
 import { SessionSummarySection } from "@/components/sessions/session-summary";
+import { SessionAudioPlayer } from "@/components/sessions/session-audio-player";
 import { useSessionDetail, useTranscript } from "@/hooks/use-sessions";
 import type { GameSessionStatus } from "@/types";
 
@@ -56,6 +58,15 @@ export function SessionDetailPage() {
     sessionId: string;
   }>();
   const navigate = useNavigate();
+  const audioRef = useRef<HTMLAudioElement | null>(null);
+
+  const handleTimestampClick = useCallback((time: number) => {
+    const audio = audioRef.current;
+    if (audio) {
+      audio.currentTime = time;
+      audio.play();
+    }
+  }, []);
 
   const {
     data: session,
@@ -164,6 +175,16 @@ export function SessionDetailPage() {
         </Card>
       </div>
 
+      {/* Audio Player */}
+      {isReady && campaignId && sessionId && session.audioPath && (
+        <SessionAudioPlayer
+          campaignId={campaignId}
+          sessionId={sessionId}
+          markers={transcript?.markers ?? []}
+          audioRef={audioRef}
+        />
+      )}
+
       {/* AI Summary */}
       {isReady && campaignId && sessionId && (
         <SessionSummarySection
@@ -217,6 +238,7 @@ export function SessionDetailPage() {
             <TranscriptViewer
               segments={transcript.segments}
               markers={transcript.markers}
+              onTimestampClick={session.audioPath ? handleTimestampClick : undefined}
             />
           )}
 

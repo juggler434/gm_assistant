@@ -13,6 +13,8 @@ vi.mock("@/modules/sessions/repository.js", () => ({
   findSessionByIdAndCampaignId: vi.fn(),
   findTranscriptBySessionId: vi.fn(),
   updateSessionStatus: vi.fn(),
+  addMarkerToTranscript: vi.fn(),
+  deleteMarkerFromTranscript: vi.fn(),
   findSummaryBySessionId: vi.fn(),
   createSummary: vi.fn(),
   updateSummary: vi.fn(),
@@ -70,6 +72,9 @@ import {
   createSession,
   findSessionsByCampaignId,
   findSessionByIdAndCampaignId,
+  findTranscriptBySessionId,
+  addMarkerToTranscript,
+  deleteMarkerFromTranscript,
   findSummaryBySessionId,
   createSummary,
   updateSummary,
@@ -1013,6 +1018,472 @@ describe("Session Routes", () => {
       });
 
       expect(response.statusCode).toBe(404);
+
+      await app.close();
+    });
+  });
+
+  // ============================================================================
+  // Marker Routes
+  // ============================================================================
+
+  const mockTranscript = {
+    id: "transcript-123",
+    sessionId: mockSessionId,
+    content: "The party enters the dungeon. A dragon appears. They fight bravely.",
+    segments: [
+      { startTime: 0, endTime: 10, speaker: "GM", text: "The party enters the dungeon." },
+      { startTime: 10, endTime: 25, speaker: "GM", text: "A dragon appears from the shadows." },
+      { startTime: 25, endTime: 40, speaker: "Player1", text: "I draw my sword and attack!" },
+      { startTime: 40, endTime: 55, speaker: "GM", text: "The dragon breathes fire." },
+    ],
+    markers: [
+      { time: 12, label: "Dragon encounter", type: "combat", notes: null },
+      { time: 42, label: "Dragon breath", type: "important", notes: "Nearly killed Player1" },
+    ],
+    createdAt: new Date(),
+    updatedAt: new Date(),
+  };
+
+  describe("POST /api/campaigns/:campaignId/sessions/:id/markers", () => {
+    it("should return 201 and add a marker", async () => {
+      vi.mocked(findSessionByIdAndCampaignId).mockResolvedValue(mockReadySession);
+      vi.mocked(findTranscriptBySessionId).mockResolvedValue(mockTranscript);
+      vi.mocked(addMarkerToTranscript).mockResolvedValue({
+        ...mockTranscript,
+        markers: [
+          ...mockTranscript.markers,
+          { time: 30, label: "Sword attack", type: "combat", notes: null },
+        ],
+      });
+
+      const app = await buildTestApp();
+      const response = await app.inject({
+        method: "POST",
+        url: `/api/campaigns/${mockCampaignId}/sessions/${mockSessionId}/markers`,
+        headers: {
+          cookie: getAuthCookie(),
+          "content-type": "application/json",
+        },
+        body: JSON.stringify({
+          label: "Sword attack",
+          time: 30,
+          type: "combat",
+        }),
+      });
+
+      expect(response.statusCode).toBe(201);
+      const body = JSON.parse(response.body);
+      expect(body.marker.label).toBe("Sword attack");
+      expect(body.marker.time).toBe(30);
+      expect(body.marker.type).toBe("combat");
+
+      await app.close();
+    });
+
+    it("should default type to 'general' when not provided", async () => {
+      vi.mocked(findSessionByIdAndCampaignId).mockResolvedValue(mockReadySession);
+      vi.mocked(findTranscriptBySessionId).mockResolvedValue(mockTranscript);
+      vi.mocked(addMarkerToTranscript).mockResolvedValue(mockTranscript);
+
+      const app = await buildTestApp();
+      const response = await app.inject({
+        method: "POST",
+        url: `/api/campaigns/${mockCampaignId}/sessions/${mockSessionId}/markers`,
+        headers: {
+          cookie: getAuthCookie(),
+          "content-type": "application/json",
+        },
+        body: JSON.stringify({ label: "Note", time: 15 }),
+      });
+
+      expect(response.statusCode).toBe(201);
+      const body = JSON.parse(response.body);
+      expect(body.marker.type).toBe("general");
+
+      await app.close();
+    });
+
+    it("should return 400 when label is missing", async () => {
+      vi.mocked(findSessionByIdAndCampaignId).mockResolvedValue(mockReadySession);
+      vi.mocked(findTranscriptBySessionId).mockResolvedValue(mockTranscript);
+
+      const app = await buildTestApp();
+      const response = await app.inject({
+        method: "POST",
+        url: `/api/campaigns/${mockCampaignId}/sessions/${mockSessionId}/markers`,
+        headers: {
+          cookie: getAuthCookie(),
+          "content-type": "application/json",
+        },
+        body: JSON.stringify({ time: 15 }),
+      });
+
+      expect(response.statusCode).toBe(400);
+
+      await app.close();
+    });
+
+    it("should return 400 when time is missing", async () => {
+      vi.mocked(findSessionByIdAndCampaignId).mockResolvedValue(mockReadySession);
+      vi.mocked(findTranscriptBySessionId).mockResolvedValue(mockTranscript);
+
+      const app = await buildTestApp();
+      const response = await app.inject({
+        method: "POST",
+        url: `/api/campaigns/${mockCampaignId}/sessions/${mockSessionId}/markers`,
+        headers: {
+          cookie: getAuthCookie(),
+          "content-type": "application/json",
+        },
+        body: JSON.stringify({ label: "Note" }),
+      });
+
+      expect(response.statusCode).toBe(400);
+
+      await app.close();
+    });
+
+    it("should return 404 when transcript not found", async () => {
+      vi.mocked(findSessionByIdAndCampaignId).mockResolvedValue(mockReadySession);
+      vi.mocked(findTranscriptBySessionId).mockResolvedValue(null);
+
+      const app = await buildTestApp();
+      const response = await app.inject({
+        method: "POST",
+        url: `/api/campaigns/${mockCampaignId}/sessions/${mockSessionId}/markers`,
+        headers: {
+          cookie: getAuthCookie(),
+          "content-type": "application/json",
+        },
+        body: JSON.stringify({ label: "Note", time: 15 }),
+      });
+
+      expect(response.statusCode).toBe(404);
+      const body = JSON.parse(response.body);
+      expect(body.message).toBe("Transcript not found");
+
+      await app.close();
+    });
+
+    it("should return 404 when campaign not found", async () => {
+      vi.mocked(findCampaignByIdAndUserId).mockResolvedValue(null);
+
+      const app = await buildTestApp();
+      const response = await app.inject({
+        method: "POST",
+        url: `/api/campaigns/${mockCampaignId}/sessions/${mockSessionId}/markers`,
+        headers: {
+          cookie: getAuthCookie(),
+          "content-type": "application/json",
+        },
+        body: JSON.stringify({ label: "Note", time: 15 }),
+      });
+
+      expect(response.statusCode).toBe(404);
+
+      await app.close();
+    });
+
+    it("should return 401 without authentication", async () => {
+      vi.mocked(validateSessionToken).mockResolvedValue({
+        ok: false,
+        error: { code: "INVALID_TOKEN" },
+      });
+
+      const app = await buildTestApp();
+      const response = await app.inject({
+        method: "POST",
+        url: `/api/campaigns/${mockCampaignId}/sessions/${mockSessionId}/markers`,
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify({ label: "Note", time: 15 }),
+      });
+
+      expect(response.statusCode).toBe(401);
+
+      await app.close();
+    });
+  });
+
+  describe("GET /api/campaigns/:campaignId/sessions/:id/markers", () => {
+    it("should return 200 and markers list", async () => {
+      vi.mocked(findSessionByIdAndCampaignId).mockResolvedValue(mockReadySession);
+      vi.mocked(findTranscriptBySessionId).mockResolvedValue(mockTranscript);
+
+      const app = await buildTestApp();
+      const response = await app.inject({
+        method: "GET",
+        url: `/api/campaigns/${mockCampaignId}/sessions/${mockSessionId}/markers`,
+        headers: { cookie: getAuthCookie() },
+      });
+
+      expect(response.statusCode).toBe(200);
+      const body = JSON.parse(response.body);
+      expect(body.markers).toHaveLength(2);
+      expect(body.markers[0].label).toBe("Dragon encounter");
+      expect(body.markers[1].label).toBe("Dragon breath");
+
+      await app.close();
+    });
+
+    it("should return markers with context when context=true", async () => {
+      vi.mocked(findSessionByIdAndCampaignId).mockResolvedValue(mockReadySession);
+      vi.mocked(findTranscriptBySessionId).mockResolvedValue(mockTranscript);
+
+      const app = await buildTestApp();
+      const response = await app.inject({
+        method: "GET",
+        url: `/api/campaigns/${mockCampaignId}/sessions/${mockSessionId}/markers?context=true&window=15`,
+        headers: { cookie: getAuthCookie() },
+      });
+
+      expect(response.statusCode).toBe(200);
+      const body = JSON.parse(response.body);
+      expect(body.markers).toHaveLength(2);
+
+      // First marker at time=12, window=15 → segments from -3 to 27
+      const first = body.markers[0];
+      expect(first.marker.label).toBe("Dragon encounter");
+      expect(first.segments.length).toBeGreaterThan(0);
+      // Should include segments that overlap [0, 27] (startTime <= 27 && endTime >= -3)
+      expect(first.segments.some((s: { text: string }) => s.text.includes("dragon"))).toBe(true);
+
+      await app.close();
+    });
+
+    it("should return empty markers array when no markers exist", async () => {
+      vi.mocked(findSessionByIdAndCampaignId).mockResolvedValue(mockReadySession);
+      vi.mocked(findTranscriptBySessionId).mockResolvedValue({
+        ...mockTranscript,
+        markers: [],
+      });
+
+      const app = await buildTestApp();
+      const response = await app.inject({
+        method: "GET",
+        url: `/api/campaigns/${mockCampaignId}/sessions/${mockSessionId}/markers`,
+        headers: { cookie: getAuthCookie() },
+      });
+
+      expect(response.statusCode).toBe(200);
+      const body = JSON.parse(response.body);
+      expect(body.markers).toEqual([]);
+
+      await app.close();
+    });
+
+    it("should return 404 when transcript not found", async () => {
+      vi.mocked(findSessionByIdAndCampaignId).mockResolvedValue(mockReadySession);
+      vi.mocked(findTranscriptBySessionId).mockResolvedValue(null);
+
+      const app = await buildTestApp();
+      const response = await app.inject({
+        method: "GET",
+        url: `/api/campaigns/${mockCampaignId}/sessions/${mockSessionId}/markers`,
+        headers: { cookie: getAuthCookie() },
+      });
+
+      expect(response.statusCode).toBe(404);
+
+      await app.close();
+    });
+
+    it("should return 401 without authentication", async () => {
+      vi.mocked(validateSessionToken).mockResolvedValue({
+        ok: false,
+        error: { code: "INVALID_TOKEN" },
+      });
+
+      const app = await buildTestApp();
+      const response = await app.inject({
+        method: "GET",
+        url: `/api/campaigns/${mockCampaignId}/sessions/${mockSessionId}/markers`,
+      });
+
+      expect(response.statusCode).toBe(401);
+
+      await app.close();
+    });
+  });
+
+  describe("DELETE /api/campaigns/:campaignId/sessions/:id/markers", () => {
+    it("should return 200 and remove the marker", async () => {
+      vi.mocked(findSessionByIdAndCampaignId).mockResolvedValue(mockReadySession);
+      vi.mocked(deleteMarkerFromTranscript).mockResolvedValue({
+        ...mockTranscript,
+        markers: [mockTranscript.markers[1]],
+      });
+
+      const app = await buildTestApp();
+      const response = await app.inject({
+        method: "DELETE",
+        url: `/api/campaigns/${mockCampaignId}/sessions/${mockSessionId}/markers?time=12&label=Dragon%20encounter`,
+        headers: {
+          cookie: getAuthCookie(),
+        },
+      });
+
+      expect(response.statusCode).toBe(200);
+      const body = JSON.parse(response.body);
+      expect(body.markers).toHaveLength(1);
+
+      await app.close();
+    });
+
+    it("should return 404 when transcript not found", async () => {
+      vi.mocked(findSessionByIdAndCampaignId).mockResolvedValue(mockReadySession);
+      vi.mocked(deleteMarkerFromTranscript).mockResolvedValue(null);
+
+      const app = await buildTestApp();
+      const response = await app.inject({
+        method: "DELETE",
+        url: `/api/campaigns/${mockCampaignId}/sessions/${mockSessionId}/markers?time=12&label=Dragon%20encounter`,
+        headers: {
+          cookie: getAuthCookie(),
+        },
+      });
+
+      expect(response.statusCode).toBe(404);
+
+      await app.close();
+    });
+
+    it("should return 400 when time is missing", async () => {
+      vi.mocked(findSessionByIdAndCampaignId).mockResolvedValue(mockReadySession);
+
+      const app = await buildTestApp();
+      const response = await app.inject({
+        method: "DELETE",
+        url: `/api/campaigns/${mockCampaignId}/sessions/${mockSessionId}/markers?label=Dragon%20encounter`,
+        headers: {
+          cookie: getAuthCookie(),
+        },
+      });
+
+      expect(response.statusCode).toBe(400);
+
+      await app.close();
+    });
+  });
+
+  // ============================================================================
+  // Audio Routes
+  // ============================================================================
+
+  describe("GET /api/campaigns/:campaignId/sessions/:id/audio", () => {
+    it("should return 200 and signed audio URL", async () => {
+      vi.mocked(findSessionByIdAndCampaignId).mockResolvedValue(mockReadySession);
+      mockStorageService.getSignedUrlByKey.mockResolvedValue({
+        ok: true,
+        value: {
+          url: "https://storage.example.com/signed-audio-url",
+          expiresAt: new Date("2026-03-20T12:00:00Z"),
+        },
+      });
+
+      const app = await buildTestApp();
+      const response = await app.inject({
+        method: "GET",
+        url: `/api/campaigns/${mockCampaignId}/sessions/${mockSessionId}/audio`,
+        headers: { cookie: getAuthCookie() },
+      });
+
+      expect(response.statusCode).toBe(200);
+      const body = JSON.parse(response.body);
+      expect(body.url).toBe("https://storage.example.com/signed-audio-url");
+      expect(body.expiresAt).toBe("2026-03-20T12:00:00.000Z");
+
+      await app.close();
+    });
+
+    it("should return 404 when session has no audio", async () => {
+      vi.mocked(findSessionByIdAndCampaignId).mockResolvedValue({
+        ...mockReadySession,
+        audioPath: null,
+      });
+
+      const app = await buildTestApp();
+      const response = await app.inject({
+        method: "GET",
+        url: `/api/campaigns/${mockCampaignId}/sessions/${mockSessionId}/audio`,
+        headers: { cookie: getAuthCookie() },
+      });
+
+      expect(response.statusCode).toBe(404);
+      const body = JSON.parse(response.body);
+      expect(body.message).toBe("No audio available for this session");
+
+      await app.close();
+    });
+
+    it("should return 404 when session not found", async () => {
+      vi.mocked(findSessionByIdAndCampaignId).mockResolvedValue(null);
+
+      const app = await buildTestApp();
+      const response = await app.inject({
+        method: "GET",
+        url: `/api/campaigns/${mockCampaignId}/sessions/${mockSessionId}/audio`,
+        headers: { cookie: getAuthCookie() },
+      });
+
+      expect(response.statusCode).toBe(404);
+      const body = JSON.parse(response.body);
+      expect(body.message).toBe("Session not found");
+
+      await app.close();
+    });
+
+    it("should return 404 when campaign not found", async () => {
+      vi.mocked(findCampaignByIdAndUserId).mockResolvedValue(null);
+
+      const app = await buildTestApp();
+      const response = await app.inject({
+        method: "GET",
+        url: `/api/campaigns/${mockCampaignId}/sessions/${mockSessionId}/audio`,
+        headers: { cookie: getAuthCookie() },
+      });
+
+      expect(response.statusCode).toBe(404);
+      const body = JSON.parse(response.body);
+      expect(body.message).toBe("Campaign not found");
+
+      await app.close();
+    });
+
+    it("should return 500 when storage fails", async () => {
+      vi.mocked(findSessionByIdAndCampaignId).mockResolvedValue(mockReadySession);
+      mockStorageService.getSignedUrlByKey.mockResolvedValue({
+        ok: false,
+        error: { code: "STORAGE_ERROR", message: "Failed to generate URL" },
+      });
+
+      const app = await buildTestApp();
+      const response = await app.inject({
+        method: "GET",
+        url: `/api/campaigns/${mockCampaignId}/sessions/${mockSessionId}/audio`,
+        headers: { cookie: getAuthCookie() },
+      });
+
+      expect(response.statusCode).toBe(500);
+      const body = JSON.parse(response.body);
+      expect(body.message).toBe("Failed to generate audio URL");
+
+      await app.close();
+    });
+
+    it("should return 401 without authentication", async () => {
+      vi.mocked(validateSessionToken).mockResolvedValue({
+        ok: false,
+        error: { code: "INVALID_TOKEN" },
+      });
+
+      const app = await buildTestApp();
+      const response = await app.inject({
+        method: "GET",
+        url: `/api/campaigns/${mockCampaignId}/sessions/${mockSessionId}/audio`,
+      });
+
+      expect(response.statusCode).toBe(401);
 
       await app.close();
     });

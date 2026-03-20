@@ -54,6 +54,11 @@ export interface StoppedMessage {
   transcript: string;
 }
 
+export interface MarkerAddedMessage {
+  event: "marker_added";
+  marker: TranscriptMarker;
+}
+
 export interface ErrorMessage {
   event: "error";
   code: string;
@@ -64,6 +69,7 @@ export type ServerMessage =
   | ReadyMessage
   | TranscriptMessage
   | StoppedMessage
+  | MarkerAddedMessage
   | ErrorMessage;
 
 /** Per-connection state for a live transcription session */
