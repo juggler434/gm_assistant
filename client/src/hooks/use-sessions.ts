@@ -7,7 +7,11 @@ import type {
   GameSessionResponse,
   TranscriptResponse,
   SessionSummaryResponse,
+  SessionAudioResponse,
   UpdateSessionSummaryRequest,
+  CreateMarkerRequest,
+  MarkerResponse,
+  MarkersResponse,
 } from "@/types";
 
 export const sessionKeys = {
@@ -17,6 +21,8 @@ export const sessionKeys = {
     ["sessions", campaignId, id, "transcript"] as const,
   summary: (campaignId: string, id: string) =>
     ["sessions", campaignId, id, "summary"] as const,
+  audio: (campaignId: string, id: string) =>
+    ["sessions", campaignId, id, "audio"] as const,
 };
 
 const PROCESSING_POLL_INTERVAL = 3000;
@@ -151,6 +157,69 @@ export function useUpdateSummary() {
     onSuccess: (_data, { campaignId, sessionId }) => {
       queryClient.invalidateQueries({
         queryKey: sessionKeys.summary(campaignId, sessionId),
+      });
+    },
+  });
+}
+
+export function useSessionAudioUrl(campaignId: string, sessionId: string, enabled = true) {
+  return useQuery({
+    queryKey: sessionKeys.audio(campaignId, sessionId),
+    queryFn: () =>
+      api.get<SessionAudioResponse>(
+        `/api/campaigns/${campaignId}/sessions/${sessionId}/audio`
+      ),
+    enabled: !!campaignId && !!sessionId && enabled,
+    staleTime: 30 * 60 * 1000, // 30 min — URL is valid for 1 hour
+  });
+}
+
+export function useAddMarker() {
+  const queryClient = useQueryClient();
+
+  return useMutation({
+    mutationFn: ({
+      campaignId,
+      sessionId,
+      data,
+    }: {
+      campaignId: string;
+      sessionId: string;
+      data: CreateMarkerRequest;
+    }) =>
+      api.post<MarkerResponse>(
+        `/api/campaigns/${campaignId}/sessions/${sessionId}/markers`,
+        data
+      ),
+    onSuccess: (_data, { campaignId, sessionId }) => {
+      queryClient.invalidateQueries({
+        queryKey: sessionKeys.transcript(campaignId, sessionId),
+      });
+    },
+  });
+}
+
+export function useDeleteMarker() {
+  const queryClient = useQueryClient();
+
+  return useMutation({
+    mutationFn: ({
+      campaignId,
+      sessionId,
+      time,
+      label,
+    }: {
+      campaignId: string;
+      sessionId: string;
+      time: number;
+      label: string;
+    }) =>
+      api.delete<MarkersResponse>(
+        `/api/campaigns/${campaignId}/sessions/${sessionId}/markers?time=${time}&label=${encodeURIComponent(label)}`
+      ),
+    onSuccess: (_data, { campaignId, sessionId }) => {
+      queryClient.invalidateQueries({
+        queryKey: sessionKeys.transcript(campaignId, sessionId),
       });
     },
   });

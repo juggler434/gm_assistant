@@ -250,12 +250,16 @@ function handleMarker(
 
   const elapsedSeconds = (Date.now() - state.recordingStartTime) / 1000;
 
-  state.markers.push({
+  const marker = {
     time: elapsedSeconds,
     label: message.label,
     type: message.type ?? "general",
     notes: message.notes ?? null,
-  });
+  };
+
+  state.markers.push(marker);
+
+  send(socket, { event: "marker_added", marker });
 
   logger.info(
     { sessionId: state.sessionId, marker: message.label, time: elapsedSeconds },

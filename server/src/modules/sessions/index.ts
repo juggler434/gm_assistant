@@ -9,6 +9,8 @@ export {
   updateSession,
   findTranscriptBySessionId,
   createTranscript,
+  addMarkerToTranscript,
+  deleteMarkerFromTranscript,
   findSummaryBySessionId,
   createSummary,
   updateSummary,

@@ -105,6 +105,48 @@ export async function createTranscript(
 }
 
 // ============================================================================
+// Markers
+// ============================================================================
+
+export async function addMarkerToTranscript(
+  sessionId: string,
+  marker: { time: number; label: string; type: string; notes: string | null }
+): Promise<TranscriptRow | null> {
+  const transcript = await findTranscriptBySessionId(sessionId);
+  if (!transcript) return null;
+
+  const markers = [...(transcript.markers ?? []), marker];
+  markers.sort((a, b) => a.time - b.time);
+
+  const result = await db
+    .update(transcripts)
+    .set({ markers })
+    .where(eq(transcripts.sessionId, sessionId))
+    .returning();
+  return result[0] ?? null;
+}
+
+export async function deleteMarkerFromTranscript(
+  sessionId: string,
+  markerTime: number,
+  markerLabel: string
+): Promise<TranscriptRow | null> {
+  const transcript = await findTranscriptBySessionId(sessionId);
+  if (!transcript) return null;
+
+  const markers = (transcript.markers ?? []).filter(
+    (m) => !(m.time === markerTime && m.label === markerLabel)
+  );
+
+  const result = await db
+    .update(transcripts)
+    .set({ markers })
+    .where(eq(transcripts.sessionId, sessionId))
+    .returning();
+  return result[0] ?? null;
+}
+
+// ============================================================================
 // Session Summary
 // ============================================================================
 

@@ -439,6 +439,12 @@ export interface SessionSummaryResponse {
   summary: SessionSummary;
 }
 
+/** Response from GET /api/campaigns/:campaignId/sessions/:id/audio */
+export interface SessionAudioResponse {
+  url: string;
+  expiresAt: string;
+}
+
 /** PATCH /api/campaigns/:campaignId/sessions/:id/summary - request body */
 export interface UpdateSessionSummaryRequest {
   content?: string;
@@ -447,6 +453,35 @@ export interface UpdateSessionSummaryRequest {
   locationsVisited?: string[];
   itemsAcquired?: string[];
   openQuestions?: string[];
+}
+
+/** POST /api/campaigns/:campaignId/sessions/:id/markers - request body */
+export interface CreateMarkerRequest {
+  label: string;
+  time: number;
+  type?: string;
+  notes?: string;
+}
+
+/** Response wrapping a single marker */
+export interface MarkerResponse {
+  marker: import("./entities.js").TranscriptMarker;
+}
+
+/** Response wrapping all markers for a session */
+export interface MarkersResponse {
+  markers: import("./entities.js").TranscriptMarker[];
+}
+
+/** A marker with surrounding transcript context */
+export interface MarkerWithContext {
+  marker: import("./entities.js").TranscriptMarker;
+  segments: import("./entities.js").TranscriptSegment[];
+}
+
+/** GET /api/campaigns/:campaignId/sessions/:id/markers?context=true response */
+export interface MarkersWithContextResponse {
+  markers: MarkerWithContext[];
 }
 
 /** MIME types accepted for audio upload */

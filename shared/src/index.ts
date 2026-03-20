@@ -144,7 +144,13 @@ export type {
   GameSessionListResponse,
   TranscriptResponse,
   SessionSummaryResponse,
+  SessionAudioResponse,
   UpdateSessionSummaryRequest,
+  CreateMarkerRequest,
+  MarkerResponse,
+  MarkersResponse,
+  MarkerWithContext,
+  MarkersWithContextResponse,
   SupportedAudioMimeType,
   SupportedMimeType,
 } from "./api.js";

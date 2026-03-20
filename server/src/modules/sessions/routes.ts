@@ -13,6 +13,9 @@ import {
   sessionUploadMetadataSchema,
   sessionListQuerySchema,
   updateSummarySchema,
+  createMarkerSchema,
+  markersQuerySchema,
+  deleteMarkerQuerySchema,
   isSupportedAudioMimeType,
   SUPPORTED_AUDIO_MIME_TYPES,
 } from "./schemas.js";
@@ -21,6 +24,8 @@ import {
   findSessionsByCampaignId,
   findSessionByIdAndCampaignId,
   findTranscriptBySessionId,
+  addMarkerToTranscript,
+  deleteMarkerFromTranscript,
   findSummaryBySessionId,
   createSummary,
   updateSummary,
@@ -323,6 +328,278 @@ export async function sessionRoutes(app: FastifyInstance): Promise<void> {
     }
 
     return reply.status(200).send({ transcript });
+  });
+
+  // POST /api/campaigns/:campaignId/sessions/:id/markers - Add marker
+  app.post("/:campaignId/sessions/:id/markers", async (request, reply) => {
+    const paramResult = sessionParamsSchema.safeParse(request.params);
+    if (!paramResult.success) {
+      return reply.status(400).send({
+        statusCode: 400,
+        error: "Bad Request",
+        message:
+          paramResult.error.issues[0]?.message ?? "Invalid parameters",
+      });
+    }
+
+    const { campaignId, id } = paramResult.data;
+    const userId = request.userId!;
+
+    const campaign = await findCampaignByIdAndUserId(campaignId, userId);
+    if (!campaign) {
+      return reply.status(404).send({
+        statusCode: 404,
+        error: "Not Found",
+        message: "Campaign not found",
+      });
+    }
+
+    const session = await findSessionByIdAndCampaignId(id, campaignId);
+    if (!session) {
+      return reply.status(404).send({
+        statusCode: 404,
+        error: "Not Found",
+        message: "Session not found",
+      });
+    }
+
+    const transcript = await findTranscriptBySessionId(id);
+    if (!transcript) {
+      return reply.status(404).send({
+        statusCode: 404,
+        error: "Not Found",
+        message: "Transcript not found",
+      });
+    }
+
+    const bodyResult = createMarkerSchema.safeParse(request.body);
+    if (!bodyResult.success) {
+      return reply.status(400).send({
+        statusCode: 400,
+        error: "Bad Request",
+        message:
+          bodyResult.error.issues[0]?.message ?? "Invalid request body",
+      });
+    }
+
+    const marker = {
+      time: bodyResult.data.time,
+      label: bodyResult.data.label,
+      type: bodyResult.data.type ?? "general",
+      notes: bodyResult.data.notes ?? null,
+    };
+
+    const updated = await addMarkerToTranscript(id, marker);
+    if (!updated) {
+      return reply.status(500).send({
+        statusCode: 500,
+        error: "Internal Server Error",
+        message: "Failed to add marker",
+      });
+    }
+
+    trackEvent(userId, "session_marker_added", {
+      session_id: id,
+      campaign_id: campaignId,
+      marker_type: marker.type,
+    });
+
+    return reply.status(201).send({ marker });
+  });
+
+  // GET /api/campaigns/:campaignId/sessions/:id/markers - Get markers
+  app.get("/:campaignId/sessions/:id/markers", async (request, reply) => {
+    const paramResult = sessionParamsSchema.safeParse(request.params);
+    if (!paramResult.success) {
+      return reply.status(400).send({
+        statusCode: 400,
+        error: "Bad Request",
+        message:
+          paramResult.error.issues[0]?.message ?? "Invalid parameters",
+      });
+    }
+
+    const { campaignId, id } = paramResult.data;
+    const userId = request.userId!;
+
+    const campaign = await findCampaignByIdAndUserId(campaignId, userId);
+    if (!campaign) {
+      return reply.status(404).send({
+        statusCode: 404,
+        error: "Not Found",
+        message: "Campaign not found",
+      });
+    }
+
+    const session = await findSessionByIdAndCampaignId(id, campaignId);
+    if (!session) {
+      return reply.status(404).send({
+        statusCode: 404,
+        error: "Not Found",
+        message: "Session not found",
+      });
+    }
+
+    const transcript = await findTranscriptBySessionId(id);
+    if (!transcript) {
+      return reply.status(404).send({
+        statusCode: 404,
+        error: "Not Found",
+        message: "Transcript not found",
+      });
+    }
+
+    const queryResult = markersQuerySchema.safeParse(request.query);
+    if (!queryResult.success) {
+      return reply.status(400).send({
+        statusCode: 400,
+        error: "Bad Request",
+        message:
+          queryResult.error.issues[0]?.message ?? "Invalid query parameters",
+      });
+    }
+
+    const markers = transcript.markers ?? [];
+
+    // If context is requested, include surrounding transcript segments
+    if (queryResult.data.context) {
+      const { window } = queryResult.data;
+      const segments = transcript.segments ?? [];
+
+      const markersWithContext = markers.map((marker) => {
+        const windowStart = marker.time - window;
+        const windowEnd = marker.time + window;
+
+        const contextSegments = segments.filter(
+          (seg) => seg.endTime >= windowStart && seg.startTime <= windowEnd
+        );
+
+        return { marker, segments: contextSegments };
+      });
+
+      return reply.status(200).send({ markers: markersWithContext });
+    }
+
+    return reply.status(200).send({ markers });
+  });
+
+  // DELETE /api/campaigns/:campaignId/sessions/:id/markers - Delete marker
+  app.delete("/:campaignId/sessions/:id/markers", async (request, reply) => {
+    const paramResult = sessionParamsSchema.safeParse(request.params);
+    if (!paramResult.success) {
+      return reply.status(400).send({
+        statusCode: 400,
+        error: "Bad Request",
+        message:
+          paramResult.error.issues[0]?.message ?? "Invalid parameters",
+      });
+    }
+
+    const { campaignId, id } = paramResult.data;
+    const userId = request.userId!;
+
+    const campaign = await findCampaignByIdAndUserId(campaignId, userId);
+    if (!campaign) {
+      return reply.status(404).send({
+        statusCode: 404,
+        error: "Not Found",
+        message: "Campaign not found",
+      });
+    }
+
+    const session = await findSessionByIdAndCampaignId(id, campaignId);
+    if (!session) {
+      return reply.status(404).send({
+        statusCode: 404,
+        error: "Not Found",
+        message: "Session not found",
+      });
+    }
+
+    const queryResult = deleteMarkerQuerySchema.safeParse(request.query);
+    if (!queryResult.success) {
+      return reply.status(400).send({
+        statusCode: 400,
+        error: "Bad Request",
+        message:
+          queryResult.error.issues[0]?.message ?? "Invalid query parameters",
+      });
+    }
+
+    const updated = await deleteMarkerFromTranscript(
+      id,
+      queryResult.data.time,
+      queryResult.data.label
+    );
+    if (!updated) {
+      return reply.status(404).send({
+        statusCode: 404,
+        error: "Not Found",
+        message: "Transcript not found",
+      });
+    }
+
+    return reply.status(200).send({ markers: updated.markers ?? [] });
+  });
+
+  // GET /api/campaigns/:campaignId/sessions/:id/audio - Get signed audio URL
+  app.get("/:campaignId/sessions/:id/audio", async (request, reply) => {
+    const paramResult = sessionParamsSchema.safeParse(request.params);
+    if (!paramResult.success) {
+      return reply.status(400).send({
+        statusCode: 400,
+        error: "Bad Request",
+        message:
+          paramResult.error.issues[0]?.message ?? "Invalid parameters",
+      });
+    }
+
+    const { campaignId, id } = paramResult.data;
+    const userId = request.userId!;
+
+    const campaign = await findCampaignByIdAndUserId(campaignId, userId);
+    if (!campaign) {
+      return reply.status(404).send({
+        statusCode: 404,
+        error: "Not Found",
+        message: "Campaign not found",
+      });
+    }
+
+    const session = await findSessionByIdAndCampaignId(id, campaignId);
+    if (!session) {
+      return reply.status(404).send({
+        statusCode: 404,
+        error: "Not Found",
+        message: "Session not found",
+      });
+    }
+
+    if (!session.audioPath) {
+      return reply.status(404).send({
+        statusCode: 404,
+        error: "Not Found",
+        message: "No audio available for this session",
+      });
+    }
+
+    const urlResult = await storage.getSignedUrlByKey(session.audioPath, 3600);
+    if (!urlResult.ok) {
+      request.log.error(
+        { error: urlResult.error, sessionId: id },
+        "Failed to generate signed URL for session audio"
+      );
+      return reply.status(500).send({
+        statusCode: 500,
+        error: "Internal Server Error",
+        message: "Failed to generate audio URL",
+      });
+    }
+
+    return reply.status(200).send({
+      url: urlResult.value.url,
+      expiresAt: urlResult.value.expiresAt.toISOString(),
+    });
   });
 
   // POST /api/campaigns/:campaignId/sessions/:id/summary - Generate summary
