@@ -12,6 +12,7 @@ import {
   sessionParamsSchema,
   sessionUploadMetadataSchema,
   sessionListQuerySchema,
+  updateSummarySchema,
   isSupportedAudioMimeType,
   SUPPORTED_AUDIO_MIME_TYPES,
 } from "./schemas.js";
@@ -20,6 +21,9 @@ import {
   findSessionsByCampaignId,
   findSessionByIdAndCampaignId,
   findTranscriptBySessionId,
+  findSummaryBySessionId,
+  createSummary,
+  updateSummary,
 } from "./repository.js";
 
 const storage = createStorageService();
@@ -32,9 +36,17 @@ interface TranscriptionJobData {
   [key: string]: unknown;
 }
 
+interface SummaryJobData {
+  sessionId: string;
+  campaignId: string;
+  [key: string]: unknown;
+}
+
 const transcriptionQueue = createQueue<TranscriptionJobData>(
   "session-transcription"
 );
+
+const summaryQueue = createQueue<SummaryJobData>("session-summary");
 
 export async function sessionRoutes(app: FastifyInstance): Promise<void> {
   app.addHook("preHandler", requireAuth);
@@ -311,5 +323,230 @@ export async function sessionRoutes(app: FastifyInstance): Promise<void> {
     }
 
     return reply.status(200).send({ transcript });
+  });
+
+  // POST /api/campaigns/:campaignId/sessions/:id/summary - Generate summary
+  app.post("/:campaignId/sessions/:id/summary", async (request, reply) => {
+    const paramResult = sessionParamsSchema.safeParse(request.params);
+    if (!paramResult.success) {
+      return reply.status(400).send({
+        statusCode: 400,
+        error: "Bad Request",
+        message:
+          paramResult.error.issues[0]?.message ?? "Invalid parameters",
+      });
+    }
+
+    const { campaignId, id } = paramResult.data;
+    const userId = request.userId!;
+
+    const campaign = await findCampaignByIdAndUserId(campaignId, userId);
+    if (!campaign) {
+      return reply.status(404).send({
+        statusCode: 404,
+        error: "Not Found",
+        message: "Campaign not found",
+      });
+    }
+
+    const session = await findSessionByIdAndCampaignId(id, campaignId);
+    if (!session) {
+      return reply.status(404).send({
+        statusCode: 404,
+        error: "Not Found",
+        message: "Session not found",
+      });
+    }
+
+    if (session.status !== "ready") {
+      return reply.status(400).send({
+        statusCode: 400,
+        error: "Bad Request",
+        message: "Session transcript must be ready before generating a summary",
+      });
+    }
+
+    // Check if a summary already exists
+    const existing = await findSummaryBySessionId(id);
+    if (existing && existing.status === "generating") {
+      return reply.status(409).send({
+        statusCode: 409,
+        error: "Conflict",
+        message: "Summary generation is already in progress",
+      });
+    }
+
+    // Create or reset the summary record
+    let summary;
+    if (existing) {
+      summary = await updateSummary(existing.id, {
+        status: "generating",
+        generationError: null,
+        content: "",
+        keyEvents: [],
+        npcsEncountered: [],
+        locationsVisited: [],
+        itemsAcquired: [],
+        openQuestions: [],
+      });
+    } else {
+      summary = await createSummary({
+        sessionId: id,
+        status: "generating",
+      });
+    }
+
+    if (!summary) {
+      return reply.status(500).send({
+        statusCode: 500,
+        error: "Internal Server Error",
+        message: "Failed to create summary record",
+      });
+    }
+
+    // Queue for generation
+    const queueResult = await summaryQueue.add("generate-summary", {
+      sessionId: id,
+      campaignId,
+    });
+
+    if (!queueResult.ok) {
+      request.log.warn(
+        { error: queueResult.error, sessionId: id },
+        "Failed to queue summary generation"
+      );
+    }
+
+    trackEvent(userId, "session_summary_requested", {
+      session_id: id,
+      campaign_id: campaignId,
+    });
+
+    return reply.status(202).send({ summary });
+  });
+
+  // GET /api/campaigns/:campaignId/sessions/:id/summary - Get summary
+  app.get("/:campaignId/sessions/:id/summary", async (request, reply) => {
+    const paramResult = sessionParamsSchema.safeParse(request.params);
+    if (!paramResult.success) {
+      return reply.status(400).send({
+        statusCode: 400,
+        error: "Bad Request",
+        message:
+          paramResult.error.issues[0]?.message ?? "Invalid parameters",
+      });
+    }
+
+    const { campaignId, id } = paramResult.data;
+    const userId = request.userId!;
+
+    const campaign = await findCampaignByIdAndUserId(campaignId, userId);
+    if (!campaign) {
+      return reply.status(404).send({
+        statusCode: 404,
+        error: "Not Found",
+        message: "Campaign not found",
+      });
+    }
+
+    const session = await findSessionByIdAndCampaignId(id, campaignId);
+    if (!session) {
+      return reply.status(404).send({
+        statusCode: 404,
+        error: "Not Found",
+        message: "Session not found",
+      });
+    }
+
+    const summary = await findSummaryBySessionId(id);
+    if (!summary) {
+      return reply.status(404).send({
+        statusCode: 404,
+        error: "Not Found",
+        message: "Summary not found",
+      });
+    }
+
+    return reply.status(200).send({ summary });
+  });
+
+  // PATCH /api/campaigns/:campaignId/sessions/:id/summary - Edit summary
+  app.patch("/:campaignId/sessions/:id/summary", async (request, reply) => {
+    const paramResult = sessionParamsSchema.safeParse(request.params);
+    if (!paramResult.success) {
+      return reply.status(400).send({
+        statusCode: 400,
+        error: "Bad Request",
+        message:
+          paramResult.error.issues[0]?.message ?? "Invalid parameters",
+      });
+    }
+
+    const { campaignId, id } = paramResult.data;
+    const userId = request.userId!;
+
+    const campaign = await findCampaignByIdAndUserId(campaignId, userId);
+    if (!campaign) {
+      return reply.status(404).send({
+        statusCode: 404,
+        error: "Not Found",
+        message: "Campaign not found",
+      });
+    }
+
+    const session = await findSessionByIdAndCampaignId(id, campaignId);
+    if (!session) {
+      return reply.status(404).send({
+        statusCode: 404,
+        error: "Not Found",
+        message: "Session not found",
+      });
+    }
+
+    const summary = await findSummaryBySessionId(id);
+    if (!summary) {
+      return reply.status(404).send({
+        statusCode: 404,
+        error: "Not Found",
+        message: "Summary not found. Generate a summary first.",
+      });
+    }
+
+    const bodyResult = updateSummarySchema.safeParse(request.body);
+    if (!bodyResult.success) {
+      return reply.status(400).send({
+        statusCode: 400,
+        error: "Bad Request",
+        message:
+          bodyResult.error.issues[0]?.message ?? "Invalid request body",
+      });
+    }
+
+    // Filter out undefined values for exactOptionalPropertyTypes compatibility
+    const updateData: Record<string, unknown> = {};
+    for (const [key, value] of Object.entries(bodyResult.data)) {
+      if (value !== undefined) {
+        updateData[key] = value;
+      }
+    }
+
+    const updated = await updateSummary(
+      summary.id,
+      updateData as Parameters<typeof updateSummary>[1],
+    );
+    if (!updated) {
+      return reply.status(500).send({
+        statusCode: 500,
+        error: "Internal Server Error",
+        message: "Failed to update summary",
+      });
+    }
+
+    trackEvent(userId, "session_summary_edited", {
+      session_id: id,
+      campaign_id: campaignId,
+    });
+
+    return reply.status(200).send({ summary: updated });
   });
 }

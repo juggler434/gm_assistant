@@ -11,7 +11,11 @@ vi.mock("@/modules/sessions/repository.js", () => ({
   createSession: vi.fn(),
   findSessionsByCampaignId: vi.fn(),
   findSessionByIdAndCampaignId: vi.fn(),
+  findTranscriptBySessionId: vi.fn(),
   updateSessionStatus: vi.fn(),
+  findSummaryBySessionId: vi.fn(),
+  createSummary: vi.fn(),
+  updateSummary: vi.fn(),
 }));
 
 vi.mock("@/modules/documents/repository.js", () => ({
@@ -66,7 +70,11 @@ import {
   createSession,
   findSessionsByCampaignId,
   findSessionByIdAndCampaignId,
+  findSummaryBySessionId,
+  createSummary,
+  updateSummary,
 } from "@/modules/sessions/repository.js";
+import type { SessionSummaryRow } from "@/db/schema/session-summaries.js";
 import { findCampaignByIdAndUserId } from "@/modules/campaigns/repository.js";
 import { validateSessionToken } from "@/modules/auth/session.js";
 import { createStorageService } from "@/services/storage/factory.js";
@@ -795,6 +803,216 @@ describe("Session Routes", () => {
       });
 
       expect(response.statusCode).toBe(401);
+
+      await app.close();
+    });
+  });
+
+  // ============================================================================
+  // Summary Routes
+  // ============================================================================
+
+  const mockReadySession: GameSessionRow = {
+    id: mockSessionId,
+    campaignId: mockCampaignId,
+    createdBy: mockUserId,
+    title: "Session 1",
+    date: new Date(),
+    status: "ready",
+    audioPath: `campaigns/${mockCampaignId}/sessions/${mockSessionId}`,
+    duration: 3600,
+    createdAt: new Date(),
+    updatedAt: new Date(),
+  };
+
+  const mockSummary: SessionSummaryRow = {
+    id: "summary-123",
+    sessionId: mockSessionId,
+    content: "The party ventured into the dungeon.",
+    keyEvents: ["Defeated the goblin king"],
+    npcsEncountered: ["Goblin King"],
+    locationsVisited: ["Dark Dungeon"],
+    itemsAcquired: ["Sword of Light"],
+    openQuestions: ["What lies deeper?"],
+    status: "ready",
+    generationError: null,
+    createdAt: new Date(),
+    updatedAt: new Date(),
+  };
+
+  describe("POST /api/campaigns/:campaignId/sessions/:id/summary", () => {
+    it("should return 202 and queue summary generation", async () => {
+      vi.mocked(findSessionByIdAndCampaignId).mockResolvedValue(mockReadySession);
+      vi.mocked(findSummaryBySessionId).mockResolvedValue(null);
+      vi.mocked(createSummary).mockResolvedValue({
+        ...mockSummary,
+        status: "generating",
+        content: "",
+        keyEvents: [],
+        npcsEncountered: [],
+        locationsVisited: [],
+        itemsAcquired: [],
+        openQuestions: [],
+      });
+
+      const app = await buildTestApp();
+      const response = await app.inject({
+        method: "POST",
+        url: `/api/campaigns/${mockCampaignId}/sessions/${mockSessionId}/summary`,
+        headers: { cookie: getAuthCookie() },
+      });
+
+      expect(response.statusCode).toBe(202);
+      const body = JSON.parse(response.body);
+      expect(body.summary).toBeDefined();
+      expect(body.summary.status).toBe("generating");
+
+      await app.close();
+    });
+
+    it("should return 400 if session is not ready", async () => {
+      vi.mocked(findSessionByIdAndCampaignId).mockResolvedValue(mockGameSession); // status: "processing"
+
+      const app = await buildTestApp();
+      const response = await app.inject({
+        method: "POST",
+        url: `/api/campaigns/${mockCampaignId}/sessions/${mockSessionId}/summary`,
+        headers: { cookie: getAuthCookie() },
+      });
+
+      expect(response.statusCode).toBe(400);
+
+      await app.close();
+    });
+
+    it("should return 409 if summary is already generating", async () => {
+      vi.mocked(findSessionByIdAndCampaignId).mockResolvedValue(mockReadySession);
+      vi.mocked(findSummaryBySessionId).mockResolvedValue({
+        ...mockSummary,
+        status: "generating",
+      });
+
+      const app = await buildTestApp();
+      const response = await app.inject({
+        method: "POST",
+        url: `/api/campaigns/${mockCampaignId}/sessions/${mockSessionId}/summary`,
+        headers: { cookie: getAuthCookie() },
+      });
+
+      expect(response.statusCode).toBe(409);
+
+      await app.close();
+    });
+
+    it("should return 404 when campaign not found", async () => {
+      vi.mocked(findCampaignByIdAndUserId).mockResolvedValue(null);
+
+      const app = await buildTestApp();
+      const response = await app.inject({
+        method: "POST",
+        url: `/api/campaigns/${mockCampaignId}/sessions/${mockSessionId}/summary`,
+        headers: { cookie: getAuthCookie() },
+      });
+
+      expect(response.statusCode).toBe(404);
+
+      await app.close();
+    });
+  });
+
+  describe("GET /api/campaigns/:campaignId/sessions/:id/summary", () => {
+    it("should return 200 and the summary", async () => {
+      vi.mocked(findSessionByIdAndCampaignId).mockResolvedValue(mockReadySession);
+      vi.mocked(findSummaryBySessionId).mockResolvedValue(mockSummary);
+
+      const app = await buildTestApp();
+      const response = await app.inject({
+        method: "GET",
+        url: `/api/campaigns/${mockCampaignId}/sessions/${mockSessionId}/summary`,
+        headers: { cookie: getAuthCookie() },
+      });
+
+      expect(response.statusCode).toBe(200);
+      const body = JSON.parse(response.body);
+      expect(body.summary.content).toBe("The party ventured into the dungeon.");
+      expect(body.summary.keyEvents).toEqual(["Defeated the goblin king"]);
+      expect(body.summary.npcsEncountered).toEqual(["Goblin King"]);
+
+      await app.close();
+    });
+
+    it("should return 404 when summary not found", async () => {
+      vi.mocked(findSessionByIdAndCampaignId).mockResolvedValue(mockReadySession);
+      vi.mocked(findSummaryBySessionId).mockResolvedValue(null);
+
+      const app = await buildTestApp();
+      const response = await app.inject({
+        method: "GET",
+        url: `/api/campaigns/${mockCampaignId}/sessions/${mockSessionId}/summary`,
+        headers: { cookie: getAuthCookie() },
+      });
+
+      expect(response.statusCode).toBe(404);
+
+      await app.close();
+    });
+
+    it("should return 401 without authentication", async () => {
+      const app = await buildTestApp();
+      const response = await app.inject({
+        method: "GET",
+        url: `/api/campaigns/${mockCampaignId}/sessions/${mockSessionId}/summary`,
+      });
+
+      expect(response.statusCode).toBe(401);
+
+      await app.close();
+    });
+  });
+
+  describe("PATCH /api/campaigns/:campaignId/sessions/:id/summary", () => {
+    it("should return 200 and updated summary", async () => {
+      vi.mocked(findSessionByIdAndCampaignId).mockResolvedValue(mockReadySession);
+      vi.mocked(findSummaryBySessionId).mockResolvedValue(mockSummary);
+      vi.mocked(updateSummary).mockResolvedValue({
+        ...mockSummary,
+        content: "Updated summary content",
+      });
+
+      const app = await buildTestApp();
+      const response = await app.inject({
+        method: "PATCH",
+        url: `/api/campaigns/${mockCampaignId}/sessions/${mockSessionId}/summary`,
+        headers: {
+          cookie: getAuthCookie(),
+          "content-type": "application/json",
+        },
+        body: JSON.stringify({ content: "Updated summary content" }),
+      });
+
+      expect(response.statusCode).toBe(200);
+      const body = JSON.parse(response.body);
+      expect(body.summary.content).toBe("Updated summary content");
+
+      await app.close();
+    });
+
+    it("should return 404 when summary not found", async () => {
+      vi.mocked(findSessionByIdAndCampaignId).mockResolvedValue(mockReadySession);
+      vi.mocked(findSummaryBySessionId).mockResolvedValue(null);
+
+      const app = await buildTestApp();
+      const response = await app.inject({
+        method: "PATCH",
+        url: `/api/campaigns/${mockCampaignId}/sessions/${mockSessionId}/summary`,
+        headers: {
+          cookie: getAuthCookie(),
+          "content-type": "application/json",
+        },
+        body: JSON.stringify({ content: "Updated" }),
+      });
+
+      expect(response.statusCode).toBe(404);
 
       await app.close();
     });

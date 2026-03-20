@@ -17,6 +17,7 @@ import { Skeleton } from "@/components/ui/skeleton";
 import { ErrorState } from "@/components/ui/error-state";
 import { EmptyState } from "@/components/ui/empty-state";
 import { TranscriptViewer } from "@/components/sessions/transcript-viewer";
+import { SessionSummarySection } from "@/components/sessions/session-summary";
 import { useSessionDetail, useTranscript } from "@/hooks/use-sessions";
 import type { GameSessionStatus } from "@/types";
 
@@ -163,20 +164,12 @@ export function SessionDetailPage() {
         </Card>
       </div>
 
-      {/* Summary section */}
-      {transcript?.content && (
-        <Card>
-          <CardHeader className="pb-3">
-            <CardTitle className="text-base">Summary</CardTitle>
-          </CardHeader>
-          <CardContent>
-            <p className="text-sm leading-relaxed text-muted-foreground">
-              {transcript.content.length > 500
-                ? transcript.content.slice(0, 500) + "..."
-                : transcript.content}
-            </p>
-          </CardContent>
-        </Card>
+      {/* AI Summary */}
+      {isReady && campaignId && sessionId && (
+        <SessionSummarySection
+          campaignId={campaignId}
+          sessionId={sessionId}
+        />
       )}
 
       {/* Transcript */}

@@ -5,11 +5,14 @@ import { db } from "@/db/index.js";
 import {
   gameSessions,
   transcripts,
+  sessionSummaries,
   type GameSessionRow,
   type NewGameSession,
   type GameSessionStatus,
   type TranscriptRow,
   type NewTranscript,
+  type SessionSummaryRow,
+  type NewSessionSummary,
 } from "@/db/schema/index.js";
 
 export async function createSession(
@@ -98,5 +101,51 @@ export async function createTranscript(
   data: NewTranscript
 ): Promise<TranscriptRow | null> {
   const result = await db.insert(transcripts).values(data).returning();
+  return result[0] ?? null;
+}
+
+// ============================================================================
+// Session Summary
+// ============================================================================
+
+export async function findSummaryBySessionId(
+  sessionId: string
+): Promise<SessionSummaryRow | null> {
+  const result = await db
+    .select()
+    .from(sessionSummaries)
+    .where(eq(sessionSummaries.sessionId, sessionId))
+    .limit(1);
+  return result[0] ?? null;
+}
+
+export async function createSummary(
+  data: NewSessionSummary
+): Promise<SessionSummaryRow | null> {
+  const result = await db.insert(sessionSummaries).values(data).returning();
+  return result[0] ?? null;
+}
+
+export async function updateSummary(
+  id: string,
+  data: Partial<
+    Pick<
+      SessionSummaryRow,
+      | "content"
+      | "keyEvents"
+      | "npcsEncountered"
+      | "locationsVisited"
+      | "itemsAcquired"
+      | "openQuestions"
+      | "status"
+      | "generationError"
+    >
+  >
+): Promise<SessionSummaryRow | null> {
+  const result = await db
+    .update(sessionSummaries)
+    .set(data)
+    .where(eq(sessionSummaries.id, id))
+    .returning();
   return result[0] ?? null;
 }

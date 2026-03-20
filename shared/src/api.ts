@@ -22,6 +22,8 @@ import type {
   Npc,
   NpcStatus,
   NpcImportance,
+  SessionSummary,
+  SummaryStatus,
   Transcript,
 } from "./entities.js";
 import type { AdventureScene } from "./generation.js";
@@ -430,6 +432,21 @@ export interface GameSessionListResponse {
 /** Response wrapping a session transcript */
 export interface TranscriptResponse {
   transcript: Transcript;
+}
+
+/** Response wrapping a session summary */
+export interface SessionSummaryResponse {
+  summary: SessionSummary;
+}
+
+/** PATCH /api/campaigns/:campaignId/sessions/:id/summary - request body */
+export interface UpdateSessionSummaryRequest {
+  content?: string;
+  keyEvents?: string[];
+  npcsEncountered?: string[];
+  locationsVisited?: string[];
+  itemsAcquired?: string[];
+  openQuestions?: string[];
 }
 
 /** MIME types accepted for audio upload */
