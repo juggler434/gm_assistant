@@ -171,6 +171,29 @@ export interface Transcript {
 }
 
 // ============================================================================
+// Session Summary
+// ============================================================================
+
+/** Status of a session summary generation */
+export type SummaryStatus = "pending" | "generating" | "ready" | "error";
+
+/** A generated summary for a game session */
+export interface SessionSummary {
+  id: Id;
+  sessionId: Id;
+  content: string;
+  keyEvents: string[];
+  npcsEncountered: string[];
+  locationsVisited: string[];
+  itemsAcquired: string[];
+  openQuestions: string[];
+  status: SummaryStatus;
+  generationError: string | null;
+  createdAt: ISOTimestamp;
+  updatedAt: ISOTimestamp;
+}
+
+// ============================================================================
 // NPC
 // ============================================================================
 

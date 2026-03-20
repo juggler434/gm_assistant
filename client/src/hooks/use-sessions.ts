@@ -6,6 +6,8 @@ import type {
   GameSessionListResponse,
   GameSessionResponse,
   TranscriptResponse,
+  SessionSummaryResponse,
+  UpdateSessionSummaryRequest,
 } from "@/types";
 
 export const sessionKeys = {
@@ -13,6 +15,8 @@ export const sessionKeys = {
   detail: (campaignId: string, id: string) => ["sessions", campaignId, id] as const,
   transcript: (campaignId: string, id: string) =>
     ["sessions", campaignId, id, "transcript"] as const,
+  summary: (campaignId: string, id: string) =>
+    ["sessions", campaignId, id, "summary"] as const,
 };
 
 const PROCESSING_POLL_INTERVAL = 3000;
@@ -82,5 +86,72 @@ export function useTranscript(campaignId: string, sessionId: string, enabled = t
       ),
     select: (data) => data.transcript,
     enabled: !!campaignId && !!sessionId && enabled,
+  });
+}
+
+export function useSessionSummary(campaignId: string, sessionId: string, enabled = true) {
+  return useQuery({
+    queryKey: sessionKeys.summary(campaignId, sessionId),
+    queryFn: () =>
+      api.get<SessionSummaryResponse>(
+        `/api/campaigns/${campaignId}/sessions/${sessionId}/summary`
+      ),
+    select: (data) => data.summary,
+    enabled: !!campaignId && !!sessionId && enabled,
+    retry: (failureCount, error) => {
+      // Don't retry 404s (summary not generated yet)
+      if (error instanceof Error && "statusCode" in error && (error as { statusCode: number }).statusCode === 404) {
+        return false;
+      }
+      return failureCount < 3;
+    },
+    refetchInterval: (query) => {
+      const summary = query.state.data?.summary;
+      return summary?.status === "generating" || summary?.status === "pending"
+        ? PROCESSING_POLL_INTERVAL
+        : false;
+    },
+  });
+}
+
+export function useGenerateSummary() {
+  const queryClient = useQueryClient();
+
+  return useMutation({
+    mutationFn: ({ campaignId, sessionId }: { campaignId: string; sessionId: string }) =>
+      api.post<SessionSummaryResponse>(
+        `/api/campaigns/${campaignId}/sessions/${sessionId}/summary`,
+        {}
+      ),
+    onSuccess: (_data, { campaignId, sessionId }) => {
+      queryClient.invalidateQueries({
+        queryKey: sessionKeys.summary(campaignId, sessionId),
+      });
+    },
+  });
+}
+
+export function useUpdateSummary() {
+  const queryClient = useQueryClient();
+
+  return useMutation({
+    mutationFn: ({
+      campaignId,
+      sessionId,
+      data,
+    }: {
+      campaignId: string;
+      sessionId: string;
+      data: UpdateSessionSummaryRequest;
+    }) =>
+      api.patch<SessionSummaryResponse>(
+        `/api/campaigns/${campaignId}/sessions/${sessionId}/summary`,
+        data
+      ),
+    onSuccess: (_data, { campaignId, sessionId }) => {
+      queryClient.invalidateQueries({
+        queryKey: sessionKeys.summary(campaignId, sessionId),
+      });
+    },
   });
 }

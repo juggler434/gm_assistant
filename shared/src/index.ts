@@ -33,6 +33,8 @@ export type {
   TranscriptSegment,
   TranscriptMarker,
   Transcript,
+  SummaryStatus,
+  SessionSummary,
   Conversation,
   MessageRole,
   ConversationMessage,
@@ -141,6 +143,8 @@ export type {
   GameSessionResponse,
   GameSessionListResponse,
   TranscriptResponse,
+  SessionSummaryResponse,
+  UpdateSessionSummaryRequest,
   SupportedAudioMimeType,
   SupportedMimeType,
 } from "./api.js";

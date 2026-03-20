@@ -9,6 +9,9 @@ export {
   updateSession,
   findTranscriptBySessionId,
   createTranscript,
+  findSummaryBySessionId,
+  createSummary,
+  updateSummary,
 } from "./repository.js";
 export {
   SUPPORTED_AUDIO_MIME_TYPES,

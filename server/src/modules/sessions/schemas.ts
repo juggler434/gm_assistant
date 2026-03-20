@@ -46,3 +46,13 @@ export const sessionListQuerySchema = z.object({
   limit: z.coerce.number().int().min(1).max(100).default(50),
   offset: z.coerce.number().int().min(0).default(0),
 });
+
+// Schema for updating a session summary
+export const updateSummarySchema = z.object({
+  content: z.string().optional(),
+  keyEvents: z.array(z.string()).optional(),
+  npcsEncountered: z.array(z.string()).optional(),
+  locationsVisited: z.array(z.string()).optional(),
+  itemsAcquired: z.array(z.string()).optional(),
+  openQuestions: z.array(z.string()).optional(),
+});
