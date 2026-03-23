@@ -55,6 +55,16 @@ export const createMarkerSchema = z.object({
   notes: z.string().max(1000).optional(),
 });
 
+// Schema for updating a marker
+export const updateMarkerSchema = z.object({
+  originalTime: z.number().min(0),
+  originalLabel: z.string().min(1).max(255),
+  label: z.string().min(1).max(255).optional(),
+  time: z.number().min(0).optional(),
+  type: z.string().max(100).optional(),
+  notes: z.string().max(1000).nullable().optional(),
+});
+
 // Schema for marker query params
 export const markersQuerySchema = z.object({
   context: z

@@ -14,6 +14,7 @@ import {
   sessionListQuerySchema,
   updateSummarySchema,
   createMarkerSchema,
+  updateMarkerSchema,
   markersQuerySchema,
   deleteMarkerQuerySchema,
   isSupportedAudioMimeType,
@@ -25,6 +26,7 @@ import {
   findSessionByIdAndCampaignId,
   findTranscriptBySessionId,
   addMarkerToTranscript,
+  updateMarkerInTranscript,
   deleteMarkerFromTranscript,
   findSummaryBySessionId,
   createSummary,
@@ -405,6 +407,75 @@ export async function sessionRoutes(app: FastifyInstance): Promise<void> {
     });
 
     return reply.status(201).send({ marker });
+  });
+
+  // PATCH /api/campaigns/:campaignId/sessions/:id/markers - Update marker
+  app.patch("/:campaignId/sessions/:id/markers", async (request, reply) => {
+    const paramResult = sessionParamsSchema.safeParse(request.params);
+    if (!paramResult.success) {
+      return reply.status(400).send({
+        statusCode: 400,
+        error: "Bad Request",
+        message:
+          paramResult.error.issues[0]?.message ?? "Invalid parameters",
+      });
+    }
+
+    const { campaignId, id } = paramResult.data;
+    const userId = request.userId!;
+
+    const campaign = await findCampaignByIdAndUserId(campaignId, userId);
+    if (!campaign) {
+      return reply.status(404).send({
+        statusCode: 404,
+        error: "Not Found",
+        message: "Campaign not found",
+      });
+    }
+
+    const session = await findSessionByIdAndCampaignId(id, campaignId);
+    if (!session) {
+      return reply.status(404).send({
+        statusCode: 404,
+        error: "Not Found",
+        message: "Session not found",
+      });
+    }
+
+    const bodyResult = updateMarkerSchema.safeParse(request.body);
+    if (!bodyResult.success) {
+      return reply.status(400).send({
+        statusCode: 400,
+        error: "Bad Request",
+        message:
+          bodyResult.error.issues[0]?.message ?? "Invalid request body",
+      });
+    }
+
+    const { originalTime, originalLabel, ...raw } = bodyResult.data;
+
+    // Strip undefined keys so the type satisfies exactOptionalPropertyTypes
+    const updates: Partial<{ time: number; label: string; type: string; notes: string | null }> = {};
+    if (raw.label !== undefined) updates.label = raw.label;
+    if (raw.time !== undefined) updates.time = raw.time;
+    if (raw.type !== undefined) updates.type = raw.type;
+    if (raw.notes !== undefined) updates.notes = raw.notes;
+
+    const updated = await updateMarkerInTranscript(
+      id,
+      originalTime,
+      originalLabel,
+      updates
+    );
+    if (!updated) {
+      return reply.status(404).send({
+        statusCode: 404,
+        error: "Not Found",
+        message: "Transcript not found",
+      });
+    }
+
+    return reply.status(200).send({ markers: updated.markers ?? [] });
   });
 
   // GET /api/campaigns/:campaignId/sessions/:id/markers - Get markers

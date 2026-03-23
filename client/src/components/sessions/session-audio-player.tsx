@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: AGPL-3.0-or-later
 
 import { useState, useRef, useCallback } from "react";
-import { Play, Pause, Plus, X, Volume2 } from "lucide-react";
+import { Play, Pause, Plus, X, Pencil, Volume2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
@@ -11,6 +11,7 @@ import { cn } from "@/lib/utils";
 import {
   useSessionAudioUrl,
   useAddMarker,
+  useUpdateMarker,
   useDeleteMarker,
 } from "@/hooks/use-sessions";
 import type { TranscriptMarker } from "@/types";
@@ -50,6 +51,14 @@ interface SessionAudioPlayerProps {
   audioRef: React.RefObject<HTMLAudioElement | null>;
 }
 
+interface EditingMarker {
+  originalTime: number;
+  originalLabel: string;
+  label: string;
+  type: string;
+  notes: string;
+}
+
 export function SessionAudioPlayer({
   campaignId,
   sessionId,
@@ -61,6 +70,7 @@ export function SessionAudioPlayer({
     sessionId
   );
   const addMarker = useAddMarker();
+  const updateMarker = useUpdateMarker();
   const deleteMarker = useDeleteMarker();
 
   const [isPlaying, setIsPlaying] = useState(false);
@@ -71,6 +81,7 @@ export function SessionAudioPlayer({
   const [markerLabel, setMarkerLabel] = useState("");
   const [markerType, setMarkerType] = useState("general");
   const [markerNotes, setMarkerNotes] = useState("");
+  const [editing, setEditing] = useState<EditingMarker | null>(null);
 
   const progressRef = useRef<HTMLDivElement>(null);
 
@@ -107,6 +118,7 @@ export function SessionAudioPlayer({
   );
 
   const openMarkerForm = useCallback(() => {
+    setEditing(null);
     setMarkerTime(currentTime);
     setMarkerLabel("");
     setMarkerType("general");
@@ -139,17 +151,63 @@ export function SessionAudioPlayer({
     );
   }, [campaignId, sessionId, markerTime, markerLabel, markerType, markerNotes, addMarker]);
 
+  const openEditForm = useCallback((marker: TranscriptMarker) => {
+    setShowMarkerForm(false);
+    setEditing({
+      originalTime: marker.time,
+      originalLabel: marker.label,
+      label: marker.label,
+      type: marker.type,
+      notes: marker.notes ?? "",
+    });
+  }, []);
+
+  const submitEdit = useCallback(() => {
+    if (!editing || !editing.label.trim()) return;
+    updateMarker.mutate(
+      {
+        campaignId,
+        sessionId,
+        data: {
+          originalTime: editing.originalTime,
+          originalLabel: editing.originalLabel,
+          label: editing.label.trim(),
+          type: editing.type,
+          notes: editing.notes.trim() || null,
+        },
+      },
+      {
+        onSuccess: () => {
+          toast.success("Marker updated");
+          setEditing(null);
+        },
+        onError: (err) => {
+          toast.error(err.message);
+        },
+      }
+    );
+  }, [campaignId, sessionId, editing, updateMarker]);
+
   const handleDeleteMarker = useCallback(
     (marker: TranscriptMarker) => {
       deleteMarker.mutate(
         { campaignId, sessionId, time: marker.time, label: marker.label },
         {
-          onSuccess: () => toast.success("Marker removed"),
+          onSuccess: () => {
+            toast.success("Marker removed");
+            if (
+              editing &&
+              editing.originalTime === marker.time &&
+              editing.originalLabel === marker.label
+            ) {
+              setEditing(null);
+            }
+          },
           onError: (err) => toast.error(err.message),
         }
       );
     },
-    [campaignId, sessionId, deleteMarker]
+    [campaignId, sessionId, deleteMarker, editing]
   );
 
   if (audioLoading) {
@@ -233,7 +291,7 @@ export function SessionAudioPlayer({
         </div>
 
         {/* Add marker button */}
-        {!showMarkerForm && (
+        {!showMarkerForm && !editing && (
           <Button
             variant="outline"
             size="sm"
@@ -299,6 +357,75 @@ export function SessionAudioPlayer({
           </div>
         )}
 
+        {/* Marker edit form */}
+        {editing && (
+          <div className="space-y-3 rounded-md border border-border bg-secondary/50 p-3">
+            <div className="flex items-center justify-between">
+              <p className="text-sm font-medium">
+                Edit marker at {formatTime(editing.originalTime)}
+              </p>
+              <Button
+                variant="ghost"
+                size="icon"
+                className="h-6 w-6"
+                onClick={() => setEditing(null)}
+              >
+                <X className="h-3 w-3" />
+              </Button>
+            </div>
+            <div className="flex gap-2">
+              <Input
+                placeholder="Label (required)"
+                value={editing.label}
+                onChange={(e) =>
+                  setEditing((prev) => prev && { ...prev, label: e.target.value })
+                }
+                className="flex-1"
+                onKeyDown={(e) => {
+                  if (e.key === "Enter") submitEdit();
+                }}
+                autoFocus
+              />
+              <select
+                value={editing.type}
+                onChange={(e) =>
+                  setEditing((prev) => prev && { ...prev, type: e.target.value })
+                }
+                className="rounded-md border border-border bg-card px-2 py-1 text-sm text-foreground"
+              >
+                {MARKER_TYPES.map((t) => (
+                  <option key={t.value} value={t.value}>
+                    {t.label}
+                  </option>
+                ))}
+              </select>
+            </div>
+            <Input
+              placeholder="Notes (optional)"
+              value={editing.notes}
+              onChange={(e) =>
+                setEditing((prev) => prev && { ...prev, notes: e.target.value })
+              }
+            />
+            <div className="flex gap-2">
+              <Button
+                size="sm"
+                onClick={submitEdit}
+                disabled={!editing.label.trim() || updateMarker.isPending}
+              >
+                {updateMarker.isPending ? "Saving..." : "Save"}
+              </Button>
+              <Button
+                size="sm"
+                variant="outline"
+                onClick={() => setEditing(null)}
+              >
+                Cancel
+              </Button>
+            </div>
+          </div>
+        )}
+
         {/* Existing markers */}
         {sortedMarkers.length > 0 && (
           <div className="flex flex-wrap gap-1.5">
@@ -320,6 +447,16 @@ export function SessionAudioPlayer({
                 <button
                   type="button"
                   className="ml-0.5 hidden rounded-full p-0.5 opacity-70 hover:opacity-100 group-hover:inline-flex"
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    openEditForm(marker);
+                  }}
+                >
+                  <Pencil className="h-2.5 w-2.5" />
+                </button>
+                <button
+                  type="button"
+                  className="hidden rounded-full p-0.5 opacity-70 hover:opacity-100 group-hover:inline-flex"
                   onClick={(e) => {
                     e.stopPropagation();
                     handleDeleteMarker(marker);

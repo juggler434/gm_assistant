@@ -463,6 +463,19 @@ export interface CreateMarkerRequest {
   notes?: string;
 }
 
+/** PATCH /api/campaigns/:campaignId/sessions/:id/markers - request body */
+export interface UpdateMarkerRequest {
+  /** Original time to identify the marker */
+  originalTime: number;
+  /** Original label to identify the marker */
+  originalLabel: string;
+  /** Updated fields */
+  label?: string;
+  time?: number;
+  type?: string;
+  notes?: string | null;
+}
+
 /** Response wrapping a single marker */
 export interface MarkerResponse {
   marker: import("./entities.js").TranscriptMarker;

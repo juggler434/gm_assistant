@@ -23,6 +23,11 @@ export interface MarkerMessage {
   notes?: string | undefined;
 }
 
+export interface FinalAudioMessage {
+  event: "final_audio";
+  data: string; // base64-encoded complete recording for S3 storage
+}
+
 export interface StopMessage {
   event: "stop";
 }
@@ -31,6 +36,7 @@ export type ClientMessage =
   | StartMessage
   | AudioMessage
   | MarkerMessage
+  | FinalAudioMessage
   | StopMessage;
 
 /** Server → Client message types */
@@ -80,6 +86,8 @@ export interface LiveSessionState {
 
   audioBuffer: Buffer[];
   allAudioChunks: Buffer[];
+  /** Complete recording sent by the client for S3 storage */
+  finalAudioBuffer: Buffer | null;
 
   segments: TranscriptSegment[];
   markers: TranscriptMarker[];

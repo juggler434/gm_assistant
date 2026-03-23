@@ -147,6 +147,7 @@ export type {
   SessionAudioResponse,
   UpdateSessionSummaryRequest,
   CreateMarkerRequest,
+  UpdateMarkerRequest,
   MarkerResponse,
   MarkersResponse,
   MarkerWithContext,
