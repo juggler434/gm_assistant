@@ -126,6 +126,34 @@ export async function addMarkerToTranscript(
   return result[0] ?? null;
 }
 
+export async function updateMarkerInTranscript(
+  sessionId: string,
+  originalTime: number,
+  originalLabel: string,
+  updates: Partial<{ time: number; label: string; type: string; notes: string | null }>
+): Promise<TranscriptRow | null> {
+  const transcript = await findTranscriptBySessionId(sessionId);
+  if (!transcript) return null;
+
+  const markers = (transcript.markers ?? []).map((m) => {
+    if (m.time === originalTime && m.label === originalLabel) {
+      return {
+        ...m,
+        ...updates,
+      };
+    }
+    return m;
+  });
+  markers.sort((a, b) => a.time - b.time);
+
+  const result = await db
+    .update(transcripts)
+    .set({ markers })
+    .where(eq(transcripts.sessionId, sessionId))
+    .returning();
+  return result[0] ?? null;
+}
+
 export async function deleteMarkerFromTranscript(
   sessionId: string,
   markerTime: number,

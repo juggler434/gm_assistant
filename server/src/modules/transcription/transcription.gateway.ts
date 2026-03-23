@@ -53,6 +53,7 @@ function createState(
     userId,
     audioBuffer: [],
     allAudioChunks: [],
+    finalAudioBuffer: null,
     segments: [],
     markers: [],
     fullTranscript: "",
@@ -99,6 +100,38 @@ function clearTimers(state: LiveSessionState): void {
   state.inactivityTimer = null;
 }
 
+/**
+ * Concatenate WebM audio chunks for S3 storage. Each chunk is a complete
+ * WebM file produced by restarting the browser's MediaRecorder. We keep
+ * the first file intact and strip the initialization segment (everything
+ * before the first Cluster element) from subsequent files so the result
+ * is one contiguous WebM stream.
+ */
+function concatAudioChunks(chunks: Buffer[]): Buffer {
+  if (chunks.length === 0) return Buffer.alloc(0);
+
+  const first = chunks[0]!;
+  if (chunks.length === 1) return first;
+
+  // WebM Cluster element EBML ID
+  const CLUSTER_ID = Buffer.from([0x1f, 0x43, 0xb6, 0x75]);
+
+  const parts: Buffer[] = [first];
+
+  for (let i = 1; i < chunks.length; i++) {
+    const chunk = chunks[i]!;
+    const clusterPos = chunk.indexOf(CLUSTER_ID);
+    if (clusterPos > 0) {
+      parts.push(chunk.subarray(clusterPos));
+    } else {
+      // No cluster found — include whole chunk as fallback
+      parts.push(chunk);
+    }
+  }
+
+  return Buffer.concat(parts);
+}
+
 async function flushAudioBuffer(
   state: LiveSessionState,
   socket: WebSocket,
@@ -107,7 +140,10 @@ async function flushAudioBuffer(
 ): Promise<void> {
   if (state.audioBuffer.length === 0) return;
 
-  const audioChunk = Buffer.concat(state.audioBuffer);
+  // Each chunk in the buffer is a complete, independently decodable audio
+  // file (the client restarts MediaRecorder periodically). Process each
+  // one individually through Whisper rather than concatenating them.
+  const chunks = [...state.audioBuffer];
   state.audioBuffer = [];
   state.lastFlushTime = Date.now();
   state.whisperInFlight = true;
@@ -119,43 +155,53 @@ async function flushAudioBuffer(
     return;
   }
 
-  const result = await transcribeAudio(audioChunk, {
-    baseUrl: whisperConfig.baseUrl,
-    model: whisperConfig.model,
-    timeout: whisperConfig.timeout,
-  });
+  let combinedText = "";
+  const combinedSegments: TranscriptSegment[] = [];
+
+  for (const chunk of chunks) {
+    const result = await transcribeAudio(chunk, {
+      baseUrl: whisperConfig.baseUrl,
+      model: whisperConfig.model,
+      timeout: whisperConfig.timeout,
+    });
+
+    if (!result.ok) {
+      logger.error(
+        { error: result.error, sessionId: state.sessionId },
+        "Whisper transcription failed"
+      );
+      sendError(socket, "TRANSCRIPTION_ERROR", result.error.message);
+      continue;
+    }
+
+    const { text, segments: whisperSegments, duration } = result.value;
+
+    if (text.trim()) {
+      const newSegments: TranscriptSegment[] = whisperSegments.map((s) => ({
+        startTime: s.start + state.currentOffset,
+        endTime: s.end + state.currentOffset,
+        speaker: "",
+        text: s.text.trim(),
+      }));
+
+      combinedSegments.push(...newSegments);
+      combinedText += (combinedText ? " " : "") + text.trim();
+      state.currentOffset += duration;
+    }
+  }
 
   state.whisperInFlight = false;
 
-  if (!result.ok) {
-    logger.error(
-      { error: result.error, sessionId: state.sessionId },
-      "Whisper transcription failed"
-    );
-    sendError(socket, "TRANSCRIPTION_ERROR", result.error.message);
-    return;
-  }
-
-  const { text, segments: whisperSegments, duration } = result.value;
-
-  if (text.trim()) {
-    // Map whisper segments to our transcript segment format with offset
-    const newSegments: TranscriptSegment[] = whisperSegments.map((s) => ({
-      startTime: s.start + state.currentOffset,
-      endTime: s.end + state.currentOffset,
-      speaker: "",
-      text: s.text.trim(),
-    }));
-
-    state.segments.push(...newSegments);
-    state.fullTranscript += (state.fullTranscript ? " " : "") + text.trim();
-    state.currentOffset += duration;
+  if (combinedText) {
+    state.segments.push(...combinedSegments);
+    state.fullTranscript +=
+      (state.fullTranscript ? " " : "") + combinedText;
 
     send(socket, {
       event: "transcript",
-      text: text.trim(),
+      text: combinedText,
       fullText: state.fullTranscript,
-      segments: newSegments,
+      segments: combinedSegments,
       isFinal,
     });
   }
@@ -267,6 +313,18 @@ function handleMarker(
   );
 }
 
+function handleFinalAudio(
+  state: LiveSessionState,
+  message: Extract<ClientMessage, { event: "final_audio" }>,
+  logger: FastifyRequest["log"]
+): void {
+  state.finalAudioBuffer = Buffer.from(message.data, "base64");
+  logger.info(
+    { sessionId: state.sessionId, bytes: state.finalAudioBuffer.length },
+    "Received final audio for storage"
+  );
+}
+
 async function handleStop(
   state: LiveSessionState,
   socket: WebSocket,
@@ -293,12 +351,13 @@ async function handleStop(
     markers: state.markers,
   });
 
-  // Optionally upload concatenated audio to S3
+  // Upload audio to S3 — prefer the complete continuous recording if available
   let audioPath: string | null = null;
-  if (state.saveAudio && state.allAudioChunks.length > 0) {
+  const audioToUpload = state.finalAudioBuffer
+    ?? (state.allAudioChunks.length > 0 ? concatAudioChunks(state.allAudioChunks) : null);
+  if (state.saveAudio && audioToUpload) {
     audioPath = `campaigns/${state.campaignId}/sessions/${state.sessionId}`;
-    const audioBuffer = Buffer.concat(state.allAudioChunks);
-    const uploadResult = await storage.uploadByKey(audioPath, audioBuffer, {
+    const uploadResult = await storage.uploadByKey(audioPath, audioToUpload, {
       contentType: "audio/webm",
     });
     if (!uploadResult.ok) {
@@ -366,10 +425,11 @@ async function handleDisconnect(
 
     // Upload partial audio if enabled
     let audioPath: string | null = null;
-    if (state.saveAudio && state.allAudioChunks.length > 0) {
+    const audioToUpload = state.finalAudioBuffer
+      ?? (state.allAudioChunks.length > 0 ? concatAudioChunks(state.allAudioChunks) : null);
+    if (state.saveAudio && audioToUpload) {
       audioPath = `campaigns/${state.campaignId}/sessions/${state.sessionId}`;
-      const audioBuffer = Buffer.concat(state.allAudioChunks);
-      const uploadResult = await storage.uploadByKey(audioPath, audioBuffer, {
+      const uploadResult = await storage.uploadByKey(audioPath, audioToUpload, {
         contentType: "audio/webm",
       });
       if (!uploadResult.ok) {
@@ -476,6 +536,9 @@ export async function transcriptionRoutes(
               break;
             case "marker":
               handleMarker(state, message, socket, request.log);
+              break;
+            case "final_audio":
+              handleFinalAudio(state, message, request.log);
               break;
             case "stop":
               await handleStop(state, socket, request.log);

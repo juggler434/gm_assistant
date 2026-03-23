@@ -10,6 +10,7 @@ import type {
   SessionAudioResponse,
   UpdateSessionSummaryRequest,
   CreateMarkerRequest,
+  UpdateMarkerRequest,
   MarkerResponse,
   MarkersResponse,
 } from "@/types";
@@ -188,6 +189,31 @@ export function useAddMarker() {
       data: CreateMarkerRequest;
     }) =>
       api.post<MarkerResponse>(
+        `/api/campaigns/${campaignId}/sessions/${sessionId}/markers`,
+        data
+      ),
+    onSuccess: (_data, { campaignId, sessionId }) => {
+      queryClient.invalidateQueries({
+        queryKey: sessionKeys.transcript(campaignId, sessionId),
+      });
+    },
+  });
+}
+
+export function useUpdateMarker() {
+  const queryClient = useQueryClient();
+
+  return useMutation({
+    mutationFn: ({
+      campaignId,
+      sessionId,
+      data,
+    }: {
+      campaignId: string;
+      sessionId: string;
+      data: UpdateMarkerRequest;
+    }) =>
+      api.patch<MarkersResponse>(
         `/api/campaigns/${campaignId}/sessions/${sessionId}/markers`,
         data
       ),

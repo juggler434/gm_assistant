@@ -20,6 +20,11 @@ const markerMessageSchema = z.object({
   notes: z.string().max(1000).optional(),
 });
 
+const finalAudioMessageSchema = z.object({
+  event: z.literal("final_audio"),
+  data: z.string().min(1),
+});
+
 const stopMessageSchema = z.object({
   event: z.literal("stop"),
 });
@@ -28,6 +33,7 @@ export const clientMessageSchema = z.discriminatedUnion("event", [
   startMessageSchema,
   audioMessageSchema,
   markerMessageSchema,
+  finalAudioMessageSchema,
   stopMessageSchema,
 ]);
 
