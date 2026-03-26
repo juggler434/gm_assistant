@@ -1,0 +1,8 @@
+fastapi==0.115.6
+python-multipart==0.0.20
+uvicorn==0.34.0
+pyannote.audio==3.3.2
+matplotlib
+huggingface_hub<0.24
+torch==2.4.1
+torchaudio==2.4.1

@@ -69,6 +69,10 @@ const envSchema = z
     WHISPER_MODEL: z.string().default("base"),
     WHISPER_TIMEOUT: z.coerce.number().int().positive().default(30000),
 
+    // Speaker Diarization (optional - speaker labels disabled if not set)
+    DIARIZATION_BASE_URL: z.string().url().optional(),
+    DIARIZATION_TIMEOUT: z.coerce.number().int().positive().default(120000),
+
     // PostHog Analytics
     POSTHOG_API_KEY: z.string().optional(),
     POSTHOG_HOST: z.string().url().optional(),

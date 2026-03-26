@@ -9,6 +9,7 @@ import {
   type GameSessionRow,
   type NewGameSession,
   type GameSessionStatus,
+  type TranscriptSegment,
   type TranscriptRow,
   type NewTranscript,
   type SessionSummaryRow,
@@ -101,6 +102,18 @@ export async function createTranscript(
   data: NewTranscript
 ): Promise<TranscriptRow | null> {
   const result = await db.insert(transcripts).values(data).returning();
+  return result[0] ?? null;
+}
+
+export async function updateTranscriptSegments(
+  sessionId: string,
+  segments: TranscriptSegment[]
+): Promise<TranscriptRow | null> {
+  const result = await db
+    .update(transcripts)
+    .set({ segments })
+    .where(eq(transcripts.sessionId, sessionId))
+    .returning();
   return result[0] ?? null;
 }
 
