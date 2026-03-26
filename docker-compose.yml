@@ -78,6 +78,21 @@ services:
       retries: 3
       start_period: 30s
 
+  diarization:
+    build: ./services/diarization
+    container_name: gm_assistant_diarization
+    profiles: ["with-diarization"]
+    env_file:
+      - ./server/.env
+    ports:
+      - "8002:8000"
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8000/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 5
+      start_period: 300s
+
   ollama:
     image: ollama/ollama:latest
     container_name: gm_assistant_ollama

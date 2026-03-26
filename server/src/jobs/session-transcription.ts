@@ -16,6 +16,10 @@ import { config } from "@/config/index.js";
 import { createStorageService } from "@/services/storage/index.js";
 import { transcribeAudio } from "@/services/whisper/index.js";
 import {
+  diarizeAudio,
+  mapSpeakersToSegments,
+} from "@/services/diarization/index.js";
+import {
   updateSession,
   createTranscript,
   findSessionByIdAndCampaignId,
@@ -147,24 +151,62 @@ async function handleSessionTranscription(
     textLength: whisperResponse.text.length,
   });
 
-  // ---- Stage 3: Store transcript (80 → 95%) ----
-  if (context.signal.aborted) {
-    await updateSession(sessionId, { status: "recording" });
-    throw new Error("Job cancelled");
-  }
-
-  await context.updateProgress({
-    percentage: 80,
-    message: "Storing transcript",
-    metadata: { stage: "storage" },
-  });
-
-  const segments = whisperResponse.segments.map((s) => ({
+  // ---- Stage 3: Diarization (80 → 90%) ----
+  let segments = whisperResponse.segments.map((s) => ({
     startTime: s.start,
     endTime: s.end,
     speaker: "unknown",
     text: s.text,
   }));
+
+  if (config.diarization.baseUrl) {
+    if (context.signal.aborted) {
+      await updateSession(sessionId, { status: "recording" });
+      throw new Error("Job cancelled");
+    }
+
+    await context.updateProgress({
+      percentage: 80,
+      message: "Identifying speakers",
+      metadata: { stage: "diarization" },
+    });
+
+    const diarizationResult = await diarizeAudio(
+      audioBuffer,
+      {
+        baseUrl: config.diarization.baseUrl,
+        timeout: config.diarization.timeout,
+      },
+      context.signal,
+    );
+
+    if (diarizationResult.ok) {
+      segments = mapSpeakersToSegments(segments, diarizationResult.value.speakers);
+      context.logger.info("Diarization complete", {
+        sessionId,
+        speakerSegments: diarizationResult.value.speakers.length,
+      });
+    } else {
+      // Diarization failure is non-fatal — continue with "unknown" speakers
+      context.logger.warn("Diarization failed, continuing without speaker labels", {
+        sessionId,
+        code: diarizationResult.error.code,
+        error: diarizationResult.error.message,
+      });
+    }
+  }
+
+  await context.updateProgress({
+    percentage: 90,
+    message: "Storing transcript",
+    metadata: { stage: "storage" },
+  });
+
+  // ---- Stage 4: Store transcript (90 → 95%) ----
+  if (context.signal.aborted) {
+    await updateSession(sessionId, { status: "recording" });
+    throw new Error("Job cancelled");
+  }
 
   const transcript = await createTranscript({
     sessionId,
@@ -185,7 +227,7 @@ async function handleSessionTranscription(
     metadata: { stage: "storage" },
   });
 
-  // ---- Stage 4: Update session to ready (95 → 100%) ----
+  // ---- Stage 5: Update session to ready (95 → 100%) ----
   await updateSession(sessionId, {
     status: "ready",
     duration: Math.round(whisperResponse.duration),

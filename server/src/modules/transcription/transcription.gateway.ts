@@ -8,6 +8,10 @@ import { createSession, updateSession } from "@/modules/sessions/index.js";
 import { createTranscript } from "@/modules/sessions/index.js";
 import { createStorageService } from "@/services/storage/index.js";
 import { transcribeAudio } from "@/services/whisper/index.js";
+import {
+  diarizeAudio,
+  mapSpeakersToSegments,
+} from "@/services/diarization/index.js";
 import { config } from "@/config/index.js";
 import { trackEvent } from "@/services/metrics/index.js";
 import { clientMessageSchema, campaignIdParamSchema } from "./schemas.js";
@@ -342,6 +346,40 @@ async function handleStop(
   await flushAudioBuffer(state, socket, true, logger);
 
   const duration = Math.round((Date.now() - state.recordingStartTime) / 1000);
+
+  // Run speaker diarization on the full audio if configured
+  const audioForDiarization = state.finalAudioBuffer
+    ?? (state.allAudioChunks.length > 0 ? concatAudioChunks(state.allAudioChunks) : null);
+
+  if (config.diarization.baseUrl && audioForDiarization && state.segments.length > 0) {
+    try {
+      const diarizationResult = await diarizeAudio(audioForDiarization, {
+        baseUrl: config.diarization.baseUrl,
+        timeout: config.diarization.timeout,
+      });
+
+      if (diarizationResult.ok) {
+        state.segments = mapSpeakersToSegments(
+          state.segments,
+          diarizationResult.value.speakers,
+        );
+        logger.info(
+          { sessionId: state.sessionId, speakerSegments: diarizationResult.value.speakers.length },
+          "Live session diarization complete",
+        );
+      } else {
+        logger.warn(
+          { sessionId: state.sessionId, error: diarizationResult.error.message },
+          "Live session diarization failed, continuing without speaker labels",
+        );
+      }
+    } catch (error) {
+      logger.warn(
+        { sessionId: state.sessionId, error },
+        "Live session diarization threw, continuing without speaker labels",
+      );
+    }
+  }
 
   // Save transcript to DB
   await createTranscript({

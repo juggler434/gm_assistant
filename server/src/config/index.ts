@@ -52,6 +52,10 @@ export const config = {
     model: env.WHISPER_MODEL,
     timeout: env.WHISPER_TIMEOUT,
   },
+  diarization: {
+    baseUrl: env.DIARIZATION_BASE_URL,
+    timeout: env.DIARIZATION_TIMEOUT,
+  },
   posthog: {
     apiKey: env.POSTHOG_API_KEY,
     host: env.POSTHOG_HOST,
