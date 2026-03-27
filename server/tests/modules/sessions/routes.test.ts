@@ -463,6 +463,7 @@ describe("Session Routes", () => {
       expect(mockQueueAdd).toHaveBeenCalledWith("transcribe-session", {
         sessionId: expect.any(String),
         campaignId: mockCampaignId,
+        userId: expect.any(String),
         audioPath: expect.stringContaining(`campaigns/${mockCampaignId}/sessions/`),
         mimeType: "audio/mpeg",
       });

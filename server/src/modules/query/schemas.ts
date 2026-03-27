@@ -35,3 +35,30 @@ export const queryBodySchema = z.object({
 });
 
 export type QueryBody = z.infer<typeof queryBodySchema>;
+
+// Schema for session query request body
+export const sessionQueryBodySchema = z.object({
+  query: z
+    .string()
+    .min(1, "Query must not be empty")
+    .max(2000, "Query must be at most 2000 characters"),
+  dateRange: z
+    .object({
+      from: z.string().datetime("Invalid 'from' date"),
+      to: z.string().datetime("Invalid 'to' date"),
+    })
+    .optional(),
+  sessionIds: z.array(z.string().uuid()).optional(),
+  includeDocuments: z.boolean().optional().default(true),
+  conversationHistory: z
+    .array(
+      z.object({
+        role: z.enum(["user", "assistant"]),
+        content: z.string().max(10_000),
+      }),
+    )
+    .max(20)
+    .optional(),
+});
+
+export type SessionQueryBody = z.infer<typeof sessionQueryBodySchema>;

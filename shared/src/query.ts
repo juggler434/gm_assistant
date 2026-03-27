@@ -32,6 +32,12 @@ export interface AnswerSource {
   relevanceScore: number;
   /** Citation index used in generated text (e.g. [1], [2]) */
   index?: number;
+  /** Session ID if the source is a transcript */
+  sessionId?: string;
+  /** Session title if the source is a transcript */
+  sessionTitle?: string;
+  /** Session date (ISO string) if the source is a transcript */
+  sessionDate?: string;
 }
 
 /** Alias for AnswerSource — used in query response contexts */

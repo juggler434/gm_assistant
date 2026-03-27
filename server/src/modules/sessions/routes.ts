@@ -38,6 +38,7 @@ const storage = createStorageService();
 interface TranscriptionJobData {
   sessionId: string;
   campaignId: string;
+  userId: string;
   audioPath: string;
   mimeType: string;
   [key: string]: unknown;
@@ -49,11 +50,22 @@ interface SummaryJobData {
   [key: string]: unknown;
 }
 
+interface TranscriptIndexingJobData {
+  sessionId: string;
+  campaignId: string;
+  userId: string;
+  [key: string]: unknown;
+}
+
 const transcriptionQueue = createQueue<TranscriptionJobData>(
   "session-transcription"
 );
 
 const summaryQueue = createQueue<SummaryJobData>("session-summary");
+
+const transcriptIndexingQueue = createQueue<TranscriptIndexingJobData>(
+  "transcript-indexing",
+);
 
 export async function sessionRoutes(app: FastifyInstance): Promise<void> {
   app.addHook("preHandler", requireAuth);
@@ -186,6 +198,7 @@ export async function sessionRoutes(app: FastifyInstance): Promise<void> {
       {
         sessionId,
         campaignId,
+        userId,
         audioPath,
         mimeType,
       }
@@ -896,5 +909,61 @@ export async function sessionRoutes(app: FastifyInstance): Promise<void> {
     });
 
     return reply.status(200).send({ summary: updated });
+  });
+
+  // POST /api/campaigns/:campaignId/sessions/reindex - Reindex all session transcripts for RAG
+  app.post("/:campaignId/sessions/reindex", async (request, reply) => {
+    const paramResult = campaignIdParamSchema.safeParse(request.params);
+    if (!paramResult.success) {
+      return reply.status(400).send({
+        statusCode: 400,
+        error: "Bad Request",
+        message:
+          paramResult.error.issues[0]?.message ?? "Invalid campaign ID",
+      });
+    }
+
+    const { campaignId } = paramResult.data;
+    const userId = request.userId!;
+
+    const campaign = await findCampaignByIdAndUserId(campaignId, userId);
+    if (!campaign) {
+      return reply.status(404).send({
+        statusCode: 404,
+        error: "Not Found",
+        message: "Campaign not found",
+      });
+    }
+
+    // Find all ready sessions
+    const sessions = await findSessionsByCampaignId(campaignId, {
+      status: "ready",
+      limit: 500,
+    });
+
+    // Queue indexing for each session that has a transcript
+    let queued = 0;
+    for (const session of sessions) {
+      const transcript = await findTranscriptBySessionId(session.id);
+      if (!transcript) continue;
+
+      const result = await transcriptIndexingQueue.add(
+        "index-transcript",
+        {
+          sessionId: session.id,
+          campaignId,
+          userId,
+        },
+        { attempts: 3, backoff: { type: "exponential", delay: 5000 } },
+      );
+
+      if (result.ok) queued++;
+    }
+
+    return reply.status(200).send({
+      message: `Queued ${queued} transcript(s) for indexing`,
+      queued,
+      totalSessions: sessions.length,
+    });
   });
 }

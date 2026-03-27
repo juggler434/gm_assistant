@@ -54,12 +54,30 @@ function formatChunkEntry(citationIndex: number, result: HybridSearchResult): st
 
   // Header with citation marker and source info
   const sourceInfo: string[] = [`[${citationIndex}]`];
-  sourceInfo.push(result.document.name);
-  if (result.chunk.section) {
-    sourceInfo.push(`- ${result.chunk.section}`);
-  }
-  if (result.chunk.pageNumber !== null) {
-    sourceInfo.push(`(p. ${result.chunk.pageNumber})`);
+
+  if (result.document.documentType === "transcript") {
+    // Transcript sources: show session title, timestamp range, and date
+    const metadata = result.document.metadata as Record<string, unknown>;
+    const sessionTitle = (metadata?.sessionTitle as string) ?? result.document.name;
+    sourceInfo.push(sessionTitle);
+    if (result.chunk.section) {
+      sourceInfo.push(`(${result.chunk.section})`);
+    }
+    if (metadata?.sessionDate) {
+      const date = new Date(metadata.sessionDate as string);
+      sourceInfo.push(
+        `[${date.toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" })}]`,
+      );
+    }
+  } else {
+    // Document sources: show document name, section, page
+    sourceInfo.push(result.document.name);
+    if (result.chunk.section) {
+      sourceInfo.push(`- ${result.chunk.section}`);
+    }
+    if (result.chunk.pageNumber !== null) {
+      sourceInfo.push(`(p. ${result.chunk.pageNumber})`);
+    }
   }
 
   parts.push(sourceInfo.join(" "));
@@ -125,7 +143,7 @@ export function buildContext(
     contextParts.push(entry);
     totalTokens += entryTokens + separatorTokens;
 
-    sources.push({
+    const citation: SourceCitation = {
       index: citationIndex,
       documentName: result.document.name,
       documentId: result.document.id,
@@ -133,7 +151,17 @@ export function buildContext(
       pageNumber: result.chunk.pageNumber,
       section: result.chunk.section,
       relevanceScore: result.score,
-    });
+    };
+
+    // Add session metadata for transcript sources
+    if (result.document.documentType === "transcript") {
+      const metadata = result.document.metadata as Record<string, unknown>;
+      if (metadata?.sessionId) citation.sessionId = metadata.sessionId as string;
+      if (metadata?.sessionTitle) citation.sessionTitle = metadata.sessionTitle as string;
+      if (metadata?.sessionDate) citation.sessionDate = metadata.sessionDate as string;
+    }
+
+    sources.push(citation);
   }
 
   const contextText = contextParts.join("\n\n---\n\n");
