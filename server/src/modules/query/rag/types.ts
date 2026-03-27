@@ -24,7 +24,7 @@ export interface SourceCitation {
   documentName: string;
   /** Document ID */
   documentId: string;
-  /** Document type (e.g. "rulebook", "notes") */
+  /** Document type (e.g. "rulebook", "notes", "transcript") */
   documentType: string;
   /** Page number, if available */
   pageNumber: number | null;
@@ -32,6 +32,12 @@ export interface SourceCitation {
   section: string | null;
   /** Relevance score from hybrid search (0-1) */
   relevanceScore: number;
+  /** Session ID, if the source is a transcript */
+  sessionId?: string;
+  /** Session title, if the source is a transcript */
+  sessionTitle?: string;
+  /** Session date (ISO string), if the source is a transcript */
+  sessionDate?: string;
 }
 
 /** The assembled context ready to inject into a prompt */

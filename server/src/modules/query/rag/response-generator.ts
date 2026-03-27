@@ -27,7 +27,7 @@ import type {
  * System prompt that instructs the LLM how to behave as a RAG assistant
  * for a tabletop RPG game master.
  */
-const SYSTEM_PROMPT = `You are a helpful assistant for a tabletop RPG game master. Answer questions based on the provided source text from their campaign documents.
+const SYSTEM_PROMPT = `You are a helpful assistant for a tabletop RPG game master. Answer questions based on the provided source text from their campaign documents and session transcripts.
 
 Rules:
 1. Base your answer on the provided source text. When the source text contains relevant information, answer clearly and specifically. Quote exact numbers, dice, DCs, ranges, durations, and mechanics verbatim — write "1d20" not "a die roll", write "DC 15" not "a moderate difficulty".
@@ -35,7 +35,8 @@ Rules:
 3. Cite sources using their markers (e.g. [1], [2]).
 4. If the source text does not address the question at all, begin with "I don't have enough information" and explain what's missing.
 5. If sources conflict, note the discrepancy and cite both.
-6. If the source text includes a [SAVED] Campaign Content section, you may use that information to answer questions about NPCs, locations, and adventure hooks in the campaign. Reference it naturally without citation numbers.`;
+6. If the source text includes a [SAVED] Campaign Content section, you may use that information to answer questions about NPCs, locations, and adventure hooks in the campaign. Reference it naturally without citation numbers.
+7. When citing session transcripts, mention the session name and approximate timestamp if available (e.g. "During the Cave Exploration session [1]...").`;
 
 /**
  * Builds the user message that combines the context and question.
@@ -47,6 +48,17 @@ function buildUserMessage(query: string, context: BuiltContext): string {
 
   const sourceLegend = context.sources
     .map((s) => {
+      if (s.documentType === "transcript") {
+        const parts = [`[${s.index}] Session: ${s.sessionTitle ?? s.documentName}`];
+        if (s.section) parts.push(`(${s.section})`);
+        if (s.sessionDate) {
+          const date = new Date(s.sessionDate);
+          parts.push(
+            `[${date.toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" })}]`,
+          );
+        }
+        return parts.join(" ");
+      }
       const parts = [`[${s.index}] ${s.documentName}`];
       if (s.section) parts.push(`- ${s.section}`);
       if (s.pageNumber !== null) parts.push(`(p. ${s.pageNumber})`);
@@ -179,14 +191,20 @@ export async function generateResponse(
   const confidence = computeConfidence(context.sources, answerText);
 
   // Map context sources to answer sources
-  const answerSources: AnswerSource[] = context.sources.map((s) => ({
-    documentName: s.documentName,
-    documentId: s.documentId,
-    documentType: s.documentType,
-    pageNumber: s.pageNumber,
-    section: s.section,
-    relevanceScore: s.relevanceScore,
-  }));
+  const answerSources: AnswerSource[] = context.sources.map((s) => {
+    const source: AnswerSource = {
+      documentName: s.documentName,
+      documentId: s.documentId,
+      documentType: s.documentType,
+      pageNumber: s.pageNumber,
+      section: s.section,
+      relevanceScore: s.relevanceScore,
+    };
+    if (s.sessionId) source.sessionId = s.sessionId;
+    if (s.sessionTitle) source.sessionTitle = s.sessionTitle;
+    if (s.sessionDate) source.sessionDate = s.sessionDate;
+    return source;
+  });
 
   return ok({
     answer: answerText,

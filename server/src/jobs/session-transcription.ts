@@ -25,8 +25,10 @@ import {
   findSessionByIdAndCampaignId,
 } from "@/modules/sessions/repository.js";
 import { trackEvent } from "@/services/metrics/index.js";
+import { createQueue } from "@/jobs/index.js";
 import { registerHandler } from "./handlers/index.js";
 import type { BaseJobData, JobContext } from "./types.js";
+import type { TranscriptIndexingJobData } from "./transcript-indexing.js";
 
 // ============================================================================
 // Types
@@ -35,9 +37,14 @@ import type { BaseJobData, JobContext } from "./types.js";
 export interface SessionTranscriptionJobData extends BaseJobData {
   sessionId: string;
   campaignId: string;
+  userId: string;
   audioPath: string;
   mimeType: string;
 }
+
+const transcriptIndexingQueue = createQueue<TranscriptIndexingJobData>(
+  "transcript-indexing",
+);
 
 // ============================================================================
 // Job Handler
@@ -227,11 +234,41 @@ async function handleSessionTranscription(
     metadata: { stage: "storage" },
   });
 
-  // ---- Stage 5: Update session to ready (95 → 100%) ----
+  // ---- Stage 5: Update session to ready (95 → 98%) ----
   await updateSession(sessionId, {
     status: "ready",
     duration: Math.round(whisperResponse.duration),
   });
+
+  await context.updateProgress({
+    percentage: 98,
+    message: "Queuing transcript for RAG indexing",
+    metadata: { stage: "indexing-queue" },
+  });
+
+  // ---- Stage 6: Queue transcript indexing for RAG search ----
+  const indexQueueResult = await transcriptIndexingQueue.add(
+    "index-transcript",
+    {
+      sessionId,
+      campaignId,
+      userId: data.userId,
+    },
+    { attempts: 3, backoff: { type: "exponential", delay: 5000 } },
+  );
+
+  if (!indexQueueResult.ok) {
+    // Non-fatal: transcription succeeded, indexing can be retried
+    context.logger.warn("Failed to queue transcript indexing", {
+      sessionId,
+      error: indexQueueResult.error.message,
+    });
+  } else {
+    context.logger.info("Transcript indexing queued", {
+      sessionId,
+      jobId: indexQueueResult.value,
+    });
+  }
 
   await context.updateProgress({
     percentage: 100,
