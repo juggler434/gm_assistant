@@ -11,6 +11,7 @@ import {
   BookOpen,
   Scroll,
   User,
+  MessageSquare,
   AlertCircle,
   Loader2,
   Clock,
@@ -28,6 +29,7 @@ const typeIcons: Record<DocumentType, React.ReactNode> = {
   map: <Map className="h-5 w-5" />,
   image: <Image className="h-5 w-5" />,
   character: <User className="h-5 w-5" />,
+  transcript: <MessageSquare className="h-5 w-5" />,
 };
 
 const statusConfig: Record<

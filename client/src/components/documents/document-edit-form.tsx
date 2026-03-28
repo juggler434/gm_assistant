@@ -36,6 +36,7 @@ const documentTypeLabels: Record<DocumentType, string> = {
   character: "Character",
   map: "Map",
   image: "Image",
+  transcript: "Transcript",
 };
 
 export function DocumentEditForm({
