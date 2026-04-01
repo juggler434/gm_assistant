@@ -67,7 +67,7 @@ const envSchema = z
     // Whisper (speech-to-text)
     WHISPER_BASE_URL: z.string().url().optional(),
     WHISPER_MODEL: z.string().default("base"),
-    WHISPER_TIMEOUT: z.coerce.number().int().positive().default(30000),
+    WHISPER_TIMEOUT: z.coerce.number().int().positive().default(120000),
 
     // Speaker Diarization (optional - speaker labels disabled if not set)
     DIARIZATION_BASE_URL: z.string().url().optional(),

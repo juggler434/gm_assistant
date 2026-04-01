@@ -14,7 +14,7 @@
 
 import { config } from "@/config/index.js";
 import { createStorageService } from "@/services/storage/index.js";
-import { transcribeAudio } from "@/services/whisper/index.js";
+import { transcribeAudioChunked } from "@/services/whisper/index.js";
 import {
   diarizeAudio,
   mapSpeakersToSegments,
@@ -123,10 +123,19 @@ async function handleSessionTranscription(
     timeout: config.whisper.timeout,
   };
 
-  const transcriptionResult = await transcribeAudio(
+  const transcriptionResult = await transcribeAudioChunked(
     audioBuffer,
+    data.mimeType,
     whisperConfig,
     context.signal,
+    ({ chunksTotal, chunksCompleted }) => {
+      const chunkProgress = 10 + Math.round((chunksCompleted / chunksTotal) * 70);
+      context.updateProgress({
+        percentage: chunkProgress,
+        message: `Transcribing audio (chunk ${chunksCompleted}/${chunksTotal})`,
+        metadata: { stage: "transcription", chunksTotal, chunksCompleted },
+      });
+    },
   );
 
   if (!transcriptionResult.ok) {
