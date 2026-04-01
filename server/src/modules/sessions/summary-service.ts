@@ -21,12 +21,17 @@ export interface GeneratedSummary {
 
 // Approximate characters per token for English text
 const CHARS_PER_TOKEN = 4;
-// Max transcript tokens to fit in a single LLM call (leave room for prompt + output)
-const MAX_SINGLE_PASS_CHARS = 12_000 * CHARS_PER_TOKEN;
+// Max transcript tokens to fit in a single LLM call.
+// Conservative to leave headroom for system prompt (~400 tokens) + output (~1K tokens)
+// even on models with small context windows (8K).
+const MAX_SINGLE_PASS_CHARS = 6_000 * CHARS_PER_TOKEN;
 // Chunk size for splitting long transcripts
-const CHUNK_SIZE_CHARS = 8_000 * CHARS_PER_TOKEN;
+const CHUNK_SIZE_CHARS = 4_000 * CHARS_PER_TOKEN;
 // Overlap between chunks to maintain context
 const CHUNK_OVERLAP_CHARS = 500 * CHARS_PER_TOKEN;
+// If the LLM response is shorter than this, it was likely truncated by
+// the model's context limit and we should retry with chunking.
+const MIN_VALID_RESPONSE_CHARS = 300;
 
 const SUMMARY_SYSTEM_PROMPT = `You are an expert RPG Game Master assistant that creates structured session summaries from game session transcripts.
 
@@ -72,7 +77,116 @@ Combine them into one coherent final summary as a JSON object with these fields:
 Respond ONLY with valid JSON. No markdown, no code fences, no explanation.`;
 
 /**
- * Parse a JSON response from the LLM, handling potential markdown fences.
+ * Attempt to recover a truncated JSON object by scanning forward to determine
+ * the structural state (open strings, arrays, objects) at the truncation point,
+ * then appending the necessary closing tokens.
+ */
+function recoverTruncatedJson(text: string): unknown | null {
+  // Forward-scan to track JSON structural state at truncation point
+  let inString = false;
+  let escape = false;
+  const stack: ("}" | "]")[] = []; // closing tokens needed, innermost last
+
+  // Track what came right before truncation (outside strings)
+  let lastNonWhitespaceOutsideString = "";
+
+  for (let i = 0; i < text.length; i++) {
+    const c = text[i]!;
+    if (escape) { escape = false; continue; }
+
+    if (inString) {
+      if (c === "\\") { escape = true; continue; }
+      if (c === '"') { inString = false; }
+      continue;
+    }
+
+    // Outside a string
+    if (c === '"') { inString = true; continue; }
+    if (c === "{") { stack.push("}"); }
+    else if (c === "[") { stack.push("]"); }
+    else if (c === "}" || c === "]") { stack.pop(); }
+
+    if (c.trim()) lastNonWhitespaceOutsideString = c;
+  }
+
+  if (stack.length === 0) return null; // Nothing to close
+
+  // Build a suffix to close the JSON structure
+  let suffix = "";
+
+  if (inString) {
+    // Truncated inside a string value — close it
+    suffix += '"';
+  }
+
+  // If the last structural token before truncation was ":" or ","
+  // we may be in an incomplete key-value position. Handle edge cases:
+  if (!inString) {
+    if (lastNonWhitespaceOutsideString === ":") {
+      // Value was never started — supply an empty string
+      suffix += '""';
+    } else if (lastNonWhitespaceOutsideString === ",") {
+      // Trailing comma — some parsers choke on this; remove it then retry
+      // We'll handle this by trying both with and without
+    }
+  }
+
+  // Close all open containers from innermost to outermost
+  for (let i = stack.length - 1; i >= 0; i--) {
+    suffix += stack[i];
+  }
+
+  // Try parsing with the computed suffix
+  try {
+    return JSON.parse(text + suffix);
+  } catch {
+    // If trailing comma caused issues, try trimming it
+    const trimmed = text.replace(/,\s*$/, "");
+    if (trimmed !== text) {
+      try {
+        return JSON.parse(trimmed + suffix);
+      } catch {
+        // fall through
+      }
+    }
+  }
+
+  // Last resort: walk backwards to find the last position where closing works
+  for (let i = text.length; i > 0; i--) {
+    const ch = text[i - 1]!;
+    if (ch === '"' || ch === "]" || ch === "}") {
+      const candidate = text.slice(0, i);
+      let braces = 0;
+      let brackets = 0;
+      let inStr = false;
+      let esc = false;
+      for (let j = 0; j < candidate.length; j++) {
+        const cc = candidate[j]!;
+        if (esc) { esc = false; continue; }
+        if (cc === "\\" && inStr) { esc = true; continue; }
+        if (cc === '"') { inStr = !inStr; continue; }
+        if (inStr) continue;
+        if (cc === "{") braces++;
+        else if (cc === "}") braces--;
+        else if (cc === "[") brackets++;
+        else if (cc === "]") brackets--;
+      }
+      if (inStr) continue;
+      const closers = "]".repeat(Math.max(0, brackets)) + "}".repeat(Math.max(0, braces));
+      try {
+        return JSON.parse(candidate + closers);
+      } catch {
+        continue;
+      }
+    }
+  }
+
+  return null;
+}
+
+/**
+ * Parse a JSON response from the LLM, handling potential markdown fences
+ * and truncated output.
  */
 function parseLLMJson(text: string): GeneratedSummary {
   let cleaned = text.trim();
@@ -81,24 +195,37 @@ function parseLLMJson(text: string): GeneratedSummary {
     cleaned = cleaned.replace(/^```(?:json)?\s*\n?/, "").replace(/\n?```\s*$/, "");
   }
 
-  const parsed = JSON.parse(cleaned);
+  let parsed: unknown;
+  try {
+    parsed = JSON.parse(cleaned);
+  } catch {
+    // LLM response was likely truncated due to token limit — attempt recovery
+    parsed = recoverTruncatedJson(cleaned);
+    if (parsed == null) {
+      throw new Error(
+        `Failed to parse LLM summary response as JSON (length=${cleaned.length}). ` +
+        `Response starts with: ${cleaned.slice(0, 200)}...`
+      );
+    }
+  }
 
+  const obj = parsed as Record<string, unknown>;
   return {
-    content: typeof parsed.content === "string" ? parsed.content : "",
-    keyEvents: Array.isArray(parsed.keyEvents)
-      ? parsed.keyEvents.filter((s: unknown) => typeof s === "string")
+    content: typeof obj.content === "string" ? obj.content : "",
+    keyEvents: Array.isArray(obj.keyEvents)
+      ? obj.keyEvents.filter((s: unknown) => typeof s === "string")
       : [],
-    npcsEncountered: Array.isArray(parsed.npcsEncountered)
-      ? parsed.npcsEncountered.filter((s: unknown) => typeof s === "string")
+    npcsEncountered: Array.isArray(obj.npcsEncountered)
+      ? obj.npcsEncountered.filter((s: unknown) => typeof s === "string")
       : [],
-    locationsVisited: Array.isArray(parsed.locationsVisited)
-      ? parsed.locationsVisited.filter((s: unknown) => typeof s === "string")
+    locationsVisited: Array.isArray(obj.locationsVisited)
+      ? obj.locationsVisited.filter((s: unknown) => typeof s === "string")
       : [],
-    itemsAcquired: Array.isArray(parsed.itemsAcquired)
-      ? parsed.itemsAcquired.filter((s: unknown) => typeof s === "string")
+    itemsAcquired: Array.isArray(obj.itemsAcquired)
+      ? obj.itemsAcquired.filter((s: unknown) => typeof s === "string")
       : [],
-    openQuestions: Array.isArray(parsed.openQuestions)
-      ? parsed.openQuestions.filter((s: unknown) => typeof s === "string")
+    openQuestions: Array.isArray(obj.openQuestions)
+      ? obj.openQuestions.filter((s: unknown) => typeof s === "string")
       : [],
   };
 }
@@ -143,14 +270,21 @@ export async function generateSessionSummary(
         },
       ],
       temperature: 0.3,
-      maxTokens: 2048,
+      maxTokens: 4096,
     });
 
     if (!result.ok) {
       throw new Error(`LLM generation failed: ${result.error.message}`);
     }
 
-    return parseLLMJson(result.value.message.content);
+    const responseText = result.value.message.content;
+
+    // If the response is suspiciously short, the model likely ran out of
+    // context window. Fall through to the chunked path instead of failing.
+    if (responseText.length >= MIN_VALID_RESPONSE_CHARS) {
+      return parseLLMJson(responseText);
+    }
+    // else: fall through to multi-pass chunking below
   }
 
   // Multi-pass: chunk → summarize each → combine
@@ -198,7 +332,7 @@ export async function generateSessionSummary(
       },
     ],
     temperature: 0.3,
-    maxTokens: 2048,
+    maxTokens: 4096,
   });
 
   if (!combineResult.ok) {

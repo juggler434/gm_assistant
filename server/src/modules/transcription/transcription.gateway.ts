@@ -7,7 +7,7 @@ import { findCampaignByIdAndUserId } from "@/modules/campaigns/index.js";
 import { createSession, updateSession } from "@/modules/sessions/index.js";
 import { createTranscript } from "@/modules/sessions/index.js";
 import { createStorageService } from "@/services/storage/index.js";
-import { transcribeAudio } from "@/services/whisper/index.js";
+import { transcribeAudio, removeWhisperRepetitions } from "@/services/whisper/index.js";
 import {
   diarizeAudio,
   mapSpeakersToSegments,
@@ -197,17 +197,37 @@ async function flushAudioBuffer(
   state.whisperInFlight = false;
 
   if (combinedText) {
-    state.segments.push(...combinedSegments);
-    state.fullTranscript +=
-      (state.fullTranscript ? " " : "") + combinedText;
+    // Check for Whisper repetition hallucinations against recent segments.
+    // Convert to WhisperSegment format for the filter, then convert back.
+    const allSegments = [
+      ...state.segments.map((s) => ({ start: s.startTime, end: s.endTime, text: s.text })),
+      ...combinedSegments.map((s) => ({ start: s.startTime, end: s.endTime, text: s.text })),
+    ];
+    const cleaned = removeWhisperRepetitions(allSegments);
 
-    send(socket, {
-      event: "transcript",
-      text: combinedText,
-      fullText: state.fullTranscript,
-      segments: combinedSegments,
-      isFinal,
-    });
+    // Extract only the new segments that survived filtering
+    const prevCount = state.segments.length;
+    const cleanedNew = cleaned.slice(prevCount).map((s) => ({
+      startTime: s.start,
+      endTime: s.end,
+      speaker: "",
+      text: s.text,
+    }));
+
+    if (cleanedNew.length > 0) {
+      const cleanedText = cleanedNew.map((s) => s.text.trim()).join(" ");
+      state.segments.push(...cleanedNew);
+      state.fullTranscript +=
+        (state.fullTranscript ? " " : "") + cleanedText;
+
+      send(socket, {
+        event: "transcript",
+        text: cleanedText,
+        fullText: state.fullTranscript,
+        segments: cleanedNew,
+        isFinal,
+      });
+    }
   }
 
   // If we accumulated more data while Whisper was busy, flush again

@@ -7,3 +7,8 @@ export {
   type WhisperSegment,
   type WhisperError,
 } from "./service.js";
+
+export {
+  transcribeAudioChunked,
+  removeWhisperRepetitions,
+} from "./chunked-transcription.js";
