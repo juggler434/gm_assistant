@@ -138,12 +138,21 @@ export function serializeAdventure(adventure: AdventureRow): string {
   const parts = [adventure.title + ":"];
   if (adventure.synopsis) parts.push(truncate(adventure.synopsis));
 
-  const sceneCount = Array.isArray(adventure.scenes) ? adventure.scenes.length : 0;
-  if (sceneCount > 0) parts.push(`(${sceneCount} scenes)`);
+  if (adventure.adventureFormat === "node-based" && Array.isArray(adventure.nodes) && adventure.nodes.length > 0) {
+    const nodeNames = adventure.nodes.map((n) => n.name).join(", ");
+    parts.push(`(${adventure.nodes.length} nodes: ${truncate(nodeNames)})`);
+    if (adventure.front) {
+      parts.push(`Situation: ${truncate(adventure.front.description)}`);
+    }
+  } else {
+    const sceneCount = Array.isArray(adventure.scenes) ? adventure.scenes.length : 0;
+    if (sceneCount > 0) parts.push(`(${sceneCount} scenes)`);
+  }
 
   const refs: string[] = [];
   if (adventure.npcs && adventure.npcs.length > 0) refs.push(`NPCs: ${adventure.npcs.join(", ")}`);
   if (adventure.locations && adventure.locations.length > 0) refs.push(`Locations: ${adventure.locations.join(", ")}`);
+  if (adventure.factions && adventure.factions.length > 0) refs.push(`Factions: ${adventure.factions.join(", ")}`);
   if (refs.length > 0) parts.push(refs.join(". ") + ".");
 
   return `- ${parts.join(" ")}`;

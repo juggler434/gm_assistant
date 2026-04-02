@@ -585,3 +585,464 @@ Respond ONLY with JSON.`;
 
   return { system, user: parts.join("\n") };
 }
+
+// ============================================================================
+// Node-Based Adventure Prompts
+// ============================================================================
+
+// ============================================================================
+// N1. Front + Doom Timeline Prompt
+// ============================================================================
+
+export function buildFrontAndDoomPrompt(
+  ctx: PipelinePromptContext,
+  tone: HookTone,
+  options: {
+    theme?: string | undefined;
+    partyLevel?: string | undefined;
+    outlineSeed?: string | undefined;
+  } = {},
+): { system: string; user: string } {
+  const themeInstruction = options.theme
+    ? `\nThe adventure theme is "${options.theme}". The entire front must revolve around this theme.`
+    : "";
+
+  const system = `You are a creative tabletop RPG game master assistant. Your tone is ${tone.toUpperCase()}: ${toneDescriptions[tone]}.${themeInstruction}
+
+You design adventures as SITUATIONS, not plots. Instead of scripting what happens, you describe:
+1. A FRONT — an evolving situation with factions that have goals, resources, and plans
+2. A DOOM TIMELINE — what happens over time if the players never intervene
+
+The front presents a situation the players react to freely. The doom timeline creates urgency — each stage escalates the consequences, giving the GM a "clock" to apply pressure.
+
+Generate a single adventure front with a doom timeline.
+
+Rules:
+- The front must describe a situation with 2-4 factions/forces, each with a clear goal and the resources to pursue it
+- Stakes must be concrete — what specifically will happen if no one stops it
+- The doom timeline must have 4-6 stages, each escalating from the last
+- Timeline labels should indicate approximate timing (e.g. "Day 1", "After 3 days", "One week later")
+- Each timeline stage should name which parts of the situation change
+- Do not invent major setting elements (cities, rulers, pantheons) not found in the context
+- ONLY add [N] citations when you mention a specific named person, place, faction, or organization from the setting context. Only cite sources listed in the context.
+
+Respond with valid JSON matching this schema:
+{
+  "title": "Adventure title",
+  "synopsis": "2-4 sentence overview of the situation",
+  "estimatedDuration": "4-6 hours",
+  "front": {
+    "description": "What is happening — the evolving situation the players walk into",
+    "stakes": "What happens if no one intervenes",
+    "keyFactions": [
+      {
+        "name": "Faction or force name",
+        "goal": "What they want to achieve",
+        "resources": "What they have at their disposal (people, magic, leverage, etc.)"
+      }
+    ]
+  },
+  "doomTimeline": [
+    {
+      "stage": 1,
+      "label": "Day 1 — The Warning Signs",
+      "event": "What happens at this stage",
+      "consequence": "How the situation changes as a result",
+      "nodesAffected": []
+    }
+  ]
+}
+
+The nodesAffected array will be empty for now — it will be filled in after nodes are generated.
+
+Respond ONLY with the JSON object. No markdown fencing, no commentary.`;
+
+  const parts: string[] = [];
+
+  if (ctx.settingText) {
+    parts.push("=== SETTING CONTEXT ===");
+    parts.push(ctx.settingText);
+    if (ctx.sourceLegend) {
+      parts.push(`\nSources:\n${ctx.sourceLegend}`);
+    }
+    parts.push("");
+  } else {
+    parts.push("No setting context available. Create a generic fantasy adventure front.");
+    parts.push("");
+  }
+
+  if (ctx.campaignContentText) {
+    parts.push("=== EXISTING CAMPAIGN CONTENT ===");
+    parts.push(ctx.campaignContentText);
+    parts.push("");
+  }
+
+  if (options.outlineSeed) {
+    parts.push("=== OUTLINE SEED ===");
+    parts.push("Use this existing adventure outline as inspiration for the front, but restructure it as a situation rather than a linear plot:");
+    parts.push(options.outlineSeed);
+    parts.push("");
+  }
+
+  parts.push("=== PARAMETERS ===");
+  parts.push(`Tone: ${tone}`);
+  if (options.partyLevel) {
+    parts.push(`Party level / CR: ${options.partyLevel}`);
+  }
+  if (options.theme) {
+    parts.push(`Theme: ${options.theme}`);
+  }
+  parts.push("");
+  parts.push("Generate an adventure front with a doom timeline based on the context above.");
+
+  return { system, user: parts.join("\n") };
+}
+
+// ============================================================================
+// N2. Node Map Prompt
+// ============================================================================
+
+export interface FrontSummary {
+  title: string;
+  synopsis: string;
+  description: string;
+  stakes: string;
+  factions: { name: string; goal: string }[];
+}
+
+export interface DoomTimelineSummary {
+  stages: { stage: number; label: string; event: string }[];
+}
+
+export function buildNodeMapPrompt(
+  ctx: PipelinePromptContext,
+  tone: HookTone,
+  front: FrontSummary,
+  doomTimeline: DoomTimelineSummary,
+  options: {
+    theme?: string | undefined;
+    partyLevel?: string | undefined;
+  } = {},
+): { system: string; user: string } {
+  const system = `You are a creative tabletop RPG game master assistant. Your tone is ${tone.toUpperCase()}: ${toneDescriptions[tone]}.
+
+Design a NODE MAP for an adventure — a web of interconnected locations and situations linked by clues. This is NOT a linear path. Players can discover nodes in any order by following clues.
+
+Key design principles:
+- THE THREE CLUE RULE: For every conclusion or node the players need to reach, provide at least 3 different clues pointing to it. Players will miss clues, misinterpret them, or ignore them. Three paths ensure they can always find their way.
+- ENTRY POINTS: Mark 1-2 nodes as entry points — where the adventure begins. These are the nodes the players encounter first or are directed to.
+- CLUE CONNECTIONS: Every non-entry node must be reachable via clues from other nodes. Clues can be physical evidence, NPC information, observations, documents, or trails.
+- VARIETY: Mix node types — locations to explore, events to witness, encounters to fight, and social situations to navigate.
+
+Generate 5-8 nodes forming an interconnected web.
+
+Rules:
+- Use simple IDs: "n1", "n2", "n3", etc.
+- Each node needs a brief description (2-3 sentences) — details will be fleshed out later
+- Connections must describe WHAT clue leads to the next node and HOW it is found
+- Hidden clues require active investigation; obvious clues are found automatically
+- Not every node needs to be visited to resolve the adventure — create optional nodes that add depth
+- Do not invent major setting elements not in the context
+- ONLY add [N] citations when mentioning specific named entities from the setting context. Only cite sources listed in the context.
+
+Respond with valid JSON:
+{
+  "nodes": [
+    {
+      "id": "n1",
+      "name": "Node name",
+      "type": "location",
+      "briefDescription": "2-3 sentences describing what this node is about",
+      "isEntryPoint": true,
+      "connections": [
+        {
+          "pointsTo": "n2",
+          "clueDescription": "What clue or information leads the players to the next node",
+          "clueType": "evidence",
+          "isHidden": false
+        }
+      ]
+    }
+  ]
+}
+
+Valid node types: "location", "event", "encounter", "social"
+Valid clue types: "evidence", "npc_info", "observation", "document", "trail"
+
+Respond ONLY with JSON.`;
+
+  const parts: string[] = [];
+
+  if (ctx.settingText) {
+    parts.push("=== SETTING CONTEXT ===");
+    parts.push(ctx.settingText);
+    if (ctx.sourceLegend) {
+      parts.push(`\nSources:\n${ctx.sourceLegend}`);
+    }
+    parts.push("");
+  }
+
+  parts.push("=== ADVENTURE FRONT ===");
+  parts.push(`Title: ${front.title}`);
+  parts.push(`Synopsis: ${front.synopsis}`);
+  parts.push(`Situation: ${front.description}`);
+  parts.push(`Stakes: ${front.stakes}`);
+  parts.push("");
+  parts.push("Factions:");
+  for (const faction of front.factions) {
+    parts.push(`- ${faction.name}: ${faction.goal}`);
+  }
+  parts.push("");
+
+  parts.push("=== DOOM TIMELINE ===");
+  for (const stage of doomTimeline.stages) {
+    parts.push(`${stage.stage}. ${stage.label}: ${stage.event}`);
+  }
+  parts.push("");
+
+  if (options.partyLevel) {
+    parts.push(`Party level / CR: ${options.partyLevel}`);
+  }
+  if (options.theme) {
+    parts.push(`Theme: ${options.theme}`);
+  }
+  parts.push("Generate a web of 5-8 interconnected nodes for this adventure.");
+
+  return { system, user: parts.join("\n") };
+}
+
+// ============================================================================
+// N3. Node Detail Prompt
+// ============================================================================
+
+export interface NodeStub {
+  id: string;
+  name: string;
+  type: string;
+  briefDescription: string;
+  isEntryPoint: boolean;
+  connections: {
+    pointsTo: string;
+    clueDescription: string;
+    clueType: string;
+    isHidden: boolean;
+  }[];
+}
+
+export function buildNodeDetailPrompt(
+  ctx: PipelinePromptContext,
+  tone: HookTone,
+  front: FrontSummary,
+  doomTimeline: DoomTimelineSummary,
+  node: NodeStub,
+  allNodes: NodeStub[],
+  options: {
+    theme?: string | undefined;
+    partyLevel?: string | undefined;
+    includeStatBlocks?: boolean | undefined;
+    previousNpcNames?: string[] | undefined;
+  } = {},
+): { system: string; user: string } {
+  const avoidNamesRule = options.previousNpcNames && options.previousNpcNames.length > 0
+    ? `\n- The following NPC names have ALREADY been used in other nodes. Do NOT reuse any of them: ${options.previousNpcNames.join(", ")}.`
+    : "";
+
+  const wantStatBlocks = options.includeStatBlocks !== false;
+  const hasRulebook = !!ctx.rulebookText;
+  let statBlockInstruction: string;
+
+  if (!wantStatBlocks) {
+    statBlockInstruction = "\n- Set statBlock to null for all encounters.";
+  } else if (hasRulebook) {
+    statBlockInstruction =
+      "\n- Include a \"statBlock\" object for EVERY encounter." +
+      " Derive the format and mechanics from the RULEBOOK section below." +
+      " Do NOT assume D&D attributes unless that is what the RULEBOOK uses.";
+  } else {
+    statBlockInstruction =
+      "\n- Include a \"statBlock\" object for each encounter with stats appropriate for the game system in the context." +
+      " If no game system is evident, use a generic format.";
+  }
+
+  const system = `You are a creative tabletop RPG game master assistant. Your tone is ${tone.toUpperCase()}: ${toneDescriptions[tone]}.
+
+Flesh out a single adventure NODE with full detail. This node is part of a non-linear, situation-based adventure where players explore a web of interconnected locations and events.
+
+Generate complete details for this node including:
+- A vivid GM-facing description with player options and potential outcomes
+- Atmospheric read-aloud text for players (2-4 sentences, second person)
+- 1-4 NPCs with distinct personalities and useful dialogue
+- 0-3 encounters appropriate for the node type
+- Clues that connect this node to other nodes in the adventure
+- Treasure and rewards appropriate for the node
+- A map/layout suggestion
+
+Rules:
+- NPCs: When creating NPC names, generate fresh, setting-appropriate names with diverse phonetics and cultural origins. Each name should feel individual.${avoidNamesRule}
+- NPC dialogue should be practical — things they would actually say to the party, with context for when
+- Clues must match the connections defined in the node map — use the exact pointsTo IDs provided
+- Encounters should fit the node's narrative context${statBlockInstruction}
+- Do not invent major NPCs or elements contradicting the setting context
+- If existing campaign NPCs are relevant, reference them by name
+- ONLY add [N] citations when mentioning specific named entities from the setting context. Only cite sources listed in the context.
+
+Respond with valid JSON:
+{
+  "node": {
+    "id": "${node.id}",
+    "name": "${node.name}",
+    "type": "${node.type}",
+    "description": "Detailed GM-facing description (3-5 sentences)",
+    "readAloud": "Atmospheric second-person text to read aloud (2-4 sentences)",
+    "npcDialogue": [
+      {
+        "npcName": "NPC Name",
+        "dialogue": "What they say",
+        "context": "When/why they say it"
+      }
+    ],
+    "encounters": [
+      {
+        "name": "Encounter name",
+        "description": "What triggers this and what happens",
+        "difficulty": "easy|medium|hard|deadly",
+        "creatures": ["Creature (count)"],
+        "tactics": "How they fight and use the environment",
+        "statBlock": null
+      }
+    ],
+    "treasure": ["Reward 1"],
+    "mapSuggestion": "Physical layout description",
+    "clues": [
+      {
+        "description": "What the clue is and how players find it",
+        "pointsTo": "target_node_id",
+        "type": "evidence|npc_info|observation|document|trail",
+        "isHidden": false
+      }
+    ],
+    "isEntryPoint": ${node.isEntryPoint}
+  }
+}
+
+Respond ONLY with JSON.`;
+
+  const parts: string[] = [];
+
+  if (ctx.settingText) {
+    parts.push("=== SETTING CONTEXT ===");
+    parts.push(ctx.settingText);
+    if (ctx.sourceLegend) {
+      parts.push(`\nSources:\n${ctx.sourceLegend}`);
+    }
+    parts.push("");
+  }
+
+  if (ctx.rulebookText) {
+    parts.push("=== RULEBOOK (use ONLY this for stat block mechanics) ===");
+    parts.push(ctx.rulebookText);
+    parts.push("");
+  }
+
+  if (ctx.campaignContentText) {
+    parts.push("=== EXISTING CAMPAIGN CONTENT ===");
+    parts.push(ctx.campaignContentText);
+    parts.push("");
+  }
+
+  parts.push("=== ADVENTURE FRONT ===");
+  parts.push(`Title: ${front.title}`);
+  parts.push(`Situation: ${front.description}`);
+  parts.push(`Stakes: ${front.stakes}`);
+  parts.push("");
+
+  parts.push("=== DOOM TIMELINE ===");
+  for (const stage of doomTimeline.stages) {
+    parts.push(`${stage.stage}. ${stage.label}: ${stage.event}`);
+  }
+  parts.push("");
+
+  parts.push("=== ALL NODES IN THIS ADVENTURE ===");
+  for (const n of allNodes) {
+    const marker = n.id === node.id ? " ← THIS NODE (flesh out)" : "";
+    const entry = n.isEntryPoint ? " [ENTRY POINT]" : "";
+    parts.push(`- ${n.id}: ${n.name} (${n.type})${entry}${marker}`);
+    parts.push(`  ${n.briefDescription}`);
+  }
+  parts.push("");
+
+  parts.push(`=== NODE TO FLESH OUT: ${node.id} — ${node.name} ===`);
+  parts.push(`Type: ${node.type}`);
+  parts.push(`Entry point: ${node.isEntryPoint}`);
+  parts.push(`Brief: ${node.briefDescription}`);
+  parts.push("");
+  if (node.connections.length > 0) {
+    parts.push("Defined clue connections (you MUST include these clues in your output):");
+    for (const conn of node.connections) {
+      const targetNode = allNodes.find(n => n.id === conn.pointsTo);
+      const targetName = targetNode ? targetNode.name : conn.pointsTo;
+      parts.push(`- → ${targetName} (${conn.pointsTo}): "${conn.clueDescription}" [${conn.clueType}, ${conn.isHidden ? "hidden" : "obvious"}]`);
+    }
+    parts.push("");
+  }
+
+  if (options.partyLevel) {
+    parts.push(`Party level / CR: ${options.partyLevel}`);
+  }
+  if (options.theme) {
+    parts.push(`Theme: ${options.theme}`);
+  }
+  parts.push(`Generate full details for node ${node.id}: ${node.name}.`);
+
+  return { system, user: parts.join("\n") };
+}
+
+// ============================================================================
+// N4. Doom Timeline Update Prompt (links timeline stages to node IDs)
+// ============================================================================
+
+export function buildDoomTimelineUpdatePrompt(
+  front: FrontSummary,
+  doomTimeline: DoomTimelineSummary,
+  allNodes: NodeStub[],
+): { system: string; user: string } {
+  const system = `You are a tabletop RPG game master assistant. Your task is simple: for each doom timeline stage, identify which adventure nodes are affected by that stage's events.
+
+Respond with valid JSON:
+{
+  "doomTimeline": [
+    {
+      "stage": 1,
+      "label": "same label",
+      "event": "same event",
+      "consequence": "same consequence",
+      "nodesAffected": ["n1", "n3"]
+    }
+  ]
+}
+
+Only use node IDs that exist in the provided node list. A timeline stage can affect 0 or more nodes.
+Respond ONLY with JSON.`;
+
+  const parts: string[] = [];
+
+  parts.push("=== ADVENTURE FRONT ===");
+  parts.push(`Title: ${front.title}`);
+  parts.push(`Situation: ${front.description}`);
+  parts.push("");
+
+  parts.push("=== NODES ===");
+  for (const n of allNodes) {
+    parts.push(`- ${n.id}: ${n.name} — ${n.briefDescription}`);
+  }
+  parts.push("");
+
+  parts.push("=== DOOM TIMELINE (add nodesAffected to each) ===");
+  for (const stage of doomTimeline.stages) {
+    parts.push(`${stage.stage}. ${stage.label}: ${stage.event}`);
+  }
+  parts.push("");
+  parts.push("For each timeline stage, determine which nodes are affected. Return the updated timeline.");
+
+  return { system, user: parts.join("\n") };
+}

@@ -527,7 +527,7 @@ export async function generationRoutes(app: FastifyInstance): Promise<void> {
         campaign_id: campaignId,
         tone,
         theme: theme ?? null,
-        scene_count: result.value.adventure.scenes.length,
+        node_count: result.value.adventure.nodes.length,
         source_outline_id: sourceOutlineId ?? null,
       });
 
@@ -564,7 +564,7 @@ export async function generationRoutes(app: FastifyInstance): Promise<void> {
       campaign_id: campaignId,
       tone,
       theme: theme ?? null,
-      scene_count: result.value.adventure.scenes.length,
+      node_count: result.value.adventure.nodes.length,
       source_outline_id: sourceOutlineId ?? null,
     });
 

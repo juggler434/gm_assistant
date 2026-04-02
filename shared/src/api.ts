@@ -26,7 +26,7 @@ import type {
   SummaryStatus,
   Transcript,
 } from "./entities.js";
-import type { AdventureScene } from "./generation.js";
+import type { AdventureFront, AdventureNode, AdventureScene, TimelineEntry } from "./generation.js";
 
 // ============================================================================
 // Shared API Error Response
@@ -367,7 +367,16 @@ export interface CreateAdventureRequest {
   title: string;
   synopsis: string;
   estimatedDuration?: string | null;
-  scenes: AdventureScene[];
+  /** Legacy linear scenes (required for linear format) */
+  scenes?: AdventureScene[];
+  /** "linear" or "node-based" (defaults to "linear" for backward compat) */
+  adventureFormat?: "linear" | "node-based";
+  /** The evolving situation (required for node-based format) */
+  front?: AdventureFront | null;
+  /** Web of interconnected nodes (required for node-based format) */
+  nodes?: AdventureNode[] | null;
+  /** Doom timeline stages (required for node-based format) */
+  doomTimeline?: TimelineEntry[] | null;
   npcs?: string[] | null;
   locations?: string[] | null;
   factions?: string[] | null;
@@ -383,6 +392,10 @@ export interface UpdateAdventureRequest {
   synopsis?: string;
   estimatedDuration?: string | null;
   scenes?: AdventureScene[];
+  adventureFormat?: "linear" | "node-based";
+  front?: AdventureFront | null;
+  nodes?: AdventureNode[] | null;
+  doomTimeline?: TimelineEntry[] | null;
   npcs?: string[] | null;
   locations?: string[] | null;
   factions?: string[] | null;

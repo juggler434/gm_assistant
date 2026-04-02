@@ -1,19 +1,20 @@
 // SPDX-License-Identifier: AGPL-3.0-or-later
 
 /**
- * Full Adventure Generator - Multi-Step Pipeline
+ * Full Adventure Generator - Node-Based Pipeline
  *
  * Generates complete adventures through a chained LLM pipeline:
- * 1. Generate/load outline (1 call if needed)
- * 2. For each act:
- *    a. Generate locations (1 call)
- *    b. Generate NPCs with location context (1 call)
- *    c. Generate encounters with location + NPC context (1 call)
- *    d. Compose full scenes tying everything together (1 call)
- * 3. Assemble final adventure
+ * 1. Retrieve setting context via RAG
+ * 2. Generate front (situation) + doom timeline (1 call)
+ * 3. Generate node map — interconnected web of locations/events (1 call)
+ * 4. For each node: generate full details (5-8 calls)
+ * 5. Update doom timeline with node references (1 call)
+ * 6. Validate node graph connectivity
+ * 7. Assemble final adventure
  *
- * Each step feeds its results into the next, producing more detailed and
- * coherent adventures than a single monolithic LLM call.
+ * This produces non-linear, situation-based adventures where players
+ * explore a web of nodes connected by clues rather than following
+ * a predetermined linear path.
  */
 
 import { type Result, ok, err } from "@/types/index.js";
@@ -28,13 +29,14 @@ import type { AnswerSource } from "@/modules/query/rag/types.js";
 import { buildCampaignContentContext } from "../campaign-content.js";
 import { findAdventureOutlineByIdAndCampaignId } from "@/modules/adventure-outlines/repository.js";
 import {
-  buildOutlineStepPrompt,
-  buildActLocationsPrompt,
-  buildActNpcsPrompt,
-  buildActEncountersPrompt,
-  buildActScenesPrompt,
+  buildFrontAndDoomPrompt,
+  buildNodeMapPrompt,
+  buildNodeDetailPrompt,
+  buildDoomTimelineUpdatePrompt,
   type PipelinePromptContext,
-  type ActDescription,
+  type FrontSummary,
+  type DoomTimelineSummary,
+  type NodeStub,
 } from "../prompts/adventures.js";
 import type {
   AdventureGenerationRequest,
@@ -44,9 +46,13 @@ import type {
   AdventurePipelineEvent,
 } from "../types.js";
 import type {
-  AdventureScene,
+  AdventureFront,
+  AdventureNode,
+  FactionGoal,
+  NodeClue,
   NpcDialogueLine,
   SceneEncounter,
+  TimelineEntry,
   TokenUsage,
 } from "@gm-assistant/shared";
 
@@ -59,56 +65,35 @@ const MAX_CONTEXT_TOKENS = 4000;
 const GENERATION_TEMPERATURE = 0.8;
 const STEP_CONTEXT_SIZE = 16384;
 
-const OUTLINE_MAX_TOKENS = 8192;
-const LOCATIONS_MAX_TOKENS = 8192;
-const NPCS_MAX_TOKENS = 8192;
-const ENCOUNTERS_MAX_TOKENS = 12288;
-const SCENES_MAX_TOKENS = 16384;
+const FRONT_DOOM_MAX_TOKENS = 8192;
+const NODE_MAP_MAX_TOKENS = 8192;
+const NODE_DETAIL_MAX_TOKENS = 12288;
+const DOOM_UPDATE_MAX_TOKENS = 4096;
 
 // ============================================================================
 // Pipeline Intermediate Types
 // ============================================================================
 
-interface PipelineOutline {
+interface PipelineFront {
   title: string;
   synopsis: string;
   estimatedDuration: string;
-  acts: PipelineAct[];
+  front: AdventureFront;
+  doomTimeline: TimelineEntry[];
 }
 
-interface PipelineAct {
-  actNumber: number;
-  title: string;
-  description: string;
-  keyEvents: string[];
-  encounterIdeas: string[];
-}
-
-interface PipelineLocation {
+interface PipelineNodeStub {
+  id: string;
   name: string;
-  description: string;
-  keyFeatures: string[];
-  atmosphere: string;
-  mapSuggestion: string;
-}
-
-interface PipelineNpc {
-  name: string;
-  role: string;
-  personality: string;
-  motivations: string;
-  appearance: string;
-  keyDialogue: { dialogue: string; context: string }[];
-}
-
-interface PipelineEncounter {
-  name: string;
-  description: string;
-  difficulty: string;
-  creatures: string[];
-  tactics: string;
-  statBlock: Record<string, unknown> | null;
-  locationName: string;
+  type: string;
+  briefDescription: string;
+  isEntryPoint: boolean;
+  connections: {
+    pointsTo: string;
+    clueDescription: string;
+    clueType: string;
+    isHidden: boolean;
+  }[];
 }
 
 // ============================================================================
@@ -131,14 +116,13 @@ async function generateQueryEmbedding(
 // Context Query Builder
 // ============================================================================
 
-function buildSettingQuery(tone: string, theme?: string, outlineTitle?: string): string {
+function buildSettingQuery(tone: string, theme?: string): string {
   const parts = [
     "important NPCs characters factions locations places organizations",
     "setting world lore history conflicts quests adventures encounters",
     "rules mechanics stat blocks creatures monsters",
   ];
   if (theme) parts.push(theme);
-  if (outlineTitle) parts.push(outlineTitle);
   parts.push(`${tone} themes and events`);
   return parts.join(" ");
 }
@@ -183,64 +167,6 @@ function safeParse(content: string): Result<unknown, AdventureGenerationError> {
   }
 }
 
-/**
- * Attempt to recover a truncated JSON array response.
- * When the LLM runs out of tokens mid-JSON, we try to salvage any complete
- * array elements by finding the last complete `}` before the truncation point,
- * then closing the array and outer wrapper object.
- *
- * @param content - raw (possibly truncated) LLM output
- * @param arrayKey - the key of the array in the wrapper object (e.g. "encounters")
- * @returns parsed object or null if recovery fails
- */
-function recoverTruncatedArray(content: string, arrayKey: string): unknown | null {
-  const cleaned = cleanJson(content);
-
-  // Find the opening of the array
-  const arrayPattern = new RegExp(`"${arrayKey}"\\s*:\\s*\\[`);
-  const arrayMatch = arrayPattern.exec(cleaned);
-  if (!arrayMatch) return null;
-
-  const arrayStart = arrayMatch.index + arrayMatch[0].length;
-
-  // Walk backwards from end to find the last complete object closing brace
-  // that could be the end of an array element
-  let braceDepth = 0;
-  let lastCompleteEnd = -1;
-
-  for (let i = cleaned.length - 1; i >= arrayStart; i--) {
-    const ch = cleaned[i];
-    if (ch === "}") {
-      if (braceDepth === 0) {
-        // Potential end of a complete object — verify by trying to parse
-        // from array start to here
-        const candidate = `{${arrayMatch[0]}${cleaned.slice(arrayStart, i + 1)}]}`;
-        try {
-          JSON.parse(candidate);
-          lastCompleteEnd = i;
-          break;
-        } catch {
-          // Not a valid boundary, keep scanning
-          braceDepth++;
-        }
-      } else {
-        braceDepth++;
-      }
-    } else if (ch === "{") {
-      braceDepth = Math.max(0, braceDepth - 1);
-    }
-  }
-
-  if (lastCompleteEnd === -1) return null;
-
-  const repaired = `{${arrayMatch[0]}${cleaned.slice(arrayStart, lastCompleteEnd + 1)}]}`;
-  try {
-    return JSON.parse(repaired);
-  } catch {
-    return null;
-  }
-}
-
 function asRecord(val: unknown): Record<string, unknown> | null {
   if (typeof val === "object" && val !== null && !Array.isArray(val)) {
     return val as Record<string, unknown>;
@@ -257,6 +183,10 @@ function asStringArray(val: unknown): string[] {
   return val.filter((v): v is string => typeof v === "string");
 }
 
+function asBool(val: unknown, fallback: boolean): boolean {
+  return typeof val === "boolean" ? val : fallback;
+}
+
 function asNumber(val: unknown, fallback: number): number {
   return typeof val === "number" ? val : fallback;
 }
@@ -265,232 +195,253 @@ function asNumber(val: unknown, fallback: number): number {
 // Response Parsers
 // ============================================================================
 
-function parseOutlineResponse(
+function parseFrontAndDoomResponse(
   content: string,
-): Result<PipelineOutline, AdventureGenerationError> {
+): Result<PipelineFront, AdventureGenerationError> {
   const parseResult = safeParse(content);
   if (!parseResult.ok) return parseResult;
 
-  const root = asRecord(parseResult.value);
-  const raw = root ? asRecord(root.outline) : null;
+  const raw = asRecord(parseResult.value);
   if (!raw) {
-    return err({ code: "PARSE_ERROR", message: "LLM response missing 'outline' object" });
+    return err({ code: "PARSE_ERROR", message: "LLM response is not a JSON object" });
   }
 
-  const acts: PipelineAct[] = [];
-  if (Array.isArray(raw.acts)) {
-    for (let i = 0; i < raw.acts.length; i++) {
-      const a = asRecord(raw.acts[i]);
-      if (!a) continue;
-      acts.push({
-        actNumber: asNumber(a.actNumber, i + 1),
-        title: asString(a.title, `Act ${i + 1}`),
-        description: asString(a.description, ""),
-        keyEvents: asStringArray(a.keyEvents),
-        encounterIdeas: asStringArray(a.encounterIdeas),
+  // Parse front
+  const frontRaw = asRecord(raw.front);
+  if (!frontRaw) {
+    return err({ code: "PARSE_ERROR", message: "LLM response missing 'front' object" });
+  }
+
+  const keyFactions: FactionGoal[] = [];
+  if (Array.isArray(frontRaw.keyFactions)) {
+    for (const f of frontRaw.keyFactions) {
+      const fr = asRecord(f);
+      if (fr) {
+        keyFactions.push({
+          name: asString(fr.name, "Unknown Faction"),
+          goal: asString(fr.goal, ""),
+          resources: asString(fr.resources, ""),
+        });
+      }
+    }
+  }
+
+  const front: AdventureFront = {
+    description: asString(frontRaw.description, ""),
+    stakes: asString(frontRaw.stakes, ""),
+    keyFactions,
+  };
+
+  // Parse doom timeline
+  const doomTimeline: TimelineEntry[] = [];
+  if (Array.isArray(raw.doomTimeline)) {
+    for (let i = 0; i < raw.doomTimeline.length; i++) {
+      const t = asRecord(raw.doomTimeline[i]);
+      if (!t) continue;
+      doomTimeline.push({
+        stage: asNumber(t.stage, i + 1),
+        label: asString(t.label, `Stage ${i + 1}`),
+        event: asString(t.event, ""),
+        consequence: asString(t.consequence, ""),
+        nodesAffected: asStringArray(t.nodesAffected),
       });
     }
   }
 
-  if (acts.length === 0) {
-    return err({ code: "PARSE_ERROR", message: "Outline has no acts" });
+  if (doomTimeline.length === 0) {
+    return err({ code: "PARSE_ERROR", message: "Doom timeline has no stages" });
   }
 
   return ok({
     title: asString(raw.title, "Untitled Adventure"),
     synopsis: asString(raw.synopsis, ""),
     estimatedDuration: asString(raw.estimatedDuration, "4-6 hours"),
-    acts,
+    front,
+    doomTimeline,
   });
 }
 
-function parseLocationsResponse(
+function parseNodeMapResponse(
   content: string,
-): Result<PipelineLocation[], AdventureGenerationError> {
+): Result<PipelineNodeStub[], AdventureGenerationError> {
   const parseResult = safeParse(content);
   if (!parseResult.ok) return parseResult;
 
   const root = asRecord(parseResult.value);
-  if (!root || !Array.isArray(root.locations)) {
-    return err({ code: "PARSE_ERROR", message: "LLM response missing 'locations' array" });
+  if (!root || !Array.isArray(root.nodes)) {
+    return err({ code: "PARSE_ERROR", message: "LLM response missing 'nodes' array" });
   }
 
-  const locations: PipelineLocation[] = [];
-  for (const item of root.locations) {
-    const r = asRecord(item);
-    if (!r) continue;
-    locations.push({
-      name: asString(r.name, "Unknown Location"),
-      description: asString(r.description, ""),
-      keyFeatures: asStringArray(r.keyFeatures),
-      atmosphere: asString(r.atmosphere, ""),
-      mapSuggestion: asString(r.mapSuggestion, ""),
-    });
-  }
-
-  return ok(locations);
-}
-
-function parseNpcsResponse(
-  content: string,
-): Result<PipelineNpc[], AdventureGenerationError> {
-  const parseResult = safeParse(content);
-  if (!parseResult.ok) return parseResult;
-
-  const root = asRecord(parseResult.value);
-  if (!root || !Array.isArray(root.npcs)) {
-    return err({ code: "PARSE_ERROR", message: "LLM response missing 'npcs' array" });
-  }
-
-  const npcs: PipelineNpc[] = [];
-  for (const item of root.npcs) {
-    const r = asRecord(item);
+  const nodes: PipelineNodeStub[] = [];
+  for (let i = 0; i < root.nodes.length; i++) {
+    const r = asRecord(root.nodes[i]);
     if (!r) continue;
 
-    const keyDialogue: { dialogue: string; context: string }[] = [];
-    if (Array.isArray(r.keyDialogue)) {
-      for (const d of r.keyDialogue) {
-        const dr = asRecord(d);
-        if (dr) {
-          keyDialogue.push({
-            dialogue: asString(dr.dialogue, ""),
-            context: asString(dr.context, ""),
+    const connections: PipelineNodeStub["connections"] = [];
+    if (Array.isArray(r.connections)) {
+      for (const c of r.connections) {
+        const cr = asRecord(c);
+        if (cr) {
+          connections.push({
+            pointsTo: asString(cr.pointsTo, ""),
+            clueDescription: asString(cr.clueDescription, ""),
+            clueType: asString(cr.clueType, "evidence"),
+            isHidden: asBool(cr.isHidden, false),
           });
         }
       }
     }
 
-    npcs.push({
-      name: asString(r.name, "Unknown NPC"),
-      role: asString(r.role, ""),
-      personality: asString(r.personality, ""),
-      motivations: asString(r.motivations, ""),
-      appearance: asString(r.appearance, ""),
-      keyDialogue,
+    nodes.push({
+      id: asString(r.id, `n${i + 1}`),
+      name: asString(r.name, `Node ${i + 1}`),
+      type: asString(r.type, "location"),
+      briefDescription: asString(r.briefDescription, ""),
+      isEntryPoint: asBool(r.isEntryPoint, false),
+      connections,
     });
   }
 
-  return ok(npcs);
+  if (nodes.length === 0) {
+    return err({ code: "PARSE_ERROR", message: "Node map has no nodes" });
+  }
+
+  // Ensure at least one entry point
+  if (!nodes.some(n => n.isEntryPoint)) {
+    nodes[0]!.isEntryPoint = true;
+  }
+
+  return ok(nodes);
 }
 
-function parseEncountersResponse(
+function parseNodeDetailResponse(
   content: string,
-): Result<PipelineEncounter[], AdventureGenerationError> {
+  nodeStub: PipelineNodeStub,
+): Result<AdventureNode, AdventureGenerationError> {
   const parseResult = safeParse(content);
+  if (!parseResult.ok) return parseResult;
 
-  // If parsing failed (e.g. truncated output), try to recover partial encounters
-  const parsed = parseResult.ok
-    ? parseResult.value
-    : recoverTruncatedArray(content, "encounters");
-  if (parsed == null) {
-    return parseResult.ok
-      ? err({ code: "PARSE_ERROR", message: "LLM response missing 'encounters' array" })
-      : parseResult;
+  const root = asRecord(parseResult.value);
+  const raw = root ? asRecord(root.node) : null;
+  if (!raw) {
+    return err({ code: "PARSE_ERROR", message: `LLM response missing 'node' object for ${nodeStub.id}` });
   }
 
-  const root = asRecord(parsed);
-  if (!root || !Array.isArray(root.encounters)) {
-    return err({ code: "PARSE_ERROR", message: "LLM response missing 'encounters' array" });
-  }
-
-  const encounters: PipelineEncounter[] = [];
-  for (const item of root.encounters) {
-    const r = asRecord(item);
-    if (!r) continue;
-    encounters.push({
-      name: asString(r.name, "Unknown Encounter"),
-      description: asString(r.description, ""),
-      difficulty: asString(r.difficulty, "medium"),
-      creatures: asStringArray(r.creatures),
-      tactics: asString(r.tactics, ""),
-      statBlock:
-        typeof r.statBlock === "object" && r.statBlock !== null
-          ? (r.statBlock as Record<string, unknown>)
-          : null,
-      locationName: asString(r.locationName, ""),
-    });
-  }
-
-  if (encounters.length === 0) {
-    return err({ code: "PARSE_ERROR", message: "No valid encounters could be parsed from LLM response" });
-  }
-
-  return ok(encounters);
-}
-
-function parseScenesResponse(
-  content: string,
-  actNumber: number,
-): Result<AdventureScene[], AdventureGenerationError> {
-  const parseResult = safeParse(content);
-
-  // If parsing failed (e.g. truncated output), try to recover partial scenes
-  const parsed = parseResult.ok
-    ? parseResult.value
-    : recoverTruncatedArray(content, "scenes");
-  if (parsed == null) {
-    return parseResult.ok
-      ? err({ code: "PARSE_ERROR", message: "LLM response missing 'scenes' array" })
-      : parseResult;
-  }
-
-  const root = asRecord(parsed);
-  if (!root || !Array.isArray(root.scenes)) {
-    return err({ code: "PARSE_ERROR", message: "LLM response missing 'scenes' array" });
-  }
-
-  const scenes: AdventureScene[] = [];
-  for (const item of root.scenes) {
-    const s = asRecord(item);
-    if (!s) continue;
-
-    const npcDialogue: NpcDialogueLine[] = [];
-    if (Array.isArray(s.npcDialogue)) {
-      for (const d of s.npcDialogue) {
-        const dr = asRecord(d);
-        if (dr) {
-          npcDialogue.push({
-            npcName: asString(dr.npcName, "Unknown NPC"),
-            dialogue: asString(dr.dialogue, ""),
-            context: asString(dr.context, ""),
-          });
-        }
-      }
-    }
-
-    const encounters: SceneEncounter[] = [];
-    if (Array.isArray(s.encounters)) {
-      for (const e of s.encounters) {
-        const er = asRecord(e);
-        if (!er) continue;
-        encounters.push({
-          name: asString(er.name, "Unknown Encounter"),
-          description: asString(er.description, ""),
-          difficulty: asString(er.difficulty, "medium"),
-          creatures: asStringArray(er.creatures),
-          tactics: asString(er.tactics, ""),
-          statBlock: null, // merged from encounter step below
+  // Parse NPC dialogue
+  const npcDialogue: NpcDialogueLine[] = [];
+  if (Array.isArray(raw.npcDialogue)) {
+    for (const d of raw.npcDialogue) {
+      const dr = asRecord(d);
+      if (dr) {
+        npcDialogue.push({
+          npcName: asString(dr.npcName, "Unknown NPC"),
+          dialogue: asString(dr.dialogue, ""),
+          context: asString(dr.context, ""),
         });
       }
     }
+  }
 
-    scenes.push({
-      title: asString(s.title, "Untitled Scene"),
-      actNumber: asNumber(s.actNumber, actNumber),
-      description: asString(s.description, ""),
-      readAloud: asString(s.readAloud, ""),
-      npcDialogue,
-      encounters,
-      treasure: asStringArray(s.treasure),
-      mapSuggestion: asString(s.mapSuggestion, ""),
+  // Parse encounters
+  const encounters: SceneEncounter[] = [];
+  if (Array.isArray(raw.encounters)) {
+    for (const e of raw.encounters) {
+      const er = asRecord(e);
+      if (!er) continue;
+      encounters.push({
+        name: asString(er.name, "Unknown Encounter"),
+        description: asString(er.description, ""),
+        difficulty: asString(er.difficulty, "medium"),
+        creatures: asStringArray(er.creatures),
+        tactics: asString(er.tactics, ""),
+        statBlock:
+          typeof er.statBlock === "object" && er.statBlock !== null
+            ? (er.statBlock as Record<string, unknown>)
+            : null,
+      });
+    }
+  }
+
+  // Parse clues
+  const clues: NodeClue[] = [];
+  if (Array.isArray(raw.clues)) {
+    for (const c of raw.clues) {
+      const cr = asRecord(c);
+      if (cr) {
+        const clueType = asString(cr.type, "evidence");
+        clues.push({
+          description: asString(cr.description, ""),
+          pointsTo: asString(cr.pointsTo, ""),
+          type: (["evidence", "npc_info", "observation", "document", "trail"].includes(clueType)
+            ? clueType
+            : "evidence") as NodeClue["type"],
+          isHidden: asBool(cr.isHidden, false),
+        });
+      }
+    }
+  }
+
+  // Ensure clues from the node stub connections are present
+  for (const conn of nodeStub.connections) {
+    const hasClue = clues.some(c => c.pointsTo === conn.pointsTo);
+    if (!hasClue) {
+      const clueType = (["evidence", "npc_info", "observation", "document", "trail"].includes(conn.clueType)
+        ? conn.clueType
+        : "evidence") as NodeClue["type"];
+      clues.push({
+        description: conn.clueDescription,
+        pointsTo: conn.pointsTo,
+        type: clueType,
+        isHidden: conn.isHidden,
+      });
+    }
+  }
+
+  const nodeType = asString(raw.type, nodeStub.type);
+
+  return ok({
+    id: nodeStub.id,
+    name: asString(raw.name, nodeStub.name),
+    type: (["location", "event", "encounter", "social"].includes(nodeType)
+      ? nodeType
+      : "location") as AdventureNode["type"],
+    description: asString(raw.description, ""),
+    readAloud: asString(raw.readAloud, ""),
+    npcDialogue,
+    encounters,
+    treasure: asStringArray(raw.treasure),
+    mapSuggestion: asString(raw.mapSuggestion, ""),
+    clues,
+    isEntryPoint: nodeStub.isEntryPoint,
+  });
+}
+
+function parseDoomTimelineUpdateResponse(
+  content: string,
+  fallback: TimelineEntry[],
+): TimelineEntry[] {
+  const parseResult = safeParse(content);
+  if (!parseResult.ok) return fallback;
+
+  const root = asRecord(parseResult.value);
+  if (!root || !Array.isArray(root.doomTimeline)) return fallback;
+
+  const result: TimelineEntry[] = [];
+  for (let i = 0; i < root.doomTimeline.length; i++) {
+    const t = asRecord(root.doomTimeline[i]);
+    if (!t) continue;
+    // Merge: keep original event/consequence text, take nodesAffected from update
+    const original = fallback[i];
+    result.push({
+      stage: asNumber(t.stage, original?.stage ?? i + 1),
+      label: asString(t.label, original?.label ?? `Stage ${i + 1}`),
+      event: asString(t.event, original?.event ?? ""),
+      consequence: asString(t.consequence, original?.consequence ?? ""),
+      nodesAffected: asStringArray(t.nodesAffected),
     });
   }
 
-  if (scenes.length === 0) {
-    return err({ code: "PARSE_ERROR", message: `No valid scenes for Act ${actNumber}` });
-  }
-
-  return ok(scenes);
+  return result.length > 0 ? result : fallback;
 }
 
 // ============================================================================
@@ -498,88 +449,62 @@ function parseScenesResponse(
 // ============================================================================
 
 /**
- * Find NPC names that collide with already-used names or are duplicated
- * within the batch itself (case-insensitive first-name match).
+ * Extract NPC names from a node's dialogue lines.
  */
-function findDuplicateNpcNames(
-  npcs: PipelineNpc[],
-  usedNames: Set<string>,
-): Set<number> {
-  const dupeIndices = new Set<number>();
-  const usedLower = new Set([...usedNames].map((n) => n.toLowerCase()));
-  const batchSeen = new Map<string, number>(); // lowercase name → first index
-
-  for (let i = 0; i < npcs.length; i++) {
-    const npc = npcs[i];
-    if (!npc) continue;
-    const lower = npc.name.toLowerCase();
-    // Also check just the first name (before space) for partial matches like
-    // "Kaelen" vs "Kaelen Ashford"
-    const firstName = lower.split(/\s+/)[0] ?? lower;
-
-    if (usedLower.has(lower) || usedLower.has(firstName)) {
-      dupeIndices.add(i);
-    } else if (batchSeen.has(lower) || batchSeen.has(firstName)) {
-      // Duplicate within the same batch — flag the later one
-      dupeIndices.add(i);
-    } else {
-      batchSeen.set(lower, i);
-      if (firstName !== lower) {
-        batchSeen.set(firstName, i);
-      }
-    }
-  }
-
-  return dupeIndices;
+function extractNpcNames(node: AdventureNode): string[] {
+  return node.npcDialogue.map(d => d.npcName);
 }
 
+// ============================================================================
+// Node Graph Validation
+// ============================================================================
+
 /**
- * Deterministic rename for NPCs that still have duplicate names after retry.
- * Appends a role-based surname to make the name unique.
+ * Validate node graph connectivity. Logs warnings but does not hard-fail.
  */
-function renameDuplicateNpcs(
-  npcs: PipelineNpc[],
-  dupeIndices: Set<number>,
-  usedNames: Set<string>,
-): void {
-  const usedLower = new Set([...usedNames].map((n) => n.toLowerCase()));
-  // Also include non-duplicate names from this batch
-  for (let i = 0; i < npcs.length; i++) {
-    if (!dupeIndices.has(i)) {
-      usedLower.add(npcs[i]!.name.toLowerCase());
+function validateNodeGraph(nodes: AdventureNode[]): string[] {
+  const warnings: string[] = [];
+  const nodeIds = new Set(nodes.map(n => n.id));
+
+  // Check clue references resolve
+  for (const node of nodes) {
+    for (const clue of node.clues) {
+      if (!nodeIds.has(clue.pointsTo)) {
+        warnings.push(`Node "${node.name}" (${node.id}) has clue pointing to unknown node "${clue.pointsTo}"`);
+      }
     }
   }
 
-  for (const idx of dupeIndices) {
-    const npc = npcs[idx];
-    if (!npc) continue;
-    // Try appending role-derived words to make the name unique
-    const roleWords = npc.role
-      .split(/[\s,]+/)
-      .filter((w) => w.length > 2)
-      .map((w) => w.charAt(0).toUpperCase() + w.slice(1).toLowerCase());
+  // Check reachability from entry points
+  const entryPoints = nodes.filter(n => n.isEntryPoint);
+  if (entryPoints.length === 0) {
+    warnings.push("No entry point nodes defined");
+    return warnings;
+  }
 
-    let renamed = false;
-    for (const word of roleWords) {
-      const candidate = `${npc.name} "${word}"`;
-      if (!usedLower.has(candidate.toLowerCase())) {
-        npc.name = candidate;
-        usedLower.add(candidate.toLowerCase());
-        renamed = true;
-        break;
+  const reachable = new Set<string>();
+  const queue = entryPoints.map(n => n.id);
+  while (queue.length > 0) {
+    const current = queue.pop()!;
+    if (reachable.has(current)) continue;
+    reachable.add(current);
+    const currentNode = nodes.find(n => n.id === current);
+    if (currentNode) {
+      for (const clue of currentNode.clues) {
+        if (nodeIds.has(clue.pointsTo) && !reachable.has(clue.pointsTo)) {
+          queue.push(clue.pointsTo);
+        }
       }
-    }
-
-    // Fallback: append numeric suffix
-    if (!renamed) {
-      let suffix = 2;
-      while (usedLower.has(`${npc.name} ${suffix}`.toLowerCase())) {
-        suffix++;
-      }
-      npc.name = `${npc.name} ${suffix}`;
-      usedLower.add(npc.name.toLowerCase());
     }
   }
+
+  for (const node of nodes) {
+    if (!node.isEntryPoint && !reachable.has(node.id)) {
+      warnings.push(`Node "${node.name}" (${node.id}) is not reachable from any entry point`);
+    }
+  }
+
+  return warnings;
 }
 
 // ============================================================================
@@ -614,159 +539,6 @@ async function callLLM(
     content: result.value.message.content,
     usage: result.value.usage,
   });
-}
-
-// ============================================================================
-// Pipeline Step Functions
-// ============================================================================
-
-async function generateOutlineStep(
-  ctx: PipelinePromptContext,
-  tone: string,
-  options: { theme?: string | undefined; partyLevel?: string | undefined },
-  llmService: LLMService,
-): Promise<
-  Result<{ outline: PipelineOutline; usage?: TokenUsage | undefined }, AdventureGenerationError>
-> {
-  const { system, user } = buildOutlineStepPrompt(ctx, tone as Parameters<typeof buildOutlineStepPrompt>[1], options);
-  const llmResult = await callLLM(llmService, system, user, OUTLINE_MAX_TOKENS);
-  if (!llmResult.ok) return llmResult;
-
-  const parseResult = parseOutlineResponse(llmResult.value.content);
-  if (!parseResult.ok) return parseResult;
-
-  return ok({ outline: parseResult.value, usage: llmResult.value.usage });
-}
-
-async function generateLocationsStep(
-  ctx: PipelinePromptContext,
-  tone: string,
-  act: ActDescription,
-  options: { theme?: string | undefined },
-  llmService: LLMService,
-): Promise<
-  Result<{ locations: PipelineLocation[]; usage?: TokenUsage | undefined }, AdventureGenerationError>
-> {
-  const { system, user } = buildActLocationsPrompt(ctx, tone as Parameters<typeof buildActLocationsPrompt>[1], act, options);
-  const llmResult = await callLLM(llmService, system, user, LOCATIONS_MAX_TOKENS);
-  if (!llmResult.ok) return llmResult;
-
-  const parseResult = parseLocationsResponse(llmResult.value.content);
-  if (!parseResult.ok) return parseResult;
-
-  return ok({ locations: parseResult.value, usage: llmResult.value.usage });
-}
-
-async function generateNpcsStep(
-  ctx: PipelinePromptContext,
-  tone: string,
-  act: ActDescription,
-  locations: PipelineLocation[],
-  options: { theme?: string | undefined; previousNpcNames?: string[] | undefined },
-  llmService: LLMService,
-): Promise<
-  Result<{ npcs: PipelineNpc[]; usage?: TokenUsage | undefined }, AdventureGenerationError>
-> {
-  const locationSummaries = locations.map((l) => ({
-    name: l.name,
-    description: l.description,
-  }));
-  const { system, user } = buildActNpcsPrompt(ctx, tone as Parameters<typeof buildActNpcsPrompt>[1], act, locationSummaries, options);
-  const llmResult = await callLLM(llmService, system, user, NPCS_MAX_TOKENS);
-  if (!llmResult.ok) return llmResult;
-
-  const parseResult = parseNpcsResponse(llmResult.value.content);
-  if (!parseResult.ok) return parseResult;
-
-  return ok({ npcs: parseResult.value, usage: llmResult.value.usage });
-}
-
-async function generateEncountersStep(
-  ctx: PipelinePromptContext,
-  tone: string,
-  act: ActDescription,
-  locations: PipelineLocation[],
-  npcs: PipelineNpc[],
-  options: { partyLevel?: string | undefined; includeStatBlocks?: boolean | undefined; theme?: string | undefined },
-  llmService: LLMService,
-): Promise<
-  Result<{ encounters: PipelineEncounter[]; usage?: TokenUsage | undefined }, AdventureGenerationError>
-> {
-  const { system, user } = buildActEncountersPrompt(
-    ctx,
-    tone as Parameters<typeof buildActEncountersPrompt>[1],
-    act,
-    locations.map((l) => ({ name: l.name, description: l.description })),
-    npcs.map((n) => ({ name: n.name, role: n.role })),
-    options,
-  );
-  const llmResult = await callLLM(llmService, system, user, ENCOUNTERS_MAX_TOKENS);
-  if (!llmResult.ok) return llmResult;
-
-  const parseResult = parseEncountersResponse(llmResult.value.content);
-  if (!parseResult.ok) return parseResult;
-
-  return ok({ encounters: parseResult.value, usage: llmResult.value.usage });
-}
-
-async function composeScenesStep(
-  ctx: PipelinePromptContext,
-  tone: string,
-  outline: PipelineOutline,
-  act: ActDescription,
-  locations: PipelineLocation[],
-  npcs: PipelineNpc[],
-  encounters: PipelineEncounter[],
-  options: { theme?: string | undefined },
-  llmService: LLMService,
-): Promise<
-  Result<{ scenes: AdventureScene[]; usage?: TokenUsage | undefined }, AdventureGenerationError>
-> {
-  const { system, user } = buildActScenesPrompt(
-    ctx,
-    tone as Parameters<typeof buildActScenesPrompt>[1],
-    { title: outline.title, synopsis: outline.synopsis },
-    act,
-    locations,
-    npcs.map((n) => ({
-      name: n.name,
-      role: n.role,
-      personality: n.personality,
-      appearance: n.appearance,
-      keyDialogue: n.keyDialogue,
-    })),
-    encounters.map((e) => ({
-      name: e.name,
-      description: e.description,
-      difficulty: e.difficulty,
-      creatures: e.creatures,
-      tactics: e.tactics,
-      locationName: e.locationName,
-    })),
-    options,
-  );
-  const llmResult = await callLLM(llmService, system, user, SCENES_MAX_TOKENS);
-  if (!llmResult.ok) return llmResult;
-
-  const parseResult = parseScenesResponse(llmResult.value.content, act.actNumber);
-  if (!parseResult.ok) return parseResult;
-
-  // Merge stat blocks from encounter step into scene encounters by name
-  const statBlockMap = new Map<string, Record<string, unknown> | null>();
-  for (const enc of encounters) {
-    statBlockMap.set(enc.name.toLowerCase(), enc.statBlock);
-  }
-
-  for (const scene of parseResult.value) {
-    for (const sceneEnc of scene.encounters) {
-      const matched = statBlockMap.get(sceneEnc.name.toLowerCase());
-      if (matched) {
-        sceneEnc.statBlock = matched;
-      }
-    }
-  }
-
-  return ok({ scenes: parseResult.value, usage: llmResult.value.usage });
 }
 
 // ============================================================================
@@ -821,7 +593,6 @@ export async function generateAdventure(
   const context = buildContext(searchResult.value, { maxTokens: MAX_CONTEXT_TOKENS });
   const campaignContent = await buildCampaignContentContext(campaignId);
 
-  // Build source legend for citation prompts
   const sourceLegend = context.sources
     .map((s) => {
       const info = [`[${s.index}] ${s.documentName}`];
@@ -837,10 +608,8 @@ export async function generateAdventure(
     campaignContentText: campaignContent.contentText,
   };
 
-  // If stat blocks are requested, do a targeted rulebook-only search for mechanics/creature stats.
-  // This is kept separate from setting context so the LLM can distinguish game rules from lore
-  // (setting books may be from a different game system than the rulebook).
-  let encounterPromptCtx = promptCtx;
+  // If stat blocks are requested, do a targeted rulebook search
+  let detailPromptCtx = promptCtx;
   if (includeStatBlocks !== false) {
     const rulebookQuery =
       "creature stat blocks monster stats AC HP hit points armor class abilities actions attacks combat mechanics challenge rating CR";
@@ -857,21 +626,20 @@ export async function generateAdventure(
           maxTokens: 3000,
         });
         if (rulebookContext.contextText) {
-          encounterPromptCtx = {
+          detailPromptCtx = {
             ...promptCtx,
             rulebookText: rulebookContext.contextText,
           };
         }
       }
     }
-    // Failures are non-fatal — the encounters step will still work without extra rulebook context
   }
 
-  // ==== Step 2: Get or generate outline ====
-  let outline: PipelineOutline;
+  // ==== Step 2: Build outline seed if using a source outline ====
+  let outlineSeed: string | undefined;
 
   if (sourceOutlineId) {
-    emit({ type: "status", message: "Loading adventure outline..." });
+    emit({ type: "status", message: "Loading adventure outline as seed..." });
     const dbOutline = await findAdventureOutlineByIdAndCampaignId(
       sourceOutlineId,
       campaignId,
@@ -883,8 +651,9 @@ export async function generateAdventure(
       });
     }
 
-    // Convert DB outline to pipeline format
-    const acts: PipelineAct[] = [];
+    const seedParts: string[] = [];
+    seedParts.push(`Title: ${dbOutline.title}`);
+    if (dbOutline.description) seedParts.push(`Synopsis: ${dbOutline.description}`);
     const rawActs = dbOutline.acts as {
       title: string;
       description: string;
@@ -892,171 +661,173 @@ export async function generateAdventure(
       encounters: string[];
     }[];
     if (Array.isArray(rawActs)) {
-      for (let i = 0; i < rawActs.length; i++) {
-        const a = rawActs[i];
-        if (!a) continue;
-        acts.push({
-          actNumber: i + 1,
-          title: a.title ?? `Act ${i + 1}`,
-          description: a.description ?? "",
-          keyEvents: Array.isArray(a.keyEvents) ? a.keyEvents : [],
-          encounterIdeas: Array.isArray(a.encounters) ? a.encounters : [],
-        });
+      for (const a of rawActs) {
+        seedParts.push(`\n${a.title}: ${a.description}`);
+        if (a.keyEvents?.length > 0) seedParts.push(`Key events: ${a.keyEvents.join("; ")}`);
       }
     }
-
-    outline = {
-      title: dbOutline.title,
-      synopsis: dbOutline.description ?? "",
-      estimatedDuration: "4-6 hours",
-      acts,
-    };
-  } else {
-    emit({ type: "status", message: "Generating adventure outline..." });
-    const outlineResult = await generateOutlineStep(
-      promptCtx,
-      tone,
-      { theme, partyLevel },
-      llmService,
-    );
-    if (!outlineResult.ok) return outlineResult;
-    outline = outlineResult.value.outline;
-    totalUsage = mergeUsage(totalUsage, outlineResult.value.usage);
+    outlineSeed = seedParts.join("\n");
   }
 
-  // ==== Step 3: Generate each act ====
-  const allScenes: AdventureScene[] = [];
+  // ==== Step 3: Generate front + doom timeline ====
+  emit({ type: "status", message: "Generating adventure situation..." });
+
+  const frontDoomPrompt = buildFrontAndDoomPrompt(promptCtx, tone as Parameters<typeof buildFrontAndDoomPrompt>[1], {
+    theme,
+    partyLevel,
+    outlineSeed,
+  });
+  const frontDoomResult = await callLLM(llmService, frontDoomPrompt.system, frontDoomPrompt.user, FRONT_DOOM_MAX_TOKENS);
+  if (!frontDoomResult.ok) return frontDoomResult;
+  totalUsage = mergeUsage(totalUsage, frontDoomResult.value.usage);
+
+  const parsedFrontDoom = parseFrontAndDoomResponse(frontDoomResult.value.content);
+  if (!parsedFrontDoom.ok) return parsedFrontDoom;
+  const pipelineFront = parsedFrontDoom.value;
+
+  // Build summaries for subsequent prompts
+  const frontSummary: FrontSummary = {
+    title: pipelineFront.title,
+    synopsis: pipelineFront.synopsis,
+    description: pipelineFront.front.description,
+    stakes: pipelineFront.front.stakes,
+    factions: pipelineFront.front.keyFactions.map(f => ({ name: f.name, goal: f.goal })),
+  };
+
+  const doomSummary: DoomTimelineSummary = {
+    stages: pipelineFront.doomTimeline.map(t => ({
+      stage: t.stage,
+      label: t.label,
+      event: t.event,
+    })),
+  };
+
+  // ==== Step 4: Generate node map ====
+  emit({ type: "status", message: "Designing adventure node map..." });
+
+  const nodeMapPrompt = buildNodeMapPrompt(promptCtx, tone as Parameters<typeof buildNodeMapPrompt>[1], frontSummary, doomSummary, {
+    theme,
+    partyLevel,
+  });
+  const nodeMapResult = await callLLM(llmService, nodeMapPrompt.system, nodeMapPrompt.user, NODE_MAP_MAX_TOKENS);
+  if (!nodeMapResult.ok) return nodeMapResult;
+  totalUsage = mergeUsage(totalUsage, nodeMapResult.value.usage);
+
+  const parsedNodeMap = parseNodeMapResponse(nodeMapResult.value.content);
+  if (!parsedNodeMap.ok) return parsedNodeMap;
+  const nodeStubs = parsedNodeMap.value;
+
+  // Convert to NodeStub for prompt types
+  const nodeStubsForPrompts: NodeStub[] = nodeStubs.map(n => ({
+    id: n.id,
+    name: n.name,
+    type: n.type,
+    briefDescription: n.briefDescription,
+    isEntryPoint: n.isEntryPoint,
+    connections: n.connections,
+  }));
+
+  // ==== Step 5: Generate details for each node ====
+  const detailedNodes: AdventureNode[] = [];
   const allNpcNames = new Set<string>();
-  const allLocationNames = new Set<string>();
 
-  for (const act of outline.acts) {
-    // 3a: Generate locations
+  for (const nodeStub of nodeStubs) {
     emit({
       type: "status",
-      message: `Act ${act.actNumber}: Generating locations...`,
+      message: `Detailing node: ${nodeStub.name}...`,
     });
-    const locResult = await generateLocationsStep(
-      promptCtx,
-      tone,
-      act,
-      { theme },
-      llmService,
-    );
-    if (!locResult.ok) return locResult;
-    const locations = locResult.value.locations;
-    totalUsage = mergeUsage(totalUsage, locResult.value.usage);
 
-    // 3b: Generate NPCs (with location context + deduplication)
-    emit({
-      type: "status",
-      message: `Act ${act.actNumber}: Generating NPCs...`,
-    });
     const previousNpcNames = allNpcNames.size > 0 ? [...allNpcNames] : undefined;
-    let npcResult = await generateNpcsStep(
-      promptCtx,
-      tone,
-      act,
-      locations,
-      { theme, previousNpcNames },
-      llmService,
+    const detailPrompt = buildNodeDetailPrompt(
+      detailPromptCtx,
+      tone as Parameters<typeof buildNodeDetailPrompt>[1],
+      frontSummary,
+      doomSummary,
+      nodeStub,
+      nodeStubsForPrompts,
+      {
+        theme,
+        partyLevel,
+        includeStatBlocks,
+        previousNpcNames,
+      },
     );
-    if (!npcResult.ok) return npcResult;
-    let npcs = npcResult.value.npcs;
-    totalUsage = mergeUsage(totalUsage, npcResult.value.usage);
 
-    // Check for duplicate names and retry once if found
-    let dupeIndices = findDuplicateNpcNames(npcs, allNpcNames);
-    if (dupeIndices.size > 0) {
-      const dupeNames = [...dupeIndices].map((i) => npcs[i]!.name);
-      const forbiddenNames = [...(previousNpcNames ?? []), ...dupeNames];
-      const retryResult = await generateNpcsStep(
-        promptCtx,
-        tone,
-        act,
-        locations,
-        { theme, previousNpcNames: forbiddenNames },
-        llmService,
-      );
-      if (retryResult.ok) {
-        npcs = retryResult.value.npcs;
-        totalUsage = mergeUsage(totalUsage, retryResult.value.usage);
-      }
-      // If retry still has duplicates, rename deterministically
-      dupeIndices = findDuplicateNpcNames(npcs, allNpcNames);
-      if (dupeIndices.size > 0) {
-        renameDuplicateNpcs(npcs, dupeIndices, allNpcNames);
-      }
+    const detailResult = await callLLM(llmService, detailPrompt.system, detailPrompt.user, NODE_DETAIL_MAX_TOKENS);
+    if (!detailResult.ok) return detailResult;
+    totalUsage = mergeUsage(totalUsage, detailResult.value.usage);
+
+    const parsedNode = parseNodeDetailResponse(detailResult.value.content, nodeStub);
+    if (!parsedNode.ok) return parsedNode;
+
+    const node = parsedNode.value;
+    detailedNodes.push(node);
+
+    // Collect NPC names for deduplication
+    for (const name of extractNpcNames(node)) {
+      allNpcNames.add(name);
     }
 
-    // 3c: Generate encounters (with location + NPC + rulebook context)
-    emit({
-      type: "status",
-      message: `Act ${act.actNumber}: Generating encounters...`,
-    });
-    const encResult = await generateEncountersStep(
-      encounterPromptCtx,
-      tone,
-      act,
-      locations,
-      npcs,
-      { partyLevel, includeStatBlocks, theme },
-      llmService,
-    );
-    if (!encResult.ok) return encResult;
-    const encounters = encResult.value.encounters;
-    totalUsage = mergeUsage(totalUsage, encResult.value.usage);
-
-    // 3d: Compose scenes (ties everything together)
-    emit({
-      type: "status",
-      message: `Act ${act.actNumber}: Composing scenes...`,
-    });
-    const scenesResult = await composeScenesStep(
-      promptCtx,
-      tone,
-      outline,
-      act,
-      locations,
-      npcs,
-      encounters,
-      { theme },
-      llmService,
-    );
-    if (!scenesResult.ok) return scenesResult;
-
-    allScenes.push(...scenesResult.value.scenes);
-    totalUsage = mergeUsage(totalUsage, scenesResult.value.usage);
-
-    // Collect entity names from this act
-    for (const loc of locations) allLocationNames.add(loc.name);
-    for (const npc of npcs) allNpcNames.add(npc.name);
-
-    // Emit partial adventure (progressive display)
+    // Emit progressive adventure update
     emit({
       type: "adventure",
       adventure: {
-        title: outline.title,
-        synopsis: outline.synopsis,
-        estimatedDuration: outline.estimatedDuration,
-        scenes: [...allScenes],
+        title: pipelineFront.title,
+        synopsis: pipelineFront.synopsis,
+        estimatedDuration: pipelineFront.estimatedDuration,
+        front: pipelineFront.front,
+        nodes: [...detailedNodes],
+        doomTimeline: pipelineFront.doomTimeline,
         npcs: [...allNpcNames],
-        locations: [...allLocationNames],
-        factions: [],
+        locations: detailedNodes.filter(n => n.type === "location").map(n => n.name),
+        factions: pipelineFront.front.keyFactions.map(f => f.name),
       },
     });
   }
 
-  // ==== Step 4: Assemble final adventure ====
+  // ==== Step 6: Update doom timeline with node references ====
+  emit({ type: "status", message: "Linking timeline to nodes..." });
+
+  const doomUpdatePrompt = buildDoomTimelineUpdatePrompt(frontSummary, doomSummary, nodeStubsForPrompts);
+  const doomUpdateResult = await callLLM(llmService, doomUpdatePrompt.system, doomUpdatePrompt.user, DOOM_UPDATE_MAX_TOKENS);
+  let finalTimeline = pipelineFront.doomTimeline;
+  if (doomUpdateResult.ok) {
+    totalUsage = mergeUsage(totalUsage, doomUpdateResult.value.usage);
+    finalTimeline = parseDoomTimelineUpdateResponse(doomUpdateResult.value.content, pipelineFront.doomTimeline);
+  }
+  // Non-fatal if this step fails — timeline just won't have node references
+
+  // ==== Step 7: Validate node graph ====
+  const warnings = validateNodeGraph(detailedNodes);
+  if (warnings.length > 0) {
+    // Log warnings but don't fail — the adventure is still usable
+    for (const w of warnings) {
+      // Use emit to surface warnings
+      emit({ type: "status", message: `Warning: ${w}` });
+    }
+  }
+
+  // ==== Step 8: Assemble final adventure ====
   emit({ type: "status", message: "Finalizing adventure..." });
 
+  // Collect all location names from nodes
+  const allLocationNames = new Set<string>();
+  for (const node of detailedNodes) {
+    if (node.type === "location") {
+      allLocationNames.add(node.name);
+    }
+  }
+
   const adventure: GeneratedAdventure = {
-    title: outline.title,
-    synopsis: outline.synopsis,
-    estimatedDuration: outline.estimatedDuration,
-    scenes: allScenes,
+    title: pipelineFront.title,
+    synopsis: pipelineFront.synopsis,
+    estimatedDuration: pipelineFront.estimatedDuration,
+    front: pipelineFront.front,
+    nodes: detailedNodes,
+    doomTimeline: finalTimeline,
     npcs: [...allNpcNames],
     locations: [...allLocationNames],
-    factions: [],
+    factions: pipelineFront.front.keyFactions.map(f => f.name),
   };
 
   const sources: AnswerSource[] = context.sources.map((s) => ({

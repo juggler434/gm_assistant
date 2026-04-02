@@ -294,7 +294,7 @@ export interface SceneEncounter {
   statBlock: Record<string, unknown> | null;
 }
 
-/** A single scene in a full adventure */
+/** A single scene in a full adventure (legacy linear format) */
 export interface AdventureScene {
   title: string;
   actNumber: number;
@@ -306,6 +306,56 @@ export interface AdventureScene {
   mapSuggestion: string;
 }
 
+// ============================================================================
+// Node-Based Adventure Types
+// ============================================================================
+
+/** A faction's goal within an adventure front */
+export interface FactionGoal {
+  name: string;
+  goal: string;
+  resources: string;
+}
+
+/** The "front" — the evolving situation that drives the adventure */
+export interface AdventureFront {
+  description: string;
+  stakes: string;
+  keyFactions: FactionGoal[];
+}
+
+/** A clue connecting one node to another */
+export interface NodeClue {
+  description: string;
+  pointsTo: string;
+  type: "evidence" | "npc_info" | "observation" | "document" | "trail";
+  isHidden: boolean;
+}
+
+/** A node in the adventure web — a location, event, encounter, or social situation */
+export interface AdventureNode {
+  id: string;
+  name: string;
+  type: "location" | "event" | "encounter" | "social";
+  description: string;
+  readAloud: string;
+  npcDialogue: NpcDialogueLine[];
+  encounters: SceneEncounter[];
+  treasure: string[];
+  mapSuggestion: string;
+  clues: NodeClue[];
+  isEntryPoint: boolean;
+}
+
+/** A stage in the doom timeline — what happens if players don't intervene */
+export interface TimelineEntry {
+  stage: number;
+  label: string;
+  event: string;
+  consequence: string;
+  nodesAffected: string[];
+}
+
 /** Request body for POST /api/campaigns/:campaignId/generate/adventures */
 export interface GenerateAdventureRequest {
   tone: AdventureTone;
@@ -315,12 +365,14 @@ export interface GenerateAdventureRequest {
   includeStatBlocks?: boolean;
 }
 
-/** A single generated full adventure */
+/** A generated node-based adventure */
 export interface GeneratedAdventure {
   title: string;
   synopsis: string;
   estimatedDuration: string;
-  scenes: AdventureScene[];
+  front: AdventureFront;
+  nodes: AdventureNode[];
+  doomTimeline: TimelineEntry[];
   npcs: string[];
   locations: string[];
   factions: string[];
