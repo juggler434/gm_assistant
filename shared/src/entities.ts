@@ -301,7 +301,16 @@ export interface AdventureEntity extends BaseEntity {
   title: string;
   synopsis: string;
   estimatedDuration: string | null;
+  /** Legacy linear scenes (populated for old adventures, empty for node-based) */
   scenes: import("./generation.js").AdventureScene[];
+  /** "linear" for legacy three-act adventures, "node-based" for front/nodes/timeline */
+  adventureFormat: "linear" | "node-based";
+  /** The evolving situation (node-based adventures only) */
+  front: import("./generation.js").AdventureFront | null;
+  /** Web of interconnected locations/situations (node-based adventures only) */
+  nodes: import("./generation.js").AdventureNode[] | null;
+  /** Escalation stages if players don't intervene (node-based adventures only) */
+  doomTimeline: import("./generation.js").TimelineEntry[] | null;
   npcs: string[] | null;
   locations: string[] | null;
   factions: string[] | null;

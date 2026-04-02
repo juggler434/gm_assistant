@@ -3,7 +3,7 @@
 import { eq, and, desc, ilike, type SQL } from "drizzle-orm";
 import { db } from "@/db/index.js";
 import { adventures, type AdventureRow, type NewAdventureRow } from "@/db/schema/index.js";
-import type { AdventureScene } from "@gm-assistant/shared";
+import type { AdventureFront, AdventureNode, AdventureScene, TimelineEntry } from "@gm-assistant/shared";
 
 export async function createAdventure(
   data: Pick<
@@ -14,6 +14,10 @@ export async function createAdventure(
     | "synopsis"
     | "estimatedDuration"
     | "scenes"
+    | "adventureFormat"
+    | "front"
+    | "nodes"
+    | "doomTimeline"
     | "npcs"
     | "locations"
     | "factions"
@@ -80,6 +84,10 @@ export async function updateAdventure(
     synopsis?: string | undefined;
     estimatedDuration?: string | null | undefined;
     scenes?: AdventureScene[] | undefined;
+    adventureFormat?: string | undefined;
+    front?: AdventureFront | null | undefined;
+    nodes?: AdventureNode[] | null | undefined;
+    doomTimeline?: TimelineEntry[] | null | undefined;
     npcs?: string[] | null | undefined;
     locations?: string[] | null | undefined;
     factions?: string[] | null | undefined;
@@ -94,6 +102,10 @@ export async function updateAdventure(
   if (data.synopsis !== undefined) updateData.synopsis = data.synopsis;
   if (data.estimatedDuration !== undefined) updateData.estimatedDuration = data.estimatedDuration;
   if (data.scenes !== undefined) updateData.scenes = data.scenes;
+  if (data.adventureFormat !== undefined) updateData.adventureFormat = data.adventureFormat;
+  if (data.front !== undefined) updateData.front = data.front;
+  if (data.nodes !== undefined) updateData.nodes = data.nodes;
+  if (data.doomTimeline !== undefined) updateData.doomTimeline = data.doomTimeline;
   if (data.npcs !== undefined) updateData.npcs = data.npcs;
   if (data.locations !== undefined) updateData.locations = data.locations;
   if (data.factions !== undefined) updateData.factions = data.factions;

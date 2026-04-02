@@ -13,7 +13,7 @@ import {
 import { users } from "./users.js";
 import { campaigns } from "./campaigns.js";
 import { adventureOutlines } from "./adventure-outlines.js";
-import type { AdventureScene } from "@gm-assistant/shared";
+import type { AdventureFront, AdventureNode, AdventureScene, TimelineEntry } from "@gm-assistant/shared";
 
 export const adventures = pgTable(
   "adventures",
@@ -29,10 +29,19 @@ export const adventures = pgTable(
     title: varchar("title", { length: 255 }).notNull(),
     synopsis: text("synopsis").notNull(),
     estimatedDuration: varchar("estimated_duration", { length: 100 }),
+    /** Legacy linear scenes — populated for old adventures, empty for node-based */
     scenes: jsonb("scenes")
       .notNull()
       .$type<AdventureScene[]>()
       .default([]),
+    /** Discriminator: "linear" for legacy three-act, "node-based" for front/nodes/timeline */
+    adventureFormat: varchar("adventure_format", { length: 20 }).notNull().default("linear"),
+    /** The evolving situation (node-based only) */
+    front: jsonb("front").$type<AdventureFront | null>(),
+    /** Web of interconnected nodes (node-based only) */
+    nodes: jsonb("nodes").$type<AdventureNode[] | null>(),
+    /** Doom timeline stages (node-based only) */
+    doomTimeline: jsonb("doom_timeline").$type<TimelineEntry[] | null>(),
     npcs: text("npcs").array().default([]),
     locations: text("locations").array().default([]),
     factions: text("factions").array().default([]),

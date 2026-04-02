@@ -119,7 +119,7 @@ export function AdventureForm({ onSubmit, isLoading, outlines = [] }: AdventureF
 
       {outlines.length > 0 && (
         <div className="space-y-2">
-          <Label htmlFor="adventure-outline">Expand from outline (optional)</Label>
+          <Label htmlFor="adventure-outline">Use outline as inspiration (optional)</Label>
           <Select value={sourceOutlineId} onValueChange={setSourceOutlineId}>
             <SelectTrigger id="adventure-outline">
               <SelectValue placeholder="Generate from scratch" />

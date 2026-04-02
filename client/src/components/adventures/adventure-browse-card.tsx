@@ -30,12 +30,17 @@ export function AdventureBrowseCard({ adventure, onClick }: AdventureBrowseCardP
       <CardContent className="space-y-3">
         <p className="line-clamp-3 text-sm text-muted-foreground">{stripCitations(adventure.synopsis)}</p>
         <div className="flex items-center gap-3 text-xs text-muted-foreground">
-          {adventure.scenes.length > 0 && (
+          {adventure.nodes && adventure.nodes.length > 0 ? (
+            <span className="flex items-center gap-1">
+              <BookOpen className="h-3 w-3" />
+              {adventure.nodes.length} {adventure.nodes.length === 1 ? "node" : "nodes"}
+            </span>
+          ) : adventure.scenes.length > 0 ? (
             <span className="flex items-center gap-1">
               <BookOpen className="h-3 w-3" />
               {adventure.scenes.length} {adventure.scenes.length === 1 ? "scene" : "scenes"}
             </span>
-          )}
+          ) : null}
           {adventure.estimatedDuration && (
             <span className="flex items-center gap-1">
               <Clock className="h-3 w-3" />
