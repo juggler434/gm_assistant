@@ -20,13 +20,19 @@ import type { ConversationMessage, RAGError } from "./types.js";
 // Constants
 // ============================================================================
 
-const REWRITE_SYSTEM_PROMPT = `You are a search query rewriter. Given a conversation history and the user's latest message, rewrite the latest message into a standalone search query that captures the full intent without needing any prior context.
+const REWRITE_SYSTEM_PROMPT = `You are a search query rewriter. Given recent conversation history and the user's latest message, rewrite the latest message into a standalone search query.
+
+IMPORTANT: Resolve pronouns and references ("that", "they", "it", "this") using the MOST RECENT exchange first. The immediately preceding question and answer define the current topic. Do not pull in subjects from earlier in the conversation unless the user explicitly names them.
+
+If the latest message is already a standalone question with no unresolved references, return it unchanged.
 
 Rules:
-- Output ONLY the rewritten query, nothing else
+- Output ONLY the final query, nothing else — no labels, no explanation
 - Keep it concise — a short phrase or sentence suitable for search
-- Preserve specific names, terms, and details from the conversation
-- If the latest message is already a standalone question, return it unchanged`;
+- Preserve specific names, terms, and details`;
+
+/** Only show the rewriter recent messages to avoid topic confusion */
+const REWRITE_HISTORY_LIMIT = 4;
 
 /** Low temperature for deterministic rewrites */
 const REWRITE_TEMPERATURE = 0.1;
@@ -58,17 +64,19 @@ export async function rewriteQuery(
     return ok(question);
   }
 
-  // Build the chat messages: system prompt, conversation history, then the
-  // latest user question with an instruction to rewrite it.
+  // Only pass the most recent messages to the rewriter so it resolves
+  // references against the current topic, not earlier ones.
+  const recentHistory = conversationHistory.slice(-REWRITE_HISTORY_LIMIT);
+
   const messages = [
     { role: "system" as const, content: REWRITE_SYSTEM_PROMPT },
-    ...conversationHistory.map((msg) => ({
+    ...recentHistory.map((msg) => ({
       role: msg.role as "user" | "assistant",
       content: msg.content,
     })),
     {
       role: "user" as const,
-      content: `Rewrite this follow-up into a standalone search query:\n\n${question}`,
+      content: `Latest user message:\n\n${question}`,
     },
   ];
 
