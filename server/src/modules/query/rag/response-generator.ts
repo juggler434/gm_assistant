@@ -27,7 +27,7 @@ import type {
  * System prompt that instructs the LLM how to behave as a RAG assistant
  * for a tabletop RPG game master.
  */
-const SYSTEM_PROMPT = `You are a helpful assistant for a tabletop RPG game master. Answer questions based on the provided source text from their campaign documents and session transcripts.
+const SYSTEM_PROMPT = `You are a helpful assistant for a tabletop RPG game master. Answer the user's current QUESTION using the provided SOURCE TEXT. Conversation history is included for context, but always prioritize the current question and its source text.
 
 Rules:
 1. Base your answer on the provided source text. When the source text contains relevant information, answer clearly and specifically. Quote exact numbers, dice, DCs, ranges, durations, and mechanics verbatim — write "1d20" not "a die roll", write "DC 15" not "a moderate difficulty".
@@ -36,7 +36,8 @@ Rules:
 4. If the source text does not address the question at all, begin with "I don't have enough information" and explain what's missing.
 5. If sources conflict, note the discrepancy and cite both.
 6. If the source text includes a [SAVED] Campaign Content section, you may use that information to answer questions about NPCs, locations, and adventure hooks in the campaign. Reference it naturally without citation numbers.
-7. When citing session transcripts, mention the session name and approximate timestamp if available (e.g. "During the Cave Exploration session [1]...").`;
+7. When citing session transcripts, mention the session name and approximate timestamp if available (e.g. "During the Cave Exploration session [1]...").
+8. Answer the current question on its own terms. If it is about a different subject than the conversation history, answer it directly without referencing previous topics.`;
 
 /**
  * Builds the user message that combines the context and question.
@@ -147,8 +148,13 @@ export function computeConfidence(
  * @param llmService - The LLM service instance to use for generation
  * @returns The generated answer with confidence and citations
  */
-/** Maximum number of history messages to include in the prompt */
-const MAX_HISTORY_MESSAGES = 10;
+/** Only include recent history to prevent old topics from overwhelming the current question */
+const MAX_HISTORY_MESSAGES = 4;
+
+/** Truncate assistant messages in history to this length to prevent old answers from
+ *  overpowering the current source text. Full RAG responses with citations are very long
+ *  and create too much "topic gravity" when included verbatim. */
+const MAX_ASSISTANT_HISTORY_CHARS = 300;
 
 export async function generateResponse(
   query: string,
@@ -166,7 +172,13 @@ export async function generateResponse(
   if (conversationHistory && conversationHistory.length > 0) {
     const recentHistory = conversationHistory.slice(-MAX_HISTORY_MESSAGES);
     for (const msg of recentHistory) {
-      messages.push({ role: msg.role, content: msg.content });
+      // Truncate assistant messages to prevent long RAG responses from
+      // overwhelming the current question's source text
+      let content = msg.content;
+      if (msg.role === "assistant" && content.length > MAX_ASSISTANT_HISTORY_CHARS) {
+        content = content.slice(0, MAX_ASSISTANT_HISTORY_CHARS) + "…";
+      }
+      messages.push({ role: msg.role, content });
     }
   }
 

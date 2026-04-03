@@ -47,6 +47,99 @@ const DEFAULT_MAX_CONTEXT_TOKENS = 16_000;
 const RERANK_FALLBACK_LIMIT = 5;
 
 // ============================================================================
+// Conversational Message Detection
+// ============================================================================
+
+/** Conversational pattern categories with responses for new and ongoing conversations */
+const CONVERSATIONAL_CATEGORIES: Array<{
+  pattern: RegExp;
+  newConversation: string[];
+  ongoingConversation: string[];
+}> = [
+  {
+    pattern: /^(hi|hello|hey|howdy|greetings|yo|sup|hiya)[\s!.,]*$/i,
+    newConversation: [
+      "Hello! What would you like to know about your campaign?",
+      "Hey there! Feel free to ask me anything about your campaign.",
+      "Hi! What can I help you with today?",
+    ],
+    ongoingConversation: [
+      "Hey! What else can I help you with?",
+      "Hi again! Got another question?",
+    ],
+  },
+  {
+    pattern: /^(thanks|thank you|thx|ty|cheers)[\s!.,]*$/i,
+    newConversation: [
+      "You're welcome! What can I help you with?",
+    ],
+    ongoingConversation: [
+      "You're welcome! Let me know if there's anything else I can help with.",
+      "Happy to help! Feel free to ask if anything else comes up.",
+      "Anytime! I'm here if you need anything else.",
+    ],
+  },
+  {
+    pattern: /^(good\s+(morning|afternoon|evening|night))[\s!.,]*$/i,
+    newConversation: [
+      "Good day! What can I help you with today?",
+    ],
+    ongoingConversation: [
+      "Is there anything else I can help you with?",
+    ],
+  },
+  {
+    pattern: /^(bye|goodbye|see\s+you|later|cya)[\s!.,]*$/i,
+    newConversation: [
+      "See you later! Happy adventuring!",
+    ],
+    ongoingConversation: [
+      "See you next time! Happy adventuring!",
+      "Until next time! Good luck with your campaign!",
+    ],
+  },
+  {
+    pattern: /^(ok|okay|got\s+it|understood|cool|nice|great|awesome|perfect)[\s!.,]*$/i,
+    newConversation: [
+      "What can I help you with?",
+    ],
+    ongoingConversation: [
+      "Feel free to ask if anything else comes up!",
+      "Let me know if you have any more questions!",
+    ],
+  },
+];
+
+function getConversationalResponse(
+  message: string,
+  hasHistory: boolean,
+): string | null {
+  if (message.length > 60) return null;
+
+  for (const category of CONVERSATIONAL_CATEGORIES) {
+    if (category.pattern.test(message)) {
+      const responses = hasHistory
+        ? category.ongoingConversation
+        : category.newConversation;
+      return responses[Math.floor(Math.random() * responses.length)]!;
+    }
+  }
+
+  return null;
+}
+
+function buildConversationalResult(answer: string): RAGResult {
+  return {
+    answer,
+    confidence: 1,
+    sources: [],
+    isUnanswerable: false,
+    chunksRetrieved: 0,
+    chunksUsed: 0,
+  };
+}
+
+// ============================================================================
 // Embedding Helper
 // ============================================================================
 
@@ -95,6 +188,13 @@ export async function executeRAGPipeline(
       code: "INVALID_QUERY",
       message: "Question must not be empty",
     });
+  }
+
+  // ---- Conversational short-circuit ----
+  const hasHistory = !!query.conversationHistory && query.conversationHistory.length > 0;
+  const conversationalAnswer = getConversationalResponse(trimmedQuestion, hasHistory);
+  if (conversationalAnswer) {
+    return ok(buildConversationalResult(conversationalAnswer));
   }
 
   // ---- Step 1: Rewrite query if conversation history is present ----
