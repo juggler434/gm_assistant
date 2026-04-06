@@ -45,6 +45,9 @@ const envSchema = z
     LLM_MAX_TOKENS: z.coerce.number().int().positive().default(4096),
     LLM_TEMPERATURE: z.coerce.number().min(0).max(2).default(0.7),
 
+    // Ollama (always required for embeddings)
+    OLLAMA_BASE_URL: z.string().url().default("http://localhost:11434"),
+
     // Google AI (Gemini)
     GOOGLE_AI_API_KEY: z.string().optional(),
 

@@ -1,5 +1,8 @@
 // SPDX-License-Identifier: AGPL-3.0-or-later
 
+import path from "node:path";
+import { existsSync } from "node:fs";
+import { fileURLToPath } from "node:url";
 import Fastify, { type FastifyInstance, type FastifyError } from "fastify";
 import { config } from "@/config/index.js";
 import {
@@ -91,6 +94,35 @@ export async function buildApp(options: AppOptions = {}): Promise<FastifyInstanc
   app.get("/health", async () => {
     return { status: "ok", timestamp: new Date().toISOString() };
   });
+
+  // In production, serve client static files
+  if (config.env === "production") {
+    const __dirname = path.dirname(fileURLToPath(import.meta.url));
+    const clientDistPath = path.resolve(__dirname, "../../client/dist");
+
+    if (existsSync(clientDistPath)) {
+      const fastifyStatic = await import("@fastify/static");
+      await app.register(fastifyStatic.default, {
+        root: clientDistPath,
+        prefix: "/",
+        wildcard: false,
+      });
+
+      // SPA fallback: serve index.html for non-API routes
+      app.setNotFoundHandler(async (request, reply) => {
+        if (request.url.startsWith("/api/")) {
+          return reply.status(404).send({
+            statusCode: 404,
+            error: "Not Found",
+            message: "Route not found",
+          });
+        }
+        return reply.sendFile("index.html");
+      });
+
+      app.log.info(`Serving client from ${clientDistPath}`);
+    }
+  }
 
   app.log.info("Routes registered");
 

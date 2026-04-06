@@ -73,7 +73,7 @@ export async function generateEmbeddings(
   }
 
   try {
-    const response = await fetch(`${config.llm.baseUrl}/api/embed`, {
+    const response = await fetch(`${config.ollama.baseUrl}/api/embed`, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({
@@ -128,7 +128,7 @@ export async function generateEmbedding(
   const timeoutId = setTimeout(() => controller.abort(), SINGLE_EMBEDDING_TIMEOUT);
 
   try {
-    const response = await fetch(`${config.llm.baseUrl}/api/embed`, {
+    const response = await fetch(`${config.ollama.baseUrl}/api/embed`, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({

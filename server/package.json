@@ -60,6 +60,7 @@
     "@fastify/cors": "^11.2.0",
     "@fastify/multipart": "^9.4.0",
     "@fastify/rate-limit": "^10.3.0",
+    "@fastify/static": "^9.0.0",
     "@fastify/websocket": "^11.2.0",
     "@gm-assistant/shared": "*",
     "@google/genai": "^1.41.0",
