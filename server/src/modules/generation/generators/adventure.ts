@@ -516,13 +516,18 @@ async function callLLM(
   system: string,
   user: string,
   maxTokens: number,
+  temperatureOverride?: number,
+  customInstructions?: string,
 ): Promise<Result<{ content: string; usage?: TokenUsage | undefined }, AdventureGenerationError>> {
+  const finalSystem = customInstructions
+    ? `${system}\n\nAdditional GM instructions:\n${customInstructions}`
+    : system;
   const result = await llmService.chat({
     messages: [
-      { role: "system", content: system },
+      { role: "system", content: finalSystem },
       { role: "user", content: user },
     ],
-    temperature: GENERATION_TEMPERATURE,
+    temperature: temperatureOverride ?? GENERATION_TEMPERATURE,
     maxTokens,
     contextSize: STEP_CONTEXT_SIZE,
   });
@@ -558,6 +563,8 @@ export async function generateAdventure(
     sourceOutlineId,
     includeStatBlocks,
     maxContextChunks = DEFAULT_MAX_CONTEXT_CHUNKS,
+    temperature,
+    customInstructions,
   } = request;
 
   const emit = onProgress ?? (() => {});
@@ -677,7 +684,7 @@ export async function generateAdventure(
     partyLevel,
     outlineSeed,
   });
-  const frontDoomResult = await callLLM(llmService, frontDoomPrompt.system, frontDoomPrompt.user, FRONT_DOOM_MAX_TOKENS);
+  const frontDoomResult = await callLLM(llmService, frontDoomPrompt.system, frontDoomPrompt.user, FRONT_DOOM_MAX_TOKENS, temperature, customInstructions);
   if (!frontDoomResult.ok) return frontDoomResult;
   totalUsage = mergeUsage(totalUsage, frontDoomResult.value.usage);
 
@@ -709,7 +716,7 @@ export async function generateAdventure(
     theme,
     partyLevel,
   });
-  const nodeMapResult = await callLLM(llmService, nodeMapPrompt.system, nodeMapPrompt.user, NODE_MAP_MAX_TOKENS);
+  const nodeMapResult = await callLLM(llmService, nodeMapPrompt.system, nodeMapPrompt.user, NODE_MAP_MAX_TOKENS, temperature, customInstructions);
   if (!nodeMapResult.ok) return nodeMapResult;
   totalUsage = mergeUsage(totalUsage, nodeMapResult.value.usage);
 
@@ -753,7 +760,7 @@ export async function generateAdventure(
       },
     );
 
-    const detailResult = await callLLM(llmService, detailPrompt.system, detailPrompt.user, NODE_DETAIL_MAX_TOKENS);
+    const detailResult = await callLLM(llmService, detailPrompt.system, detailPrompt.user, NODE_DETAIL_MAX_TOKENS, temperature, customInstructions);
     if (!detailResult.ok) return detailResult;
     totalUsage = mergeUsage(totalUsage, detailResult.value.usage);
 
@@ -789,7 +796,7 @@ export async function generateAdventure(
   emit({ type: "status", message: "Linking timeline to nodes..." });
 
   const doomUpdatePrompt = buildDoomTimelineUpdatePrompt(frontSummary, doomSummary, nodeStubsForPrompts);
-  const doomUpdateResult = await callLLM(llmService, doomUpdatePrompt.system, doomUpdatePrompt.user, DOOM_UPDATE_MAX_TOKENS);
+  const doomUpdateResult = await callLLM(llmService, doomUpdatePrompt.system, doomUpdatePrompt.user, DOOM_UPDATE_MAX_TOKENS, temperature, customInstructions);
   let finalTimeline = pipelineFront.doomTimeline;
   if (doomUpdateResult.ok) {
     totalUsage = mergeUsage(totalUsage, doomUpdateResult.value.usage);

@@ -30,6 +30,7 @@ import {
 } from "@/components/generation/adventure-form";
 import { AdventureGenerationResult } from "@/components/generation/adventure-generation-result";
 import { useGenerationContext } from "@/hooks/use-generation-context";
+import { useCampaign } from "@/hooks/use-campaigns";
 import { useCreateNpc } from "@/hooks/use-npcs";
 import { useCreateLocation } from "@/hooks/use-locations";
 import { useCreateAdventureHook } from "@/hooks/use-adventure-hooks";
@@ -40,6 +41,8 @@ import type { GeneratedNpc, GeneratedLocation, GeneratedAdventureOutline, Genera
 
 export function GeneratePage() {
   const { id: campaignId } = useParams<{ id: string }>();
+  const { data: campaign } = useCampaign(campaignId!);
+  const defaultTones = campaign?.generationSettings?.defaultTones;
 
   // Pull all streaming state from the layout-level context so it survives navigation
   const {
@@ -401,7 +404,7 @@ export function GeneratePage() {
             <h3 className="mb-4 text-base font-semibold text-foreground">
               Generate Adventure Hooks
             </h3>
-            <AdventureHookForm onSubmit={handleGenerate} isLoading={isStreaming} />
+            <AdventureHookForm onSubmit={handleGenerate} isLoading={isStreaming} defaultTone={defaultTones?.hook} />
           </div>
 
           <GenerationResult
@@ -420,7 +423,7 @@ export function GeneratePage() {
         <div className="space-y-6">
           <div className="rounded-[var(--radius)] border border-border bg-card p-5">
             <h3 className="mb-4 text-base font-semibold text-foreground">Generate NPCs</h3>
-            <NpcGenerationForm onSubmit={handleGenerateNpcs} isLoading={npcIsStreaming} />
+            <NpcGenerationForm onSubmit={handleGenerateNpcs} isLoading={npcIsStreaming} defaultTone={defaultTones?.npc} />
           </div>
 
           <NpcGenerationResult
@@ -440,6 +443,7 @@ export function GeneratePage() {
             <LocationGenerationForm
               onSubmit={handleGenerateLocations}
               isLoading={locationIsStreaming}
+              defaultTone={defaultTones?.location}
             />
           </div>
 
@@ -462,6 +466,7 @@ export function GeneratePage() {
             <AdventureOutlineForm
               onSubmit={handleGenerateOutlines}
               isLoading={outlineIsStreaming}
+              defaultTone={defaultTones?.outline}
             />
           </div>
 
@@ -487,6 +492,7 @@ export function GeneratePage() {
               onSubmit={handleGenerateAdventure}
               isLoading={adventureIsStreaming}
               outlines={outlinesList?.map((o) => ({ id: o.id, title: o.title })) ?? []}
+              defaultTone={defaultTones?.adventure}
             />
           </div>
 

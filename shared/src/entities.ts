@@ -45,11 +45,28 @@ export interface Session {
 // Campaign
 // ============================================================================
 
+/** Per-campaign AI generation preferences stored as JSONB */
+export interface GenerationSettings {
+  /** LLM sampling temperature (0–2). Higher = more creative. */
+  temperature?: number;
+  /** Free-text instructions appended to every generation prompt for this campaign */
+  customInstructions?: string;
+  /** Default tone selections per content type */
+  defaultTones?: {
+    hook?: import("./generation.js").HookTone;
+    npc?: import("./generation.js").NpcTone;
+    location?: import("./generation.js").LocationTone;
+    outline?: import("./generation.js").OutlineTone;
+    adventure?: import("./generation.js").AdventureTone;
+  };
+}
+
 /** Campaign entity matching server/src/db/schema/campaigns.ts */
 export interface Campaign extends BaseEntity {
   userId: Id;
   name: string;
   description: string | null;
+  generationSettings: GenerationSettings | null;
 }
 
 // ============================================================================
