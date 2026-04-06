@@ -189,6 +189,8 @@ export async function generateAdventureHooks(
     count,
     maxContextChunks = DEFAULT_MAX_CONTEXT_CHUNKS,
     includeNpcsLocations,
+    temperature,
+    customInstructions,
   } = request;
 
   // ---- Step 1: Build setting-focused search query ----
@@ -238,14 +240,17 @@ export async function generateAdventureHooks(
   if (campaignContent.contentText) promptOptions.campaignContent = campaignContent;
 
   const { system, user } = buildAdventureHookPrompt(context, tone, promptOptions);
+  const finalSystem = customInstructions
+    ? `${system}\n\nAdditional GM instructions:\n${customInstructions}`
+    : system;
 
   // ---- Step 6: Call LLM ----
   const chatResult = await llmService.chat({
     messages: [
-      { role: "system", content: system },
+      { role: "system", content: finalSystem },
       { role: "user", content: user },
     ],
-    temperature: GENERATION_TEMPERATURE,
+    temperature: temperature ?? GENERATION_TEMPERATURE,
     maxTokens: GENERATION_MAX_TOKENS,
   });
 

@@ -1,6 +1,6 @@
 // SPDX-License-Identifier: AGPL-3.0-or-later
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { useParams, useNavigate } from "react-router-dom";
 import { toast } from "sonner";
 import {
@@ -24,6 +24,19 @@ import { Badge } from "@/components/ui/badge";
 import { Spinner } from "@/components/ui/spinner";
 import { Skeleton } from "@/components/ui/skeleton";
 import { ErrorState } from "@/components/ui/error-state";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
+import type {
+  GenerationSettings,
+  HookTone,
+  NpcTone,
+  LocationTone,
+} from "@/types";
 
 function formatBytes(bytes: number): string {
   if (bytes === 0) return "0 B";
@@ -40,6 +53,41 @@ const STATUS_LABELS: Record<string, { label: string; variant: "default" | "secon
   failed: { label: "Failed", variant: "destructive" },
 };
 
+const HOOK_TONE_OPTIONS: { value: HookTone; label: string }[] = [
+  { value: "mysterious", label: "Mysterious" },
+  { value: "dark", label: "Dark" },
+  { value: "heroic", label: "Heroic" },
+  { value: "comedic", label: "Comedic" },
+  { value: "political", label: "Political" },
+  { value: "horror", label: "Horror" },
+  { value: "intrigue", label: "Intrigue" },
+];
+
+const NPC_TONE_OPTIONS: { value: NpcTone; label: string }[] = [
+  { value: "mysterious", label: "Mysterious" },
+  { value: "dark", label: "Dark" },
+  { value: "heroic", label: "Heroic" },
+  { value: "comedic", label: "Comedic" },
+  { value: "gritty", label: "Gritty" },
+  { value: "whimsical", label: "Whimsical" },
+];
+
+const LOCATION_TONE_OPTIONS: { value: LocationTone; label: string }[] = [
+  { value: "mysterious", label: "Mysterious" },
+  { value: "dark", label: "Dark" },
+  { value: "peaceful", label: "Peaceful" },
+  { value: "bustling", label: "Bustling" },
+  { value: "ruined", label: "Ruined" },
+  { value: "magical", label: "Magical" },
+];
+
+function temperatureLabel(temp: number): string {
+  if (temp <= 0.4) return "Conservative";
+  if (temp <= 0.8) return "Balanced";
+  if (temp <= 1.2) return "Creative";
+  return "Wild";
+}
+
 export function SettingsPage() {
   const { id: campaignId } = useParams<{ id: string }>();
   const navigate = useNavigate();
@@ -52,6 +100,33 @@ export function SettingsPage() {
   const [deleteOpen, setDeleteOpen] = useState(false);
   const [exporting, setExporting] = useState(false);
 
+  // Generation settings state — initialized from campaign data
+  const [genSettingsLoaded, setGenSettingsLoaded] = useState(false);
+  const [temperature, setTemperature] = useState(0.8);
+  const [customInstructions, setCustomInstructions] = useState("");
+  const [hookTone, setHookTone] = useState("");
+  const [npcTone, setNpcTone] = useState("");
+  const [locationTone, setLocationTone] = useState("");
+  const [outlineTone, setOutlineTone] = useState("");
+  const [adventureTone, setAdventureTone] = useState("");
+
+  // Sync generation settings from campaign data on first load
+  useEffect(() => {
+    if (campaign && !genSettingsLoaded) {
+      const gs = campaign.generationSettings;
+      if (gs) {
+        setTemperature(gs.temperature ?? 0.8);
+        setCustomInstructions(gs.customInstructions ?? "");
+        setHookTone(gs.defaultTones?.hook ?? "");
+        setNpcTone(gs.defaultTones?.npc ?? "");
+        setLocationTone(gs.defaultTones?.location ?? "");
+        setOutlineTone(gs.defaultTones?.outline ?? "");
+        setAdventureTone(gs.defaultTones?.adventure ?? "");
+      }
+      setGenSettingsLoaded(true);
+    }
+  }, [campaign, genSettingsLoaded]);
+
   // Use local state if user has edited, otherwise fall back to campaign data
   const currentName = name ?? campaign?.name ?? "";
   const currentDescription = description ?? campaign?.description ?? "";
@@ -59,6 +134,57 @@ export function SettingsPage() {
   const hasChanges =
     campaign &&
     (currentName !== campaign.name || currentDescription !== (campaign.description ?? ""));
+
+  function buildGenSettings(): GenerationSettings {
+    const defaultTones: GenerationSettings["defaultTones"] = {};
+    if (hookTone) defaultTones.hook = hookTone as HookTone;
+    if (npcTone) defaultTones.npc = npcTone as NpcTone;
+    if (locationTone) defaultTones.location = locationTone as LocationTone;
+    if (outlineTone) defaultTones.outline = outlineTone as HookTone;
+    if (adventureTone) defaultTones.adventure = adventureTone as HookTone;
+    return {
+      temperature,
+      ...(customInstructions.trim() && { customInstructions: customInstructions.trim() }),
+      ...(Object.keys(defaultTones).length > 0 && { defaultTones }),
+    };
+  }
+
+  const hasGenChanges = (() => {
+    if (!campaign || !genSettingsLoaded) return false;
+    const gs = campaign.generationSettings;
+    const saved = {
+      temperature: gs?.temperature ?? 0.8,
+      customInstructions: gs?.customInstructions ?? "",
+      hookTone: gs?.defaultTones?.hook ?? "",
+      npcTone: gs?.defaultTones?.npc ?? "",
+      locationTone: gs?.defaultTones?.location ?? "",
+      outlineTone: gs?.defaultTones?.outline ?? "",
+      adventureTone: gs?.defaultTones?.adventure ?? "",
+    };
+    return (
+      temperature !== saved.temperature ||
+      customInstructions !== saved.customInstructions ||
+      hookTone !== saved.hookTone ||
+      npcTone !== saved.npcTone ||
+      locationTone !== saved.locationTone ||
+      outlineTone !== saved.outlineTone ||
+      adventureTone !== saved.adventureTone
+    );
+  })();
+
+  function handleSaveGenSettings(e: React.FormEvent) {
+    e.preventDefault();
+    updateMutation.mutate(
+      { generationSettings: buildGenSettings() },
+      {
+        onSuccess: () => {
+          toast.success("Generation settings updated");
+          setGenSettingsLoaded(false);
+        },
+        onError: () => toast.error("Failed to update generation settings"),
+      }
+    );
+  }
 
   if (isError) {
     return (
@@ -161,7 +287,7 @@ export function SettingsPage() {
         </CardContent>
       </Card>
 
-      {/* Generation Settings (placeholder) */}
+      {/* Generation Settings */}
       <Card>
         <CardHeader>
           <CardTitle className="flex items-center gap-2">
@@ -169,14 +295,136 @@ export function SettingsPage() {
             Generation Settings
           </CardTitle>
           <CardDescription>
-            Per-campaign AI generation preferences coming soon.
+            Configure default AI generation preferences for this campaign.
           </CardDescription>
         </CardHeader>
         <CardContent>
-          <p className="text-sm text-muted-foreground">
-            Configure default tone, style, and parameters for AI-generated content in this
-            campaign. This feature is not yet available.
-          </p>
+          {isLoading ? (
+            <div className="space-y-4">
+              <Skeleton className="h-10 w-full" />
+              <Skeleton className="h-20 w-full" />
+            </div>
+          ) : (
+            <form onSubmit={handleSaveGenSettings} className="space-y-6">
+              {/* Temperature / Creativity */}
+              <div className="grid gap-2">
+                <div className="flex items-center justify-between">
+                  <Label htmlFor="gen-temperature">Creativity Level</Label>
+                  <span className="text-sm text-muted-foreground">
+                    {temperature.toFixed(1)} &mdash; {temperatureLabel(temperature)}
+                  </span>
+                </div>
+                <input
+                  id="gen-temperature"
+                  type="range"
+                  min="0.1"
+                  max="1.5"
+                  step="0.1"
+                  value={temperature}
+                  onChange={(e) => setTemperature(parseFloat(e.target.value))}
+                  className="w-full accent-primary"
+                />
+                <div className="flex justify-between text-xs text-muted-foreground">
+                  <span>Conservative</span>
+                  <span>Balanced</span>
+                  <span>Creative</span>
+                  <span>Wild</span>
+                </div>
+              </div>
+
+              {/* Custom Instructions */}
+              <div className="grid gap-2">
+                <Label htmlFor="gen-instructions">Custom Instructions</Label>
+                <Textarea
+                  id="gen-instructions"
+                  value={customInstructions}
+                  onChange={(e) => setCustomInstructions(e.target.value)}
+                  placeholder="e.g. &quot;All NPCs speak with old English dialect&quot; or &quot;This is a steampunk Victorian setting&quot;"
+                  rows={3}
+                  maxLength={2000}
+                />
+                <p className="text-xs text-muted-foreground">
+                  These instructions are included in every generation prompt for this campaign.
+                </p>
+              </div>
+
+              {/* Default Tones */}
+              <div className="grid gap-3">
+                <Label>Default Tones</Label>
+                <p className="text-xs text-muted-foreground -mt-1">
+                  Pre-fill the tone selector when generating content. Leave empty to choose each time.
+                </p>
+                <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
+                  <div className="grid gap-1.5">
+                    <Label htmlFor="gen-tone-hook" className="text-xs text-muted-foreground">Hooks &amp; Outlines</Label>
+                    <Select value={hookTone} onValueChange={(v: string) => { setHookTone(v === "none" ? "" : v); setOutlineTone(v === "none" ? "" : v); }}>
+                      <SelectTrigger id="gen-tone-hook">
+                        <SelectValue placeholder="No default" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="none">No default</SelectItem>
+                        {HOOK_TONE_OPTIONS.map((o) => (
+                          <SelectItem key={o.value} value={o.value}>{o.label}</SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                  </div>
+
+                  <div className="grid gap-1.5">
+                    <Label htmlFor="gen-tone-npc" className="text-xs text-muted-foreground">NPCs</Label>
+                    <Select value={npcTone} onValueChange={(v: string) => setNpcTone(v === "none" ? "" : v)}>
+                      <SelectTrigger id="gen-tone-npc">
+                        <SelectValue placeholder="No default" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="none">No default</SelectItem>
+                        {NPC_TONE_OPTIONS.map((o) => (
+                          <SelectItem key={o.value} value={o.value}>{o.label}</SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                  </div>
+
+                  <div className="grid gap-1.5">
+                    <Label htmlFor="gen-tone-location" className="text-xs text-muted-foreground">Locations</Label>
+                    <Select value={locationTone} onValueChange={(v: string) => setLocationTone(v === "none" ? "" : v)}>
+                      <SelectTrigger id="gen-tone-location">
+                        <SelectValue placeholder="No default" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="none">No default</SelectItem>
+                        {LOCATION_TONE_OPTIONS.map((o) => (
+                          <SelectItem key={o.value} value={o.value}>{o.label}</SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                  </div>
+
+                  <div className="grid gap-1.5">
+                    <Label htmlFor="gen-tone-adventure" className="text-xs text-muted-foreground">Adventures</Label>
+                    <Select value={adventureTone} onValueChange={(v: string) => setAdventureTone(v === "none" ? "" : v)}>
+                      <SelectTrigger id="gen-tone-adventure">
+                        <SelectValue placeholder="No default" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="none">No default</SelectItem>
+                        {HOOK_TONE_OPTIONS.map((o) => (
+                          <SelectItem key={o.value} value={o.value}>{o.label}</SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                  </div>
+                </div>
+              </div>
+
+              <div className="flex justify-end">
+                <Button type="submit" disabled={!hasGenChanges || updateMutation.isPending}>
+                  {updateMutation.isPending && <Spinner label="Saving" />}
+                  Save Generation Settings
+                </Button>
+              </div>
+            </form>
+          )}
         </CardContent>
       </Card>
 

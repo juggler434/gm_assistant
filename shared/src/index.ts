@@ -16,6 +16,7 @@ export type {
   AuthUser,
   Session,
   Campaign,
+  GenerationSettings,
   DocumentType,
   DocumentStatus,
   DocumentMetadata,

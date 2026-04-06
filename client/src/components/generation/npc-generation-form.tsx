@@ -41,10 +41,11 @@ export interface NpcGenerationFormValues {
 interface NpcGenerationFormProps {
   onSubmit: (values: NpcGenerationFormValues) => void;
   isLoading: boolean;
+  defaultTone?: NpcTone;
 }
 
-export function NpcGenerationForm({ onSubmit, isLoading }: NpcGenerationFormProps) {
-  const [tone, setTone] = useState<NpcTone>("mysterious");
+export function NpcGenerationForm({ onSubmit, isLoading, defaultTone }: NpcGenerationFormProps) {
+  const [tone, setTone] = useState<NpcTone>(defaultTone ?? "mysterious");
   const [race, setRace] = useState("");
   const [classRole, setClassRole] = useState("");
   const [level, setLevel] = useState("");

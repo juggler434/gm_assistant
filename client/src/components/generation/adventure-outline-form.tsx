@@ -39,10 +39,11 @@ export interface AdventureOutlineFormValues {
 interface AdventureOutlineFormProps {
   onSubmit: (values: AdventureOutlineFormValues) => void;
   isLoading: boolean;
+  defaultTone?: OutlineTone;
 }
 
-export function AdventureOutlineForm({ onSubmit, isLoading }: AdventureOutlineFormProps) {
-  const [tone, setTone] = useState<OutlineTone>("mysterious");
+export function AdventureOutlineForm({ onSubmit, isLoading, defaultTone }: AdventureOutlineFormProps) {
+  const [tone, setTone] = useState<OutlineTone>(defaultTone ?? "mysterious");
   const [theme, setTheme] = useState("");
   const [count, setCount] = useState("1");
   const [partyLevel, setPartyLevel] = useState("");

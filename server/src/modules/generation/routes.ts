@@ -23,6 +23,16 @@ import {
   generateAdventureBodySchema,
 } from "./schemas.js";
 import type { AdventureHookRequest, NpcGenerationRequest, LocationGenerationRequest, AdventureOutlineRequest, AdventureGenerationRequest } from "./types.js";
+import type { GenerationSettings } from "@gm-assistant/shared";
+
+function getCampaignGenerationOverrides(campaign: { generationSettings: unknown }) {
+  const settings = campaign.generationSettings as GenerationSettings | null;
+  if (!settings) return {};
+  return {
+    ...(settings.temperature !== undefined && { temperature: settings.temperature }),
+    ...(settings.customInstructions && { customInstructions: settings.customInstructions }),
+  };
+}
 
 export async function generationRoutes(app: FastifyInstance): Promise<void> {
   // All generation routes require authentication
@@ -76,6 +86,7 @@ export async function generationRoutes(app: FastifyInstance): Promise<void> {
       ...(count !== undefined && { count }),
       ...(count !== undefined && { maxContextChunks: Math.max(count, 6) }),
       ...(includeNpcsLocations !== undefined && { includeNpcsLocations }),
+      ...getCampaignGenerationOverrides(campaign),
     };
 
     const llmService = createLLMService();
@@ -185,6 +196,7 @@ export async function generationRoutes(app: FastifyInstance): Promise<void> {
       ...(count !== undefined && { maxContextChunks: Math.max(count, 6) }),
       ...(includeStatBlock !== undefined && { includeStatBlock }),
       ...(constraints !== undefined && { constraints }),
+      ...getCampaignGenerationOverrides(campaign),
     };
 
     const llmService = createLLMService();
@@ -289,6 +301,7 @@ export async function generationRoutes(app: FastifyInstance): Promise<void> {
       ...(count !== undefined && { count }),
       ...(count !== undefined && { maxContextChunks: Math.max(count, 6) }),
       ...(constraints !== undefined && { constraints }),
+      ...getCampaignGenerationOverrides(campaign),
     };
 
     const llmService = createLLMService();
@@ -391,6 +404,7 @@ export async function generationRoutes(app: FastifyInstance): Promise<void> {
       ...(count !== undefined && { count }),
       ...(count !== undefined && { maxContextChunks: Math.max(count * 4, 8) }),
       ...(includeNpcsLocations !== undefined && { includeNpcsLocations }),
+      ...getCampaignGenerationOverrides(campaign),
     };
 
     const llmService = createLLMService();
@@ -490,6 +504,7 @@ export async function generationRoutes(app: FastifyInstance): Promise<void> {
       ...(sourceOutlineId !== undefined && { sourceOutlineId }),
       ...(includeStatBlocks !== undefined && { includeStatBlocks }),
       maxContextChunks: 10,
+      ...getCampaignGenerationOverrides(campaign),
     };
 
     const llmService = createLLMService();

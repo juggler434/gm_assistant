@@ -39,10 +39,11 @@ export interface AdventureHookFormValues {
 interface AdventureHookFormProps {
   onSubmit: (values: AdventureHookFormValues) => void;
   isLoading: boolean;
+  defaultTone?: HookTone;
 }
 
-export function AdventureHookForm({ onSubmit, isLoading }: AdventureHookFormProps) {
-  const [tone, setTone] = useState<HookTone>("mysterious");
+export function AdventureHookForm({ onSubmit, isLoading, defaultTone }: AdventureHookFormProps) {
+  const [tone, setTone] = useState<HookTone>(defaultTone ?? "mysterious");
   const [theme, setTheme] = useState("");
   const [count, setCount] = useState("3");
   const [partyLevel, setPartyLevel] = useState("");

@@ -25,6 +25,7 @@ import type {
   SessionSummary,
   SummaryStatus,
   Transcript,
+  GenerationSettings,
 } from "./entities.js";
 import type { AdventureFront, AdventureNode, AdventureScene, TimelineEntry } from "./generation.js";
 
@@ -75,6 +76,7 @@ export interface CreateCampaignRequest {
 export interface UpdateCampaignRequest {
   name?: string;
   description?: string | null;
+  generationSettings?: GenerationSettings | null;
 }
 
 /** Response wrapping a single campaign */

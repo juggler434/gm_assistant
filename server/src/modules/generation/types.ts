@@ -43,6 +43,10 @@ export interface AdventureHookRequest {
   maxContextChunks?: number;
   /** Comma-separated NPCs/locations to specifically include in hooks */
   includeNpcsLocations?: string;
+  /** Campaign-level temperature override */
+  temperature?: number;
+  /** Campaign-level custom instructions to append to system prompt */
+  customInstructions?: string;
 }
 
 /** Result of adventure hook generation */
@@ -85,6 +89,10 @@ export interface NpcGenerationRequest {
   includeStatBlock?: boolean;
   constraints?: string;
   maxContextChunks?: number;
+  /** Campaign-level temperature override */
+  temperature?: number;
+  /** Campaign-level custom instructions to append to system prompt */
+  customInstructions?: string;
 }
 
 /** Result of NPC generation */
@@ -121,6 +129,10 @@ export interface LocationGenerationRequest {
   count?: number;
   constraints?: string;
   maxContextChunks?: number;
+  /** Campaign-level temperature override */
+  temperature?: number;
+  /** Campaign-level custom instructions to append to system prompt */
+  customInstructions?: string;
 }
 
 /** Result of location generation */
@@ -156,6 +168,10 @@ export interface AdventureOutlineRequest {
   count?: number;
   maxContextChunks?: number;
   includeNpcsLocations?: string;
+  /** Campaign-level temperature override */
+  temperature?: number;
+  /** Campaign-level custom instructions to append to system prompt */
+  customInstructions?: string;
 }
 
 /** Result of adventure outline generation */
@@ -191,6 +207,10 @@ export interface AdventureGenerationRequest {
   sourceOutlineId?: string;
   includeStatBlocks?: boolean;
   maxContextChunks?: number;
+  /** Campaign-level temperature override */
+  temperature?: number;
+  /** Campaign-level custom instructions to append to system prompt */
+  customInstructions?: string;
 }
 
 /** Result of full adventure generation */

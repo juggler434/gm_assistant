@@ -49,7 +49,7 @@ export async function findCampaignByIdAndUserId(
 export async function updateCampaign(
   id: string,
   userId: string,
-  data: { name?: string | undefined; description?: string | null | undefined }
+  data: { name?: string | undefined; description?: string | null | undefined; generationSettings?: Record<string, unknown> | null | undefined }
 ): Promise<Campaign | null> {
   // Filter out undefined values to only update provided fields
   const updateData: Record<string, unknown> = {};
@@ -58,6 +58,9 @@ export async function updateCampaign(
   }
   if (data.description !== undefined) {
     updateData.description = data.description;
+  }
+  if (data.generationSettings !== undefined) {
+    updateData.generationSettings = data.generationSettings;
   }
 
   const result = await db

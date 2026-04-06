@@ -39,10 +39,11 @@ export interface LocationGenerationFormValues {
 interface LocationGenerationFormProps {
   onSubmit: (values: LocationGenerationFormValues) => void;
   isLoading: boolean;
+  defaultTone?: LocationTone;
 }
 
-export function LocationGenerationForm({ onSubmit, isLoading }: LocationGenerationFormProps) {
-  const [tone, setTone] = useState<LocationTone>("mysterious");
+export function LocationGenerationForm({ onSubmit, isLoading, defaultTone }: LocationGenerationFormProps) {
+  const [tone, setTone] = useState<LocationTone>(defaultTone ?? "mysterious");
   const [terrain, setTerrain] = useState("");
   const [climate, setClimate] = useState("");
   const [size, setSize] = useState("");
