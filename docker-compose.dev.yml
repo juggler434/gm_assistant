@@ -6,6 +6,8 @@ services:
       POSTGRES_USER: gm_user
       POSTGRES_PASSWORD: gm_password
       POSTGRES_DB: gm_assistant
+    ports:
+      - "5432:5432"
     volumes:
       - postgres_data:/var/lib/postgresql/data
     healthcheck:
@@ -18,6 +20,8 @@ services:
   redis:
     image: redis:7-alpine
     container_name: gm_assistant_redis
+    ports:
+      - "6379:6379"
     volumes:
       - redis_data:/data
     healthcheck:
@@ -34,6 +38,9 @@ services:
     environment:
       MINIO_ROOT_USER: minio_admin
       MINIO_ROOT_PASSWORD: minio_password
+    ports:
+      - "9000:9000"
+      - "9001:9001"
     volumes:
       - minio_data:/data
     healthcheck:
@@ -44,21 +51,11 @@ services:
       start_period: 10s
     command: server /data --console-address ":9001"
 
-  minio-init:
-    image: minio/mc:latest
-    container_name: gm_assistant_minio_init
-    depends_on:
-      minio:
-        condition: service_healthy
-    entrypoint: >
-      sh -c "mc alias set myminio http://minio:9000 minio_admin minio_password &&
-             mc mb --ignore-existing myminio/gm-assistant &&
-             echo 'Bucket ready.'"
-    restart: "no"
-
   ocr:
     build: ./services/ocr
     container_name: gm_assistant_ocr
+    ports:
+      - "8080:8080"
     healthcheck:
       test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://localhost:8080/health')"]
       interval: 10s
@@ -66,57 +63,12 @@ services:
       retries: 3
       start_period: 10s
 
-  ollama:
-    image: ollama/ollama:latest
-    container_name: gm_assistant_ollama
-    environment:
-      - LLM_PROVIDER=${LLM_PROVIDER:-ollama}
-      - LLM_MODEL=${LLM_MODEL:-gemma3:1b}
-    volumes:
-      - ollama_data:/root/.ollama
-    entrypoint: >
-      sh -c "ollama serve &
-             until ollama list 2>/dev/null; do sleep 2; done &&
-             echo 'Pulling embedding model...' &&
-             ollama pull nomic-embed-text &&
-             if [ \"$$LLM_PROVIDER\" = 'ollama' ]; then
-               echo \"Pulling LLM model: $$LLM_MODEL\" &&
-               ollama pull $$LLM_MODEL;
-             fi &&
-             echo 'Ollama ready.' &&
-             wait"
-    healthcheck:
-      test: ["CMD", "ollama", "list"]
-      interval: 30s
-      timeout: 10s
-      retries: 3
-      start_period: 120s
-
-  app:
-    build: .
-    container_name: gm_assistant_app
-    env_file:
-      - .env
-    ports:
-      - "${PORT:-3000}:3000"
-    depends_on:
-      postgres:
-        condition: service_healthy
-      redis:
-        condition: service_healthy
-      minio:
-        condition: service_healthy
-      minio-init:
-        condition: service_completed_successfully
-      ollama:
-        condition: service_healthy
-      ocr:
-        condition: service_healthy
-
   whisper:
     image: fedirz/faster-whisper-server:latest-cpu
     container_name: gm_assistant_whisper
     profiles: ["with-whisper"]
+    ports:
+      - "8001:8000"
     environment:
       WHISPER__MODEL: "Systran/faster-whisper-base.en"
     healthcheck:
@@ -131,13 +83,35 @@ services:
     container_name: gm_assistant_diarization
     profiles: ["with-diarization"]
     env_file:
-      - .env
+      - ./server/.env
+    ports:
+      - "8002:8000"
     healthcheck:
       test: ["CMD", "curl", "-f", "http://localhost:8000/health"]
       interval: 30s
       timeout: 10s
       retries: 5
       start_period: 300s
+
+  ollama:
+    image: ollama/ollama:latest
+    container_name: gm_assistant_ollama
+    ports:
+      - "11434:11434"
+    volumes:
+      - ollama_data:/root/.ollama
+    entrypoint: >
+      sh -c "ollama serve &
+             until ollama list 2>/dev/null; do sleep 2; done &&
+             ollama pull nomic-embed-text &&
+             ollama pull gemma3:1b &&
+             wait"
+    healthcheck:
+      test: ["CMD", "ollama", "list"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 60s
 
 volumes:
   postgres_data:

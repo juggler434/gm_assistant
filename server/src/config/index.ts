@@ -27,6 +27,9 @@ export const config = {
     maxTokens: env.LLM_MAX_TOKENS,
     temperature: env.LLM_TEMPERATURE,
   },
+  ollama: {
+    baseUrl: env.OLLAMA_BASE_URL,
+  },
   googleAi: {
     apiKey: env.GOOGLE_AI_API_KEY,
   },
