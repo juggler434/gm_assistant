@@ -87,6 +87,16 @@ export interface CampaignListResponse {
   campaigns: Campaign[];
 }
 
+/** Response from GET /api/campaigns/:id/stats */
+export interface CampaignStatsResponse {
+  stats: {
+    documentCount: number;
+    totalSizeBytes: number;
+    chunkCount: number;
+    documentsByStatus: Record<string, number>;
+  };
+}
+
 // ============================================================================
 // Document API
 // ============================================================================

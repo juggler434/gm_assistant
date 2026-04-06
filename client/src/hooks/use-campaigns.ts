@@ -6,6 +6,7 @@ import type {
   Campaign,
   CampaignListResponse,
   CampaignResponse,
+  CampaignStatsResponse,
   CreateCampaignRequest,
   UpdateCampaignRequest,
 } from "@/types";
@@ -13,6 +14,7 @@ import type {
 export const campaignKeys = {
   all: ["campaigns"] as const,
   detail: (id: string) => ["campaigns", id] as const,
+  stats: (id: string) => ["campaigns", id, "stats"] as const,
 };
 
 export function useCampaigns() {
@@ -94,5 +96,13 @@ export function useDeleteCampaign() {
       queryClient.removeQueries({ queryKey: campaignKeys.detail(id) });
       queryClient.invalidateQueries({ queryKey: campaignKeys.all });
     },
+  });
+}
+
+export function useCampaignStats(id: string) {
+  return useQuery({
+    queryKey: campaignKeys.stats(id),
+    queryFn: () => api.get<CampaignStatsResponse>(`/api/campaigns/${id}/stats`),
+    select: (data) => data.stats,
   });
 }

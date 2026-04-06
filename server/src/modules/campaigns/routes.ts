@@ -14,7 +14,15 @@ import {
   findCampaignByIdAndUserId,
   updateCampaign,
   deleteCampaign,
+  getCampaignStats,
 } from "./repository.js";
+import { findDocumentsByCampaignId } from "@/modules/documents/repository.js";
+import { findNpcsByCampaignId } from "@/modules/npcs/repository.js";
+import { findLocationsByCampaignId } from "@/modules/locations/repository.js";
+import { findAdventureHooksByCampaignId } from "@/modules/adventure-hooks/repository.js";
+import { findAdventureOutlinesByCampaignId } from "@/modules/adventure-outlines/repository.js";
+import { findAdventuresByCampaignId } from "@/modules/adventures/repository.js";
+import { findSessionsByCampaignId } from "@/modules/sessions/repository.js";
 
 export async function campaignRoutes(app: FastifyInstance): Promise<void> {
   // All campaign routes require authentication
@@ -158,5 +166,87 @@ export async function campaignRoutes(app: FastifyInstance): Promise<void> {
     trackEvent(userId, "campaign_deleted", { campaign_id: id });
 
     return reply.status(204).send();
+  });
+
+  // GET /api/campaigns/:id/stats - Get campaign storage stats
+  app.get("/:id/stats", async (request, reply) => {
+    const paramResult = campaignIdParamSchema.safeParse(request.params);
+    if (!paramResult.success) {
+      return reply.status(400).send({
+        statusCode: 400,
+        error: "Bad Request",
+        message: paramResult.error.issues[0]?.message ?? "Invalid campaign ID",
+      });
+    }
+
+    const { id } = paramResult.data;
+    const userId = request.userId!;
+
+    const campaign = await findCampaignByIdAndUserId(id, userId);
+    if (!campaign) {
+      return reply.status(404).send({
+        statusCode: 404,
+        error: "Not Found",
+        message: "Campaign not found",
+      });
+    }
+
+    const stats = await getCampaignStats(id);
+    return reply.status(200).send({ stats });
+  });
+
+  // GET /api/campaigns/:id/export - Export campaign data as JSON
+  app.get("/:id/export", async (request, reply) => {
+    const paramResult = campaignIdParamSchema.safeParse(request.params);
+    if (!paramResult.success) {
+      return reply.status(400).send({
+        statusCode: 400,
+        error: "Bad Request",
+        message: paramResult.error.issues[0]?.message ?? "Invalid campaign ID",
+      });
+    }
+
+    const { id } = paramResult.data;
+    const userId = request.userId!;
+
+    const campaign = await findCampaignByIdAndUserId(id, userId);
+    if (!campaign) {
+      return reply.status(404).send({
+        statusCode: 404,
+        error: "Not Found",
+        message: "Campaign not found",
+      });
+    }
+
+    const [documents, npcs, locations, adventureHooks, adventureOutlines, adventures, sessions] =
+      await Promise.all([
+        findDocumentsByCampaignId(id),
+        findNpcsByCampaignId(id),
+        findLocationsByCampaignId(id),
+        findAdventureHooksByCampaignId(id),
+        findAdventureOutlinesByCampaignId(id),
+        findAdventuresByCampaignId(id),
+        findSessionsByCampaignId(id),
+      ]);
+
+    const exportData = {
+      exportedAt: new Date().toISOString(),
+      campaign,
+      documents,
+      npcs,
+      locations,
+      adventureHooks,
+      adventureOutlines,
+      adventures,
+      sessions,
+    };
+
+    const filename = `${campaign.name.replace(/[^a-zA-Z0-9-_ ]/g, "").replace(/\s+/g, "-")}-export.json`;
+
+    return reply
+      .status(200)
+      .header("Content-Type", "application/json")
+      .header("Content-Disposition", `attachment; filename="${filename}"`)
+      .send(exportData);
   });
 }

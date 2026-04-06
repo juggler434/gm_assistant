@@ -110,6 +110,7 @@ export type {
   UpdateCampaignRequest,
   CampaignResponse,
   CampaignListResponse,
+  CampaignStatsResponse,
   DocumentListQuery,
   UpdateDocumentRequest,
   DocumentResponse,

@@ -18,9 +18,10 @@ interface DeleteCampaignDialogProps {
   open: boolean;
   onOpenChange: (open: boolean) => void;
   campaign: Campaign;
+  onDeleted?: () => void;
 }
 
-export function DeleteCampaignDialog({ open, onOpenChange, campaign }: DeleteCampaignDialogProps) {
+export function DeleteCampaignDialog({ open, onOpenChange, campaign, onDeleted }: DeleteCampaignDialogProps) {
   const deleteMutation = useDeleteCampaign();
 
   function handleDelete() {
@@ -28,6 +29,7 @@ export function DeleteCampaignDialog({ open, onOpenChange, campaign }: DeleteCam
       onSuccess: () => {
         toast.success("Campaign deleted");
         onOpenChange(false);
+        onDeleted?.();
       },
       onError: () => {
         toast.error("Failed to delete campaign");
