@@ -1,8 +1,14 @@
 // SPDX-License-Identifier: AGPL-3.0-or-later
 
-import { eq, and, desc } from "drizzle-orm";
+import { eq, and, desc, sql } from "drizzle-orm";
 import { db } from "@/db/index.js";
-import { campaigns, type Campaign, type NewCampaign } from "@/db/schema/index.js";
+import {
+  campaigns,
+  documents,
+  chunks,
+  type Campaign,
+  type NewCampaign,
+} from "@/db/schema/index.js";
 
 export async function createCampaign(
   data: Pick<NewCampaign, "userId" | "name" | "description">
@@ -71,4 +77,51 @@ export async function deleteCampaign(
     .where(and(eq(campaigns.id, id), eq(campaigns.userId, userId)))
     .returning();
   return result[0] ?? null;
+}
+
+export interface CampaignStats {
+  documentCount: number;
+  totalSizeBytes: number;
+  chunkCount: number;
+  documentsByStatus: Record<string, number>;
+}
+
+export async function getCampaignStats(
+  campaignId: string
+): Promise<CampaignStats> {
+  const [docStats, statusBreakdown, chunkStats] = await Promise.all([
+    db
+      .select({
+        count: sql<number>`count(*)::int`,
+        totalSize: sql<number>`coalesce(sum(${documents.fileSize}), 0)::bigint`,
+      })
+      .from(documents)
+      .where(eq(documents.campaignId, campaignId)),
+    db
+      .select({
+        status: documents.status,
+        count: sql<number>`count(*)::int`,
+      })
+      .from(documents)
+      .where(eq(documents.campaignId, campaignId))
+      .groupBy(documents.status),
+    db
+      .select({
+        count: sql<number>`count(*)::int`,
+      })
+      .from(chunks)
+      .where(eq(chunks.campaignId, campaignId)),
+  ]);
+
+  const documentsByStatus: Record<string, number> = {};
+  for (const row of statusBreakdown) {
+    documentsByStatus[row.status] = row.count;
+  }
+
+  return {
+    documentCount: docStats[0]?.count ?? 0,
+    totalSizeBytes: Number(docStats[0]?.totalSize ?? 0),
+    chunkCount: chunkStats[0]?.count ?? 0,
+    documentsByStatus,
+  };
 }

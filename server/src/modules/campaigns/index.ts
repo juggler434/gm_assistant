@@ -21,4 +21,5 @@ export {
   findCampaignByIdAndUserId,
   updateCampaign,
   deleteCampaign,
+  getCampaignStats,
 } from "./repository.js";
