@@ -2,6 +2,10 @@
 
 An AI-powered RPG Game Master campaign management tool. Features include user authentication, campaign CRUD, document upload/processing, a RAG pipeline for answering questions from campaign documents, AI content generation, and persistent conversation history.
 
+## Setup Video
+
+[![The Grimoire setup guide](https://img.youtube.com/vi/JbRk-iAU6Q4/maxresdefault.jpg)](https://www.youtube.com/watch?v=JbRk-iAU6Q4)
+
 ## License
 
 This project is licensed under [AGPL-3.0-or-later](LICENSE).

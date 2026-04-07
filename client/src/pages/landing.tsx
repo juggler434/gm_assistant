@@ -90,6 +90,26 @@ export function LandingPage() {
         </div>
       </section>
 
+      {/* Setup Video */}
+      <section className="mx-auto max-w-4xl px-6 py-16">
+        <h2 className="mb-2 text-center text-3xl font-bold tracking-tight text-foreground">
+          Get started in minutes
+        </h2>
+        <p className="mb-10 text-center text-muted-foreground">
+          Watch the setup guide to get The Grimoire running locally.
+        </p>
+        <div className="aspect-video w-full overflow-hidden rounded-[var(--radius)] border border-border">
+          <iframe
+            className="h-full w-full"
+            src="https://www.youtube.com/embed/JbRk-iAU6Q4"
+            title="The Grimoire setup guide"
+            allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; web-share"
+            referrerPolicy="strict-origin-when-cross-origin"
+            allowFullScreen
+          />
+        </div>
+      </section>
+
       {/* Features */}
       <section className="mx-auto max-w-5xl px-6 py-16">
         <h2 className="mb-10 text-center text-3xl font-bold tracking-tight text-foreground">
