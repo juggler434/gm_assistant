@@ -112,11 +112,12 @@ services:
         condition: service_healthy
       ocr:
         condition: service_healthy
+      whisper:
+        condition: service_healthy
 
   whisper:
     image: fedirz/faster-whisper-server:latest-cpu
     container_name: gm_assistant_whisper
-    profiles: ["with-whisper"]
     environment:
       WHISPER__MODEL: "Systran/faster-whisper-base.en"
     healthcheck:
