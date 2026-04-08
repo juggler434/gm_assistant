@@ -109,14 +109,15 @@ docker-compose up -d
 
 #### Service ports
 
-| Service    | Port  | Description                 |
-|------------|-------|-----------------------------|
-| PostgreSQL | 5432  | Database (pgvector enabled) |
-| Redis      | 6379  | Job queue and caching       |
-| MinIO      | 9000  | S3-compatible storage API   |
-| MinIO      | 9001  | MinIO web console           |
-| Ollama     | 11434 | LLM API                     |
-| OCR        | 8080  | PDF to Text conversion API  |
+| Service     | Port  | Description                       |
+|-------------|-------|-----------------------------------|
+| PostgreSQL  | 5432  | Database (pgvector enabled)       |
+| Redis       | 6379  | Job queue and caching             |
+| MinIO       | 9000  | S3-compatible storage API         |
+| MinIO       | 9001  | MinIO web console                 |
+| Ollama      | 11434 | LLM API                           |
+| OCR         | 8080  | PDF to Text conversion API        |
+| Uptime Kuma | 3001  | Production monitoring dashboard   |
 
 ### 4. Configure environment variables
 
@@ -218,6 +219,24 @@ Open [http://localhost:5173/register](http://localhost:5173/register) in your br
 |----------------------|-----------------------------------|
 | `npm run build`      | Compile TypeScript (outputs to dist/) |
 | `npm run typecheck`  | Type-check without emitting       |
+
+## Production Monitoring
+
+The stack includes [Uptime Kuma](https://github.com/louislam/uptime-kuma) for production monitoring. Once `docker-compose up -d` is running, open [http://localhost:3001](http://localhost:3001) to create the admin account and add monitors.
+
+Suggested monitors (use the `gm_assistant_*` container hostnames since Uptime Kuma runs on the same Docker network):
+
+| Monitor              | Type      | Target                                       |
+|----------------------|-----------|----------------------------------------------|
+| App health           | HTTP(s)   | `http://app:3000/health`                     |
+| OCR service          | HTTP(s)   | `http://ocr:8080/health`                     |
+| Whisper service      | HTTP(s)   | `http://whisper:8000/health`                 |
+| Ollama               | HTTP(s)   | `http://ollama:11434/`                       |
+| MinIO                | HTTP(s)   | `http://minio:9000/minio/health/live`        |
+| PostgreSQL           | Postgres  | `postgresql://gm_user:gm_password@postgres:5432/gm_assistant` |
+| Redis                | Redis     | `redis://redis:6379`                         |
+
+Override the host port by setting `UPTIME_KUMA_PORT` in your `.env` (defaults to `3001`).
 
 ## Stopping Services
 
