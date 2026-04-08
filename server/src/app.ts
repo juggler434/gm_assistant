@@ -13,7 +13,7 @@ import {
   registerAuth,
 } from "@/plugins/index.js";
 import { registerMetrics } from "@/plugins/metrics.js";
-import { authRoutes } from "@/modules/auth/index.js";
+import { authRoutes, csrfProtection } from "@/modules/auth/index.js";
 import { campaignRoutes } from "@/modules/campaigns/index.js";
 import { documentRoutes } from "@/modules/documents/index.js";
 import { generationRoutes } from "@/modules/generation/index.js";
@@ -59,6 +59,16 @@ export async function buildApp(options: AppOptions = {}): Promise<FastifyInstanc
   await registerWebSocket(app);
   await registerAuth(app);
   await registerMetrics(app);
+
+  // CSRF protection: reject state-changing /api requests with a foreign Origin.
+  // No-op for GET/HEAD/OPTIONS and for routes outside /api/.
+  app.addHook("preHandler", async (request, reply) => {
+    if (!request.url.startsWith("/api/")) {
+      return;
+    }
+    await csrfProtection(request, reply);
+  });
+
   app.log.info("Plugins registered");
 
   // Global error handler
