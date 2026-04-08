@@ -140,11 +140,19 @@ export function verifyRequestOrigin(request: FastifyRequest): boolean {
 /**
  * Middleware to verify request origin for CSRF protection.
  * Returns 403 Forbidden if origin verification fails.
+ *
+ * Skipped entirely in development so the Vite client (localhost:5173) can
+ * call the API (localhost:3000) across ports without configuring an
+ * allowlist.
  */
 export async function csrfProtection(
   request: FastifyRequest,
   reply: FastifyReply
 ): Promise<void> {
+  if (config.env === "development") {
+    return;
+  }
+
   // Only check for state-changing methods
   const method = request.method.toUpperCase();
   if (method === "GET" || method === "HEAD" || method === "OPTIONS") {
