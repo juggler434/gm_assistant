@@ -140,8 +140,18 @@ services:
       retries: 5
       start_period: 300s
 
+  uptime-kuma:
+    image: louislam/uptime-kuma:1
+    container_name: gm_assistant_uptime_kuma
+    restart: unless-stopped
+    ports:
+      - "${UPTIME_KUMA_PORT:-3001}:3001"
+    volumes:
+      - uptime_kuma_data:/app/data
+
 volumes:
   postgres_data:
   redis_data:
   minio_data:
   ollama_data:
+  uptime_kuma_data:
