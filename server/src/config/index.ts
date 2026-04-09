@@ -63,6 +63,13 @@ export const config = {
     apiKey: env.POSTHOG_API_KEY,
     host: env.POSTHOG_HOST,
   },
+  email: {
+    provider: env.EMAIL_PROVIDER,
+    postmarkServerToken: env.POSTMARK_SERVER_TOKEN,
+    fromAddress: env.EMAIL_FROM_ADDRESS,
+    fromName: env.EMAIL_FROM_NAME,
+  },
+  appUrl: env.APP_URL,
   server: {
     corsOrigin: env.CORS_ORIGIN,
     rateLimit: {

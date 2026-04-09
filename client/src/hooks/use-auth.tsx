@@ -8,10 +8,13 @@ import type { AuthResponse, AuthUser } from "@/types";
 interface AuthContextValue {
   user: AuthUser | null;
   isAuthenticated: boolean;
+  isEmailVerified: boolean;
   isLoading: boolean;
-  login: (email: string, password: string) => Promise<void>;
-  register: (name: string, email: string, password: string) => Promise<void>;
+  login: (email: string, password: string) => Promise<AuthUser>;
+  register: (name: string, email: string, password: string) => Promise<AuthUser>;
   logout: () => Promise<void>;
+  /** Refresh user data from the server (e.g. after email verification). */
+  refreshUser: () => Promise<void>;
 }
 
 const AuthContext = createContext<AuthContextValue | null>(null);
@@ -41,21 +44,23 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     };
   }, []);
 
-  const login = useCallback(async (email: string, password: string) => {
+  const login = useCallback(async (email: string, password: string): Promise<AuthUser> => {
     const data = await api.post<AuthResponse>("/api/auth/login", {
       email,
       password,
     });
     setUser(data.user);
+    return data.user;
   }, []);
 
-  const register = useCallback(async (name: string, email: string, password: string) => {
+  const register = useCallback(async (name: string, email: string, password: string): Promise<AuthUser> => {
     const data = await api.post<AuthResponse>("/api/auth/register", {
       name,
       email,
       password,
     });
     setUser(data.user);
+    return data.user;
   }, []);
 
   const logout = useCallback(async () => {
@@ -72,15 +77,26 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     queryClient.clear();
   }, [queryClient]);
 
+  const refreshUser = useCallback(async () => {
+    try {
+      const data = await api.get<AuthResponse>("/api/auth/me");
+      setUser(data.user);
+    } catch {
+      // If refresh fails, leave current state
+    }
+  }, []);
+
   return (
     <AuthContext.Provider
       value={{
         user,
         isAuthenticated: !!user,
+        isEmailVerified: !!user?.emailVerified,
         isLoading,
         login,
         register,
         logout,
+        refreshUser,
       }}
     >
       {children}

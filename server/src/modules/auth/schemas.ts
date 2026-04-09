@@ -16,3 +16,13 @@ export const loginBodySchema = z.object({
 });
 
 export type LoginBody = z.infer<typeof loginBodySchema>;
+
+export const verifyEmailQuerySchema = z.object({
+  token: z.string().min(1),
+});
+
+export type VerifyEmailQuery = z.infer<typeof verifyEmailQuerySchema>;
+
+export const resendVerificationBodySchema = z.object({}).optional();
+
+export type ResendVerificationBody = z.infer<typeof resendVerificationBodySchema>;

@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: AGPL-3.0-or-later
 
 import type { FastifyInstance } from "fastify";
-import { requireAuth } from "@/modules/auth/index.js";
+import { requireAuth, requireVerifiedEmail } from "@/modules/auth/index.js";
 import { findCampaignByIdAndUserId } from "@/modules/campaigns/index.js";
 import { createLLMService } from "@/services/llm/factory.js";
 import { trackEvent } from "@/services/metrics/index.js";
@@ -35,8 +35,9 @@ function getCampaignGenerationOverrides(campaign: { generationSettings: unknown 
 }
 
 export async function generationRoutes(app: FastifyInstance): Promise<void> {
-  // All generation routes require authentication
+  // All generation routes require authentication and verified email
   app.addHook("preHandler", requireAuth);
+  app.addHook("preHandler", requireVerifiedEmail);
 
   // POST /api/campaigns/:campaignId/generate/hooks - Generate adventure hooks
   app.post("/:campaignId/generate/hooks", async (request, reply) => {

@@ -45,8 +45,8 @@ export function LoginPage() {
 
     setIsSubmitting(true);
     try {
-      await login(email.trim(), password);
-      navigate("/campaigns");
+      const authedUser = await login(email.trim(), password);
+      navigate(authedUser.emailVerified ? "/campaigns" : "/verify-email");
     } catch (err) {
       if (err instanceof ApiError && err.statusCode === 401) {
         setError("Invalid email or password.");

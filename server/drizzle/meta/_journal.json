@@ -50,6 +50,13 @@
       "when": 1771545600000,
       "tag": "0006_switch_to_nomic_embed",
       "breakpoints": true
+    },
+    {
+      "idx": 7,
+      "version": "7",
+      "when": 1775865600000,
+      "tag": "0007_add_email_verified_at",
+      "breakpoints": true
     }
   ]
 }

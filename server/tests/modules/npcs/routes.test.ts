@@ -50,6 +50,24 @@ vi.mock("@/jobs/factory.js", () => ({
   DEFAULT_JOB_OPTIONS: {},
 }));
 
+vi.mock("@/modules/auth/email-verification.js", () => ({
+  createVerificationToken: vi.fn().mockResolvedValue({
+    ok: true,
+    value: { token: "test-verify-token", expiresAt: new Date(Date.now() + 86400000) },
+  }),
+  consumeVerificationToken: vi.fn(),
+  VERIFICATION_TOKEN_TTL_SECONDS: 86400,
+}));
+
+vi.mock("@/services/email/factory.js", () => ({
+  getEmailService: vi.fn(() => ({
+    sendVerificationEmail: vi.fn().mockResolvedValue({ ok: true, value: {} }),
+    providerName: "log",
+  })),
+  createEmailService: vi.fn(),
+  __resetEmailServiceForTests: vi.fn(),
+}));
+
 import {
   createNpc,
   findNpcsByCampaignId,

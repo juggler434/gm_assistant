@@ -46,6 +46,24 @@ vi.mock("@/jobs/factory.js", () => ({
   DEFAULT_JOB_OPTIONS: {},
 }));
 
+vi.mock("@/modules/auth/email-verification.js", () => ({
+  createVerificationToken: vi.fn().mockResolvedValue({
+    ok: true,
+    value: { token: "test-verify-token", expiresAt: new Date(Date.now() + 86400000) },
+  }),
+  consumeVerificationToken: vi.fn(),
+  VERIFICATION_TOKEN_TTL_SECONDS: 86400,
+}));
+
+vi.mock("@/services/email/factory.js", () => ({
+  getEmailService: vi.fn(() => ({
+    sendVerificationEmail: vi.fn().mockResolvedValue({ ok: true, value: {} }),
+    providerName: "log",
+  })),
+  createEmailService: vi.fn(),
+  __resetEmailServiceForTests: vi.fn(),
+}));
+
 // Import mocked modules
 import { findUserByEmail, createUser } from "@/modules/auth/repository.js";
 import {
@@ -61,6 +79,7 @@ describe("Full Authentication Flow", () => {
     email: "player@example.com",
     passwordHash: "argon2-hashed-password",
     name: "Test Player",
+    emailVerifiedAt: null,
     createdAt: new Date("2025-01-01T00:00:00Z"),
     updatedAt: new Date("2025-01-01T00:00:00Z"),
   };
@@ -131,6 +150,7 @@ describe("Full Authentication Flow", () => {
         id: "user-abc-123",
         email: "player@example.com",
         name: "Test Player",
+        emailVerified: false,
       });
 
       // Verify password was hashed before storage
@@ -259,6 +279,7 @@ describe("Full Authentication Flow", () => {
         id: "user-abc-123",
         email: "player@example.com",
         name: "Test Player",
+        emailVerified: false,
       });
 
       // Verify password was verified against stored hash

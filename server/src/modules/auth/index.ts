@@ -17,6 +17,7 @@ export {
 export {
   registerAuth,
   requireAuth,
+  requireVerifiedEmail,
   csrfProtection,
   setSessionCookie,
   clearSessionCookie,
@@ -31,4 +32,11 @@ export { authRoutes } from "./routes.js";
 export { registerBodySchema, type RegisterBody } from "./schemas.js";
 
 // Repository
-export { findUserByEmail, findUserById, createUser } from "./repository.js";
+export { findUserByEmail, findUserById, createUser, markEmailVerified, isEmailVerified } from "./repository.js";
+
+// Email verification
+export {
+  createVerificationToken,
+  consumeVerificationToken,
+  VERIFICATION_TOKEN_TTL_SECONDS,
+} from "./email-verification.js";
