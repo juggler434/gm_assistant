@@ -4,6 +4,7 @@ import type { FastifyInstance, FastifyRequest, FastifyReply } from "fastify";
 import fp from "fastify-plugin";
 import { config } from "@/config/index.js";
 import { validateSessionToken } from "./session.js";
+import { isEmailVerified } from "./repository.js";
 import type { ValidatedSession } from "./types.js";
 
 declare module "fastify" {
@@ -108,6 +109,34 @@ export async function requireAuth(
       statusCode: 401,
       error: "Unauthorized",
       message: "Authentication required",
+    });
+  }
+}
+
+/**
+ * Middleware to require a verified email address.
+ * Must be used after requireAuth. Returns 403 if the user has not verified.
+ */
+export async function requireVerifiedEmail(
+  request: FastifyRequest,
+  reply: FastifyReply
+): Promise<void> {
+  if (!request.userId) {
+    // requireAuth should have already blocked this, but be safe
+    reply.status(401).send({
+      statusCode: 401,
+      error: "Unauthorized",
+      message: "Authentication required",
+    });
+    return;
+  }
+
+  const verified = await isEmailVerified(request.userId);
+  if (!verified) {
+    reply.status(403).send({
+      statusCode: 403,
+      error: "Forbidden",
+      message: "Email verification required",
     });
   }
 }

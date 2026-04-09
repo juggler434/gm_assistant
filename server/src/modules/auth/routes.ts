@@ -4,9 +4,12 @@ import type { FastifyInstance } from "fastify";
 import * as argon2 from "argon2";
 import { createSession, invalidateSession } from "./session.js";
 import { setSessionCookie, clearSessionCookie, requireAuth } from "./middleware.js";
-import { registerBodySchema, loginBodySchema } from "./schemas.js";
-import { findUserByEmail, findUserById, createUser } from "./repository.js";
+import { registerBodySchema, loginBodySchema, verifyEmailQuerySchema } from "./schemas.js";
+import { findUserByEmail, findUserById, createUser, markEmailVerified } from "./repository.js";
 import { trackEvent, identifyUser } from "@/services/metrics/index.js";
+import { createVerificationToken, consumeVerificationToken, VERIFICATION_TOKEN_TTL_SECONDS } from "./email-verification.js";
+import { getEmailService } from "@/services/email/index.js";
+import { config } from "@/config/index.js";
 
 export async function authRoutes(app: FastifyInstance): Promise<void> {
   app.post("/register", async (request, reply) => {
@@ -62,11 +65,17 @@ export async function authRoutes(app: FastifyInstance): Promise<void> {
     identifyUser(newUser.id, { email: newUser.email, name: newUser.name });
     trackEvent(newUser.id, "user_registered");
 
+    // Send verification email (fire-and-forget — don't block registration)
+    sendVerificationTokenEmail(newUser.id, newUser.email, newUser.name, request.log).catch(
+      (error) => request.log.error({ error }, "Failed to send verification email after registration")
+    );
+
     return reply.status(201).send({
       user: {
         id: newUser.id,
         email: newUser.email,
         name: newUser.name,
+        emailVerified: false,
       },
     });
   });
@@ -124,6 +133,7 @@ export async function authRoutes(app: FastifyInstance): Promise<void> {
         id: user.id,
         email: user.email,
         name: user.name,
+        emailVerified: user.emailVerifiedAt !== null,
       },
     });
   });
@@ -143,6 +153,7 @@ export async function authRoutes(app: FastifyInstance): Promise<void> {
         id: user.id,
         email: user.email,
         name: user.name,
+        emailVerified: user.emailVerifiedAt !== null,
       },
     });
   });
@@ -155,4 +166,146 @@ export async function authRoutes(app: FastifyInstance): Promise<void> {
 
     return reply.status(200).send({ message: "Logged out" });
   });
+
+  // GET /api/auth/verify-email?token=... — consume verification token
+  app.get("/verify-email", async (request, reply) => {
+    const parseResult = verifyEmailQuerySchema.safeParse(request.query);
+    if (!parseResult.success) {
+      return reply.status(400).send({
+        statusCode: 400,
+        error: "Bad Request",
+        message: "Missing or invalid token",
+      });
+    }
+
+    const { token } = parseResult.data;
+    const consumeResult = await consumeVerificationToken(token);
+
+    if (!consumeResult.ok) {
+      if (consumeResult.error.code === "TOKEN_NOT_FOUND") {
+        return reply.status(400).send({
+          statusCode: 400,
+          error: "Bad Request",
+          message: "Invalid or expired verification link",
+        });
+      }
+      request.log.error({ error: consumeResult.error }, "Failed to consume verification token");
+      return reply.status(500).send({
+        statusCode: 500,
+        error: "Internal Server Error",
+        message: "Failed to verify email",
+      });
+    }
+
+    const userId = consumeResult.value;
+    const user = await markEmailVerified(userId);
+    if (!user) {
+      return reply.status(404).send({
+        statusCode: 404,
+        error: "Not Found",
+        message: "User not found",
+      });
+    }
+
+    trackEvent(userId, "email_verified");
+
+    return reply.status(200).send({
+      message: "Email verified successfully",
+      user: {
+        id: user.id,
+        email: user.email,
+        name: user.name,
+        emailVerified: true,
+      },
+    });
+  });
+
+  // POST /api/auth/resend-verification — resend the verification email
+  app.post(
+    "/resend-verification",
+    {
+      preHandler: [requireAuth],
+      config: {
+        rateLimit: {
+          max: 3,
+          timeWindow: "15 minutes",
+        },
+      },
+    },
+    async (request, reply) => {
+      const userId = request.userId!;
+      const user = await findUserById(userId);
+      if (!user) {
+        return reply.status(404).send({
+          statusCode: 404,
+          error: "Not Found",
+          message: "User not found",
+        });
+      }
+
+      if (user.emailVerifiedAt) {
+        return reply.status(400).send({
+          statusCode: 400,
+          error: "Bad Request",
+          message: "Email is already verified",
+        });
+      }
+
+      const sendResult = await sendVerificationTokenEmail(
+        user.id,
+        user.email,
+        user.name,
+        request.log
+      );
+
+      if (!sendResult.ok) {
+        return reply.status(500).send({
+          statusCode: 500,
+          error: "Internal Server Error",
+          message: "Failed to send verification email",
+        });
+      }
+
+      return reply.status(200).send({
+        message: "Verification email sent",
+      });
+    }
+  );
+}
+
+/**
+ * Generate a verification token and send the verification email.
+ */
+async function sendVerificationTokenEmail(
+  userId: string,
+  email: string,
+  name: string,
+  log: { error: (obj: Record<string, unknown>, msg: string) => void }
+): Promise<{ ok: boolean }> {
+  const tokenResult = await createVerificationToken(userId, VERIFICATION_TOKEN_TTL_SECONDS);
+  if (!tokenResult.ok) {
+    log.error({ error: tokenResult.error }, "Failed to create verification token");
+    return { ok: false };
+  }
+
+  const { token, expiresAt } = tokenResult.value;
+  const verificationUrl = `${config.appUrl}/verify-email?token=${encodeURIComponent(token)}`;
+
+  const emailService = getEmailService();
+  const emailResult = await emailService.sendVerificationEmail({
+    to: email,
+    recipientName: name,
+    verificationUrl,
+    expiresAt,
+  });
+
+  if (!emailResult.ok) {
+    log.error(
+      { error: { code: emailResult.error.code, message: emailResult.error.message } },
+      "Failed to send verification email"
+    );
+    return { ok: false };
+  }
+
+  return { ok: true };
 }

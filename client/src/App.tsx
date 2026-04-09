@@ -25,6 +25,7 @@ import { SessionsPage } from "@/pages/campaign-sessions";
 import { SessionDetailPage } from "@/pages/campaign-session-detail";
 import { SettingsPage } from "@/pages/campaign-settings";
 import { LandingPage } from "@/pages/landing";
+import { VerifyEmailPage } from "@/pages/verify-email";
 
 const queryClient = new QueryClient({
   defaultOptions: {
@@ -50,6 +51,9 @@ function App() {
                 <Route path="/login" element={<LoginPage />} />
                 <Route path="/register" element={<RegisterPage />} />
               </Route>
+
+              {/* Email verification (authenticated but not necessarily verified) */}
+              <Route path="/verify-email" element={<VerifyEmailPage />} />
 
               {/* Protected routes */}
               <Route element={<ProtectedRoute />}>

@@ -47,6 +47,24 @@ vi.mock("@/jobs/factory.js", () => ({
   DEFAULT_JOB_OPTIONS: {},
 }));
 
+vi.mock("@/modules/auth/email-verification.js", () => ({
+  createVerificationToken: vi.fn().mockResolvedValue({
+    ok: true,
+    value: { token: "test-verify-token", expiresAt: new Date(Date.now() + 86400000) },
+  }),
+  consumeVerificationToken: vi.fn(),
+  VERIFICATION_TOKEN_TTL_SECONDS: 86400,
+}));
+
+vi.mock("@/services/email/factory.js", () => ({
+  getEmailService: vi.fn(() => ({
+    sendVerificationEmail: vi.fn().mockResolvedValue({ ok: true, value: {} }),
+    providerName: "log",
+  })),
+  createEmailService: vi.fn(),
+  __resetEmailServiceForTests: vi.fn(),
+}));
+
 // Import mocked modules
 import { findUserByEmail } from "@/modules/auth/repository.js";
 import { createSession } from "@/modules/auth/session.js";
@@ -128,6 +146,7 @@ describe("Login Route Handler", () => {
     email: "test@example.com",
     passwordHash: "hashed-password",
     name: "Test User",
+    emailVerifiedAt: null,
     createdAt: new Date(),
     updatedAt: new Date(),
   };
@@ -183,6 +202,7 @@ describe("Login Route Handler", () => {
       id: "user-123",
       email: "test@example.com",
       name: "Test User",
+      emailVerified: false,
     });
 
     // Verify session cookie is set

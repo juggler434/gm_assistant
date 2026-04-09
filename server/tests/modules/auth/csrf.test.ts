@@ -6,6 +6,8 @@ import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
 vi.mock("@/modules/auth/repository.js", () => ({
   findUserByEmail: vi.fn(),
   createUser: vi.fn(),
+  markEmailVerified: vi.fn(),
+  isEmailVerified: vi.fn().mockResolvedValue(true),
 }));
 
 vi.mock("@/modules/auth/session.js", () => ({
@@ -41,6 +43,24 @@ vi.mock("@/jobs/factory.js", () => ({
     add: vi.fn().mockResolvedValue({ ok: true, value: "job-123" }),
   })),
   DEFAULT_JOB_OPTIONS: {},
+}));
+
+vi.mock("@/modules/auth/email-verification.js", () => ({
+  createVerificationToken: vi.fn().mockResolvedValue({
+    ok: true,
+    value: { token: "test-verify-token", expiresAt: new Date(Date.now() + 86400000) },
+  }),
+  consumeVerificationToken: vi.fn(),
+  VERIFICATION_TOKEN_TTL_SECONDS: 86400,
+}));
+
+vi.mock("@/services/email/factory.js", () => ({
+  getEmailService: vi.fn(() => ({
+    sendVerificationEmail: vi.fn().mockResolvedValue({ ok: true, value: {} }),
+    providerName: "log",
+  })),
+  createEmailService: vi.fn(),
+  __resetEmailServiceForTests: vi.fn(),
 }));
 
 import { validateSessionToken } from "@/modules/auth/session.js";

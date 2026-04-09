@@ -28,3 +28,21 @@ export async function createUser(
   const result = await db.insert(users).values(data).returning();
   return result[0] ?? null;
 }
+
+export async function markEmailVerified(userId: string): Promise<User | null> {
+  const result = await db
+    .update(users)
+    .set({ emailVerifiedAt: new Date() })
+    .where(eq(users.id, userId))
+    .returning();
+  return result[0] ?? null;
+}
+
+export async function isEmailVerified(userId: string): Promise<boolean> {
+  const result = await db
+    .select({ emailVerifiedAt: users.emailVerifiedAt })
+    .from(users)
+    .where(eq(users.id, userId))
+    .limit(1);
+  return result[0]?.emailVerifiedAt !== null && result[0]?.emailVerifiedAt !== undefined;
+}

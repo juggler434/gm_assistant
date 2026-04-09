@@ -27,6 +27,7 @@ export interface AuthUser {
   id: Id;
   email: string;
   name: string;
+  emailVerified: boolean;
 }
 
 // ============================================================================

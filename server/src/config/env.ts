@@ -80,6 +80,15 @@ const envSchema = z
     POSTHOG_API_KEY: z.string().optional(),
     POSTHOG_HOST: z.string().url().optional(),
 
+    // Email (Postmark)
+    EMAIL_PROVIDER: z.enum(["postmark", "log"]).default("log"),
+    POSTMARK_SERVER_TOKEN: z.string().optional(),
+    EMAIL_FROM_ADDRESS: z.string().email().optional(),
+    EMAIL_FROM_NAME: z.string().default("GM Assistant"),
+
+    // Public app URL (used to build links in transactional emails)
+    APP_URL: z.string().url().default("http://localhost:5173"),
+
     // Server
     CORS_ORIGIN: z
       .string()
@@ -134,6 +143,23 @@ const envSchema = z
           message: "REDIS_URL is required in production",
           path: ["REDIS_URL"],
         });
+      }
+
+      if (data.EMAIL_PROVIDER === "postmark") {
+        if (!data.POSTMARK_SERVER_TOKEN) {
+          ctx.addIssue({
+            code: z.ZodIssueCode.custom,
+            message: "POSTMARK_SERVER_TOKEN is required when EMAIL_PROVIDER=postmark",
+            path: ["POSTMARK_SERVER_TOKEN"],
+          });
+        }
+        if (!data.EMAIL_FROM_ADDRESS) {
+          ctx.addIssue({
+            code: z.ZodIssueCode.custom,
+            message: "EMAIL_FROM_ADDRESS is required when EMAIL_PROVIDER=postmark",
+            path: ["EMAIL_FROM_ADDRESS"],
+          });
+        }
       }
 
       if (!data.S3_ENDPOINT || !data.S3_BUCKET || !data.S3_ACCESS_KEY || !data.S3_SECRET_KEY) {

@@ -71,8 +71,8 @@ export function RegisterPage() {
 
     setIsSubmitting(true);
     try {
-      await register(name.trim(), email.trim(), password);
-      navigate("/campaigns");
+      const authedUser = await register(name.trim(), email.trim(), password);
+      navigate(authedUser.emailVerified ? "/campaigns" : "/verify-email");
     } catch (err) {
       if (err instanceof ApiError && err.statusCode === 409) {
         setFieldErrors((prev) => ({ ...prev, email: "This email is already registered" }));

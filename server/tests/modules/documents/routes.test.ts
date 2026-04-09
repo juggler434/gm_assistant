@@ -30,6 +30,32 @@ vi.mock("@/modules/auth/session.js", () => ({
   validateSessionToken: vi.fn(),
 }));
 
+vi.mock("@/modules/auth/repository.js", () => ({
+  findUserByEmail: vi.fn(),
+  findUserById: vi.fn(),
+  createUser: vi.fn(),
+  markEmailVerified: vi.fn(),
+  isEmailVerified: vi.fn().mockResolvedValue(true),
+}));
+
+vi.mock("@/modules/auth/email-verification.js", () => ({
+  createVerificationToken: vi.fn().mockResolvedValue({
+    ok: true,
+    value: { token: "test-verify-token", expiresAt: new Date(Date.now() + 86400000) },
+  }),
+  consumeVerificationToken: vi.fn(),
+  VERIFICATION_TOKEN_TTL_SECONDS: 86400,
+}));
+
+vi.mock("@/services/email/factory.js", () => ({
+  getEmailService: vi.fn(() => ({
+    sendVerificationEmail: vi.fn().mockResolvedValue({ ok: true, value: {} }),
+    providerName: "log",
+  })),
+  createEmailService: vi.fn(),
+  __resetEmailServiceForTests: vi.fn(),
+}));
+
 vi.mock("@/services/storage/factory.js", () => ({
   createStorageService: vi.fn(() => ({
     upload: vi.fn(),
@@ -64,6 +90,7 @@ import {
 } from "@/modules/documents/repository.js";
 import { findCampaignByIdAndUserId } from "@/modules/campaigns/repository.js";
 import { validateSessionToken } from "@/modules/auth/session.js";
+import { isEmailVerified } from "@/modules/auth/repository.js";
 import { createStorageService } from "@/services/storage/factory.js";
 
 describe("Document Routes", () => {
@@ -122,8 +149,9 @@ describe("Document Routes", () => {
     // Default queue mock
     mockQueueAdd.mockResolvedValue({ ok: true, value: "job-123" });
 
-    // Default to authenticated user
+    // Default to authenticated user with verified email
     vi.mocked(validateSessionToken).mockResolvedValue(mockSessionResult);
+    vi.mocked(isEmailVerified).mockResolvedValue(true);
 
     // Default campaign found
     vi.mocked(findCampaignByIdAndUserId).mockResolvedValue(mockCampaign);

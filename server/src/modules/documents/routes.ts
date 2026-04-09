@@ -2,7 +2,7 @@
 
 import type { FastifyInstance } from "fastify";
 import { randomUUID } from "node:crypto";
-import { requireAuth } from "@/modules/auth/index.js";
+import { requireAuth, requireVerifiedEmail } from "@/modules/auth/index.js";
 import { findCampaignByIdAndUserId } from "@/modules/campaigns/index.js";
 import { createStorageService } from "@/services/storage/index.js";
 import { createQueue } from "@/jobs/index.js";
@@ -47,7 +47,7 @@ export async function documentRoutes(app: FastifyInstance): Promise<void> {
   app.addHook("preHandler", requireAuth);
 
   // POST /api/campaigns/:campaignId/documents - Upload document
-  app.post("/:campaignId/documents", async (request, reply) => {
+  app.post("/:campaignId/documents", { preHandler: [requireVerifiedEmail] }, async (request, reply) => {
     // Validate campaign ID
     const paramResult = campaignIdParamSchema.safeParse(request.params);
     if (!paramResult.success) {
