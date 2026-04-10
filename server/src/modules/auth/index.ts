@@ -48,6 +48,9 @@ export {
   PASSWORD_RESET_TTL_SECONDS,
 } from "./password-reset.js";
 
+// Audit log
+export { recordAuthEvent, purgeOldAuthEvents } from "./audit-log.js";
+
 // Brute-force protection
 export {
   checkBruteForce,

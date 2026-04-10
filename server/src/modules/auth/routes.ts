@@ -12,6 +12,7 @@ import { createPasswordResetToken, consumePasswordResetToken, PASSWORD_RESET_TTL
 import { checkBruteForce, recordFailedAttempt, resetFailedAttempts } from "./brute-force.js";
 import { getEmailService } from "@/services/email/index.js";
 import { config } from "@/config/index.js";
+import { recordAuthEvent } from "./audit-log.js";
 
 export async function authRoutes(app: FastifyInstance): Promise<void> {
   app.post("/register", { config: { rateLimit: { max: 5, timeWindow: "15 minutes" } } }, async (request, reply) => {
@@ -66,6 +67,7 @@ export async function authRoutes(app: FastifyInstance): Promise<void> {
 
     identifyUser(newUser.id, { email: newUser.email, name: newUser.name });
     trackEvent(newUser.id, "user_registered");
+    recordAuthEvent({ userId: newUser.id, eventType: "register", request });
 
     // Send verification email (fire-and-forget — don't block registration)
     sendVerificationTokenEmail(newUser.id, newUser.email, newUser.name, request.log).catch(
@@ -109,6 +111,7 @@ export async function authRoutes(app: FastifyInstance): Promise<void> {
     const user = await findUserByEmail(email);
     if (!user) {
       await recordFailedAttempt(email);
+      recordAuthEvent({ userId: null, eventType: "login_failure", request, metadata: { email, reason: "unknown_email" } });
       return reply.status(401).send({
         statusCode: 401,
         error: "Unauthorized",
@@ -120,6 +123,7 @@ export async function authRoutes(app: FastifyInstance): Promise<void> {
     const passwordValid = await argon2.verify(user.passwordHash, password);
     if (!passwordValid) {
       await recordFailedAttempt(email);
+      recordAuthEvent({ userId: user.id, eventType: "login_failure", request, metadata: { reason: "invalid_password" } });
       return reply.status(401).send({
         statusCode: 401,
         error: "Unauthorized",
@@ -145,6 +149,7 @@ export async function authRoutes(app: FastifyInstance): Promise<void> {
     setSessionCookie(reply, sessionResult.value.token);
 
     trackEvent(user.id, "user_logged_in");
+    recordAuthEvent({ userId: user.id, eventType: "login_success", request });
 
     return reply.status(200).send({
       user: {
@@ -181,6 +186,7 @@ export async function authRoutes(app: FastifyInstance): Promise<void> {
       await invalidateSession(request.session.id);
     }
     clearSessionCookie(reply);
+    recordAuthEvent({ userId: request.userId, eventType: "logout", request });
 
     return reply.status(200).send({ message: "Logged out" });
   });
@@ -322,6 +328,7 @@ export async function authRoutes(app: FastifyInstance): Promise<void> {
         sendPasswordResetEmail(user.id, user.email, user.name, request.log).catch((error) =>
           request.log.error({ error }, "Failed to send password reset email")
         );
+        recordAuthEvent({ userId: user.id, eventType: "password_reset_request", request });
       }
 
       return reply.status(200).send({ message: genericMessage });
@@ -382,6 +389,8 @@ export async function authRoutes(app: FastifyInstance): Promise<void> {
       await invalidateAllUserSessions(userId);
 
       trackEvent(userId, "password_reset");
+      recordAuthEvent({ userId, eventType: "password_reset_complete", request });
+      recordAuthEvent({ userId, eventType: "sessions_invalidated", request, metadata: { reason: "password_reset" } });
 
       return reply.status(200).send({ message: "Password reset successfully" });
     }
