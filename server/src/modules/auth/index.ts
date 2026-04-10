@@ -47,3 +47,12 @@ export {
   consumePasswordResetToken,
   PASSWORD_RESET_TTL_SECONDS,
 } from "./password-reset.js";
+
+// Brute-force protection
+export {
+  checkBruteForce,
+  recordFailedAttempt,
+  resetFailedAttempts,
+  MAX_FAILED_ATTEMPTS,
+  LOCKOUT_DURATION_SECONDS,
+} from "./brute-force.js";
