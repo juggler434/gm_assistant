@@ -26,3 +26,16 @@ export type VerifyEmailQuery = z.infer<typeof verifyEmailQuerySchema>;
 export const resendVerificationBodySchema = z.object({}).optional();
 
 export type ResendVerificationBody = z.infer<typeof resendVerificationBodySchema>;
+
+export const forgotPasswordBodySchema = z.object({
+  email: z.string().email(),
+});
+
+export type ForgotPasswordBody = z.infer<typeof forgotPasswordBodySchema>;
+
+export const resetPasswordBodySchema = z.object({
+  token: z.string().min(1),
+  password: z.string().min(8),
+});
+
+export type ResetPasswordBody = z.infer<typeof resetPasswordBodySchema>;

@@ -2,12 +2,13 @@
 
 import type { FastifyInstance } from "fastify";
 import * as argon2 from "argon2";
-import { createSession, invalidateSession } from "./session.js";
+import { createSession, invalidateSession, invalidateAllUserSessions } from "./session.js";
 import { setSessionCookie, clearSessionCookie, requireAuth } from "./middleware.js";
-import { registerBodySchema, loginBodySchema, verifyEmailQuerySchema } from "./schemas.js";
-import { findUserByEmail, findUserById, createUser, markEmailVerified } from "./repository.js";
+import { registerBodySchema, loginBodySchema, verifyEmailQuerySchema, forgotPasswordBodySchema, resetPasswordBodySchema } from "./schemas.js";
+import { findUserByEmail, findUserById, createUser, markEmailVerified, updatePassword } from "./repository.js";
 import { trackEvent, identifyUser } from "@/services/metrics/index.js";
 import { createVerificationToken, consumeVerificationToken, VERIFICATION_TOKEN_TTL_SECONDS } from "./email-verification.js";
+import { createPasswordResetToken, consumePasswordResetToken, PASSWORD_RESET_TTL_SECONDS } from "./password-reset.js";
 import { getEmailService } from "@/services/email/index.js";
 import { config } from "@/config/index.js";
 
@@ -271,6 +272,103 @@ export async function authRoutes(app: FastifyInstance): Promise<void> {
       });
     }
   );
+
+  // POST /api/auth/forgot-password — request a password reset email
+  app.post(
+    "/forgot-password",
+    {
+      config: {
+        rateLimit: {
+          max: 3,
+          timeWindow: "15 minutes",
+        },
+      },
+    },
+    async (request, reply) => {
+      const parseResult = forgotPasswordBodySchema.safeParse(request.body);
+      if (!parseResult.success) {
+        return reply.status(400).send({
+          statusCode: 400,
+          error: "Bad Request",
+          message: parseResult.error.issues[0]?.message ?? "Validation failed",
+        });
+      }
+      const { email } = parseResult.data;
+
+      // Always return the same response to prevent email enumeration.
+      const genericMessage =
+        "If an account with that email exists, we sent a password reset link.";
+
+      // Fire-and-forget: create token + send email in background.
+      const user = await findUserByEmail(email);
+      if (user) {
+        sendPasswordResetEmail(user.id, user.email, user.name, request.log).catch((error) =>
+          request.log.error({ error }, "Failed to send password reset email")
+        );
+      }
+
+      return reply.status(200).send({ message: genericMessage });
+    }
+  );
+
+  // POST /api/auth/reset-password — consume token and set new password
+  app.post(
+    "/reset-password",
+    {
+      config: {
+        rateLimit: {
+          max: 5,
+          timeWindow: "15 minutes",
+        },
+      },
+    },
+    async (request, reply) => {
+      const parseResult = resetPasswordBodySchema.safeParse(request.body);
+      if (!parseResult.success) {
+        return reply.status(400).send({
+          statusCode: 400,
+          error: "Bad Request",
+          message: parseResult.error.issues[0]?.message ?? "Validation failed",
+        });
+      }
+      const { token, password } = parseResult.data;
+
+      const consumeResult = await consumePasswordResetToken(token);
+      if (!consumeResult.ok) {
+        if (consumeResult.error.code === "TOKEN_NOT_FOUND") {
+          return reply.status(400).send({
+            statusCode: 400,
+            error: "Bad Request",
+            message: "Invalid or expired reset link",
+          });
+        }
+        request.log.error({ error: consumeResult.error }, "Failed to consume password reset token");
+        return reply.status(500).send({
+          statusCode: 500,
+          error: "Internal Server Error",
+          message: "Failed to reset password",
+        });
+      }
+
+      const userId = consumeResult.value;
+      const passwordHash = await argon2.hash(password);
+      const user = await updatePassword(userId, passwordHash);
+      if (!user) {
+        return reply.status(404).send({
+          statusCode: 404,
+          error: "Not Found",
+          message: "User not found",
+        });
+      }
+
+      // Invalidate all sessions so the user (and any attacker) must re-authenticate.
+      await invalidateAllUserSessions(userId);
+
+      trackEvent(userId, "password_reset");
+
+      return reply.status(200).send({ message: "Password reset successfully" });
+    }
+  );
 }
 
 /**
@@ -303,6 +401,43 @@ async function sendVerificationTokenEmail(
     log.error(
       { error: { code: emailResult.error.code, message: emailResult.error.message } },
       "Failed to send verification email"
+    );
+    return { ok: false };
+  }
+
+  return { ok: true };
+}
+
+/**
+ * Generate a password reset token and send the reset email.
+ */
+async function sendPasswordResetEmail(
+  userId: string,
+  email: string,
+  name: string,
+  log: { error: (obj: Record<string, unknown>, msg: string) => void }
+): Promise<{ ok: boolean }> {
+  const tokenResult = await createPasswordResetToken(userId, PASSWORD_RESET_TTL_SECONDS);
+  if (!tokenResult.ok) {
+    log.error({ error: tokenResult.error }, "Failed to create password reset token");
+    return { ok: false };
+  }
+
+  const { token, expiresAt } = tokenResult.value;
+  const resetUrl = `${config.appUrl}/reset-password?token=${encodeURIComponent(token)}`;
+
+  const emailService = getEmailService();
+  const emailResult = await emailService.sendPasswordResetEmail({
+    to: email,
+    recipientName: name,
+    resetUrl,
+    expiresAt,
+  });
+
+  if (!emailResult.ok) {
+    log.error(
+      { error: { code: emailResult.error.code, message: emailResult.error.message } },
+      "Failed to send password reset email"
     );
     return { ok: false };
   }

@@ -29,10 +29,10 @@ export {
 export { authRoutes } from "./routes.js";
 
 // Schemas
-export { registerBodySchema, type RegisterBody } from "./schemas.js";
+export { registerBodySchema, type RegisterBody, forgotPasswordBodySchema, type ForgotPasswordBody, resetPasswordBodySchema, type ResetPasswordBody } from "./schemas.js";
 
 // Repository
-export { findUserByEmail, findUserById, createUser, markEmailVerified, isEmailVerified } from "./repository.js";
+export { findUserByEmail, findUserById, createUser, markEmailVerified, isEmailVerified, updatePassword } from "./repository.js";
 
 // Email verification
 export {
@@ -40,3 +40,10 @@ export {
   consumeVerificationToken,
   VERIFICATION_TOKEN_TTL_SECONDS,
 } from "./email-verification.js";
+
+// Password reset
+export {
+  createPasswordResetToken,
+  consumePasswordResetToken,
+  PASSWORD_RESET_TTL_SECONDS,
+} from "./password-reset.js";
