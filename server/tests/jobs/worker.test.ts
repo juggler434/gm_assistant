@@ -3,6 +3,7 @@
 import { describe, it, expect, vi, beforeEach } from "vitest";
 
 import type { JobLogger } from "../../src/jobs/types.js";
+import type { Worker } from "bullmq";
 
 describe("JobWorker", () => {
   // Store the processor function
@@ -16,20 +17,23 @@ describe("JobWorker", () => {
   const mockIsRunning = vi.fn();
   const mockIsPaused = vi.fn();
 
-  const mockWorkerInstance = {
-    on: mockOn,
-    close: mockClose,
-    pause: mockPause,
-    resume: mockResume,
-    isRunning: mockIsRunning,
-    isPaused: mockIsPaused,
+  function mockWorkerInstance(this: Worker) {
+    this.on = mockOn
+    this.close = mockClose
+    this.pause = mockPause
+    this.resume = mockResume
+    this.isRunning = mockIsRunning
+    this.isPaused = mockIsPaused
   };
 
   vi.doMock("bullmq", () => ({
-    Worker: vi.fn((_name: string, processor: unknown, _opts: unknown) => {
-      capturedProcessor = processor as (job: unknown) => Promise<unknown>;
-      return mockWorkerInstance;
-    }),
+    Worker: vi.fn(class {
+      constructor(_name: string, processor: unknown, _opts: unknown) {
+        capturedProcessor = processor as (job: unknown) => Promise<unknown>;
+        mockWorkerInstance.call(this as unknown as Worker);
+      }
+    }
+    ),
   }));
 
   vi.doMock("../../src/jobs/connection.js", () => ({

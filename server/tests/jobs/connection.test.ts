@@ -11,11 +11,11 @@ import { JobError } from "../../src/jobs/errors.js";
 
 // Mock ioredis
 vi.mock("ioredis", () => {
-  const MockRedis = vi.fn().mockImplementation(() => ({
-    ping: vi.fn(),
-    quit: vi.fn(),
-    options: { host: "localhost" },
-  }));
+  const MockRedis = vi.fn(class {
+    ping = vi.fn()
+    quit = vi.fn()
+    options = vi.fn()
+  })
   return { Redis: MockRedis, default: MockRedis };
 });
 
