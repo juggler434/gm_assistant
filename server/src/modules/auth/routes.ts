@@ -9,11 +9,12 @@ import { findUserByEmail, findUserById, createUser, markEmailVerified, updatePas
 import { trackEvent, identifyUser } from "@/services/metrics/index.js";
 import { createVerificationToken, consumeVerificationToken, VERIFICATION_TOKEN_TTL_SECONDS } from "./email-verification.js";
 import { createPasswordResetToken, consumePasswordResetToken, PASSWORD_RESET_TTL_SECONDS } from "./password-reset.js";
+import { checkBruteForce, recordFailedAttempt, resetFailedAttempts } from "./brute-force.js";
 import { getEmailService } from "@/services/email/index.js";
 import { config } from "@/config/index.js";
 
 export async function authRoutes(app: FastifyInstance): Promise<void> {
-  app.post("/register", async (request, reply) => {
+  app.post("/register", { config: { rateLimit: { max: 5, timeWindow: "15 minutes" } } }, async (request, reply) => {
     // 1. Validate body with Zod
     const parseResult = registerBodySchema.safeParse(request.body);
     if (!parseResult.success) {
@@ -81,7 +82,7 @@ export async function authRoutes(app: FastifyInstance): Promise<void> {
     });
   });
 
-  app.post("/login", async (request, reply) => {
+  app.post("/login", { config: { rateLimit: { max: 5, timeWindow: "15 minutes" } } }, async (request, reply) => {
     // 1. Validate body with Zod
     const parseResult = loginBodySchema.safeParse(request.body);
     if (!parseResult.success) {
@@ -93,9 +94,21 @@ export async function authRoutes(app: FastifyInstance): Promise<void> {
     }
     const { email, password } = parseResult.data;
 
-    // 2. Find user by email
+    // 2. Check brute-force lockout for this email
+    const bruteForce = await checkBruteForce(email);
+    if (bruteForce.locked) {
+      reply.header("Retry-After", String(bruteForce.retryAfter));
+      return reply.status(429).send({
+        statusCode: 429,
+        error: "Too Many Requests",
+        message: "Too many failed login attempts. Please try again later.",
+      });
+    }
+
+    // 3. Find user by email
     const user = await findUserByEmail(email);
     if (!user) {
+      await recordFailedAttempt(email);
       return reply.status(401).send({
         statusCode: 401,
         error: "Unauthorized",
@@ -103,9 +116,10 @@ export async function authRoutes(app: FastifyInstance): Promise<void> {
       });
     }
 
-    // 3. Verify password against hash
+    // 4. Verify password against hash
     const passwordValid = await argon2.verify(user.passwordHash, password);
     if (!passwordValid) {
+      await recordFailedAttempt(email);
       return reply.status(401).send({
         statusCode: 401,
         error: "Unauthorized",
@@ -113,7 +127,10 @@ export async function authRoutes(app: FastifyInstance): Promise<void> {
       });
     }
 
-    // 4. Create new session
+    // 5. Successful login — reset brute-force counter
+    await resetFailedAttempts(email);
+
+    // 6. Create new session
     const sessionResult = await createSession(user.id);
     if (!sessionResult.ok) {
       request.log.error({ error: sessionResult.error }, "Failed to create session during login");
@@ -124,7 +141,7 @@ export async function authRoutes(app: FastifyInstance): Promise<void> {
       });
     }
 
-    // 5. Set cookie and return user
+    // 7. Set cookie and return user
     setSessionCookie(reply, sessionResult.value.token);
 
     trackEvent(user.id, "user_logged_in");
