@@ -23,6 +23,12 @@ vi.mock("argon2", () => ({
   hash: vi.fn(),
 }));
 
+vi.mock("@/modules/auth/brute-force.js", () => ({
+  checkBruteForce: vi.fn().mockResolvedValue({ locked: false, attempts: 0, retryAfter: 0 }),
+  recordFailedAttempt: vi.fn().mockResolvedValue({ locked: false, attempts: 1, retryAfter: 0 }),
+  resetFailedAttempts: vi.fn().mockResolvedValue(undefined),
+}));
+
 vi.mock("@/services/metrics/service.js", () => ({
   trackEvent: vi.fn(),
   identifyUser: vi.fn(),
