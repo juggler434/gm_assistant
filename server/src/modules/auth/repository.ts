@@ -38,6 +38,18 @@ export async function markEmailVerified(userId: string): Promise<User | null> {
   return result[0] ?? null;
 }
 
+export async function updatePassword(
+  userId: string,
+  passwordHash: string
+): Promise<User | null> {
+  const result = await db
+    .update(users)
+    .set({ passwordHash })
+    .where(eq(users.id, userId))
+    .returning();
+  return result[0] ?? null;
+}
+
 export async function isEmailVerified(userId: string): Promise<boolean> {
   const result = await db
     .select({ emailVerifiedAt: users.emailVerifiedAt })

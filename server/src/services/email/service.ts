@@ -22,6 +22,17 @@ export interface EmailServiceOptions {
   logger?: EmailServiceLogger;
 }
 
+export interface PasswordResetEmailContext {
+  /** Recipient address. */
+  to: string;
+  /** Display name for greeting. */
+  recipientName: string;
+  /** Fully-qualified reset URL containing the token. */
+  resetUrl: string;
+  /** When the link will expire (used in copy). */
+  expiresAt: Date;
+}
+
 export interface VerificationEmailContext {
   /** Recipient address. */
   to: string;
@@ -70,6 +81,35 @@ export class EmailService {
     return result;
   }
 
+  /** Send the password-reset message. */
+  async sendPasswordResetEmail(
+    context: PasswordResetEmailContext
+  ): Promise<Result<SendEmailResponse, EmailError>> {
+    const hours = Math.max(1, Math.round((context.expiresAt.getTime() - Date.now()) / 3_600_000));
+    const subject = "Reset your password — The Grimoire";
+    const text = [
+      `Hi ${context.recipientName},`,
+      "",
+      "We received a request to reset your password. Use the link below to choose a new one:",
+      "",
+      context.resetUrl,
+      "",
+      `This link will expire in about ${hours} hour${hours === 1 ? "" : "s"}.`,
+      "",
+      "If you didn't request a password reset, you can safely ignore this email. Your password won't change.",
+      "",
+      "— The Grimoire",
+    ].join("\n");
+    const html = buildPasswordResetHtml(context, hours);
+
+    return this.send({
+      to: context.to,
+      subject,
+      text,
+      html,
+    });
+  }
+
   /** Send the email-verification message. */
   async sendVerificationEmail(
     context: VerificationEmailContext
@@ -98,6 +138,56 @@ export class EmailService {
       html,
     });
   }
+}
+
+function buildPasswordResetHtml(context: PasswordResetEmailContext, hours: number): string {
+  const url = escapeAttribute(context.resetUrl);
+  const name = escapeHtml(context.recipientName);
+  const expiry = `${hours} hour${hours === 1 ? "" : "s"}`;
+
+  return `<!DOCTYPE html>
+<html lang="en">
+<head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1.0"></head>
+<body style="margin:0;padding:0;background-color:#0f0f14;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,sans-serif;">
+  <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="background-color:#0f0f14;padding:40px 16px;">
+    <tr><td align="center">
+      <table role="presentation" width="480" cellpadding="0" cellspacing="0" style="max-width:480px;width:100%;">
+        <!-- Header -->
+        <tr><td style="text-align:center;padding-bottom:32px;">
+          <span style="font-size:28px;">&#128214;</span>
+          <h1 style="margin:8px 0 0;font-size:24px;font-weight:700;color:#e8e6e3;letter-spacing:-0.5px;">The Grimoire</h1>
+        </td></tr>
+        <!-- Card -->
+        <tr><td style="background-color:#1e1e28;border:1px solid #3a3a4a;border-radius:12px;padding:32px 28px;">
+          <p style="margin:0 0 8px;font-size:16px;color:#e8e6e3;">Hi ${name},</p>
+          <p style="margin:0 0 24px;font-size:14px;line-height:1.6;color:#9d9baf;">
+            We received a request to reset your password. Click the button below to choose a new one.
+          </p>
+          <!-- CTA Button -->
+          <table role="presentation" width="100%" cellpadding="0" cellspacing="0">
+            <tr><td align="center" style="padding-bottom:24px;">
+              <a href="${url}" style="display:inline-block;padding:12px 32px;background-color:#a855f7;color:#ffffff;font-size:14px;font-weight:600;text-decoration:none;border-radius:8px;">Reset Password</a>
+            </td></tr>
+          </table>
+          <p style="margin:0 0 16px;font-size:12px;line-height:1.5;color:#9d9baf;">
+            Or copy this link into your browser:<br>
+            <a href="${url}" style="color:#a855f7;word-break:break-all;">${escapeHtml(context.resetUrl)}</a>
+          </p>
+          <p style="margin:0;font-size:12px;color:#9d9baf;">
+            This link expires in about ${expiry}.
+          </p>
+        </td></tr>
+        <!-- Footer -->
+        <tr><td style="text-align:center;padding-top:24px;">
+          <p style="margin:0;font-size:12px;color:#9d9baf;">
+            If you didn't request a password reset, you can safely ignore this email.
+          </p>
+        </td></tr>
+      </table>
+    </td></tr>
+  </table>
+</body>
+</html>`;
 }
 
 function buildVerificationHtml(context: VerificationEmailContext, hours: number): string {

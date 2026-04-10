@@ -26,6 +26,8 @@ import { SessionDetailPage } from "@/pages/campaign-session-detail";
 import { SettingsPage } from "@/pages/campaign-settings";
 import { LandingPage } from "@/pages/landing";
 import { VerifyEmailPage } from "@/pages/verify-email";
+import { ForgotPasswordPage } from "@/pages/forgot-password";
+import { ResetPasswordPage } from "@/pages/reset-password";
 
 const queryClient = new QueryClient({
   defaultOptions: {
@@ -50,6 +52,8 @@ function App() {
               <Route element={<PublicLayout />}>
                 <Route path="/login" element={<LoginPage />} />
                 <Route path="/register" element={<RegisterPage />} />
+                <Route path="/forgot-password" element={<ForgotPasswordPage />} />
+                <Route path="/reset-password" element={<ResetPasswordPage />} />
               </Route>
 
               {/* Email verification (authenticated but not necessarily verified) */}

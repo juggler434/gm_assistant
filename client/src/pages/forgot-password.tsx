@@ -1,24 +1,18 @@
 // SPDX-License-Identifier: AGPL-3.0-or-later
 
 import { useState, type FormEvent } from "react";
-import { Link, useNavigate, useSearchParams } from "react-router-dom";
+import { Link } from "react-router-dom";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Button } from "@/components/ui/button";
 import { Spinner } from "@/components/ui/spinner";
-import { useAuth } from "@/hooks/use-auth";
-import { ApiError } from "@/lib/api-client";
+import { api } from "@/lib/api-client";
 
-export function LoginPage() {
-  const { login } = useAuth();
-  const navigate = useNavigate();
-  const [searchParams] = useSearchParams();
-  const resetSuccess = searchParams.get("reset") === "success";
-
+export function ForgotPasswordPage() {
   const [email, setEmail] = useState("");
-  const [password, setPassword] = useState("");
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const [isSuccess, setIsSuccess] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [fieldErrors, setFieldErrors] = useState<Record<string, string>>({});
 
@@ -29,10 +23,6 @@ export function LoginPage() {
       errors.email = "Email is required";
     } else if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
       errors.email = "Please enter a valid email address";
-    }
-
-    if (!password) {
-      errors.password = "Password is required";
     }
 
     setFieldErrors(errors);
@@ -47,38 +37,46 @@ export function LoginPage() {
 
     setIsSubmitting(true);
     try {
-      const authedUser = await login(email.trim(), password);
-      navigate(authedUser.emailVerified ? "/campaigns" : "/verify-email");
-    } catch (err) {
-      if (err instanceof ApiError && err.statusCode === 401) {
-        setError("Invalid email or password.");
-      } else if (err instanceof ApiError) {
-        setError(err.message);
-      } else {
-        setError("Something went wrong. Please try again.");
-      }
+      await api.post("/api/auth/forgot-password", { email: email.trim() });
+      setIsSuccess(true);
+    } catch {
+      setError("Something went wrong. Please try again.");
     } finally {
       setIsSubmitting(false);
     }
   }
 
+  if (isSuccess) {
+    return (
+      <Card>
+        <CardHeader className="text-center">
+          <CardTitle className="text-2xl">Check Your Email</CardTitle>
+          <CardDescription>
+            If an account exists for <strong>{email}</strong>, we sent a password
+            reset link. It may take a minute to arrive.
+          </CardDescription>
+        </CardHeader>
+        <CardContent>
+          <p className="text-center text-sm text-muted-foreground">
+            <Link to="/login" className="text-primary hover:underline">
+              Back to sign in
+            </Link>
+          </p>
+        </CardContent>
+      </Card>
+    );
+  }
+
   return (
     <Card>
       <CardHeader className="text-center">
-        <CardTitle className="text-2xl">Welcome Back</CardTitle>
-        <CardDescription>Sign in to your GM Assistant account</CardDescription>
+        <CardTitle className="text-2xl">Forgot Password</CardTitle>
+        <CardDescription>
+          Enter your email and we&apos;ll send you a link to reset your password
+        </CardDescription>
       </CardHeader>
       <CardContent>
         <form onSubmit={handleSubmit} className="space-y-4" noValidate>
-          {resetSuccess && (
-            <div
-              role="status"
-              className="rounded-md border border-success/50 bg-success/10 px-3 py-2 text-sm text-success"
-            >
-              Your password has been reset. Please sign in with your new password.
-            </div>
-          )}
-
           {error && (
             <div
               role="alert"
@@ -109,41 +107,14 @@ export function LoginPage() {
             )}
           </div>
 
-          <div className="space-y-2">
-            <Label htmlFor="password">Password</Label>
-            <Input
-              id="password"
-              type="password"
-              placeholder="Enter your password"
-              value={password}
-              onChange={(e) => {
-                setPassword(e.target.value);
-                setFieldErrors((prev) => ({ ...prev, password: "" }));
-              }}
-              aria-invalid={!!fieldErrors.password}
-              aria-describedby={fieldErrors.password ? "password-error" : undefined}
-            />
-            {fieldErrors.password && (
-              <p id="password-error" className="text-xs text-destructive">
-                {fieldErrors.password}
-              </p>
-            )}
-          </div>
-
-          <div className="flex justify-end">
-            <Link to="/forgot-password" className="text-sm text-primary hover:underline">
-              Forgot your password?
-            </Link>
-          </div>
-
           <Button type="submit" className="w-full" disabled={isSubmitting}>
-            {isSubmitting ? <Spinner label="Signing in" /> : "Sign In"}
+            {isSubmitting ? <Spinner label="Sending" /> : "Send Reset Link"}
           </Button>
 
           <p className="text-center text-sm text-muted-foreground">
-            Don&apos;t have an account?{" "}
-            <Link to="/register" className="text-primary hover:underline">
-              Create one
+            Remember your password?{" "}
+            <Link to="/login" className="text-primary hover:underline">
+              Sign in
             </Link>
           </p>
         </form>
