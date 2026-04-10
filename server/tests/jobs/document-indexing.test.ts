@@ -106,6 +106,7 @@ vi.mock("@/services/ocr/index.js", () => ({
 vi.mock("@/config/index.js", () => ({
   config: {
     llm: { baseUrl: "http://localhost:11434" },
+    ollama: { baseUrl: "http://localhost:11434" },
   },
 }));
 
