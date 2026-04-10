@@ -1,6 +1,7 @@
 // SPDX-License-Identifier: AGPL-3.0-or-later
 
 import { describe, it, expect, vi, beforeEach } from "vitest";
+import type { Queue } from "bullmq";
 
 
 describe("JobQueue", () => {
@@ -14,19 +15,19 @@ describe("JobQueue", () => {
   const mockClean = vi.fn();
   const mockClose = vi.fn();
 
-  const mockQueueInstance = {
-    add: mockAdd,
-    addBulk: mockAddBulk,
-    getJob: mockGetJob,
-    pause: mockPause,
-    resume: mockResume,
-    getJobCounts: mockGetJobCounts,
-    clean: mockClean,
-    close: mockClose,
+  function MockQueueInstance(this: Queue) {
+    this.add = mockAdd
+    this.addBulk = mockAddBulk
+    this.getJob = mockGetJob
+    this.pause = mockPause
+    this.resume = mockResume
+    this.getJobCounts = mockGetJobCounts
+    this.clean = mockClean
+    this.close = mockClose
   };
 
   vi.doMock("bullmq", () => ({
-    Queue: vi.fn(() => mockQueueInstance),
+    Queue: MockQueueInstance,
   }));
 
   vi.doMock("../../src/jobs/connection.js", () => ({

@@ -5,17 +5,21 @@ import { S3Provider } from "../../../../src/services/storage/providers/s3.js";
 import type { StorageConfig } from "../../../../src/services/storage/types.js";
 
 // Mock the AWS SDK
+const mockSend = vi.fn();
 vi.mock("@aws-sdk/client-s3", () => {
-  const mockSend = vi.fn();
+
+  function MockClient(this: S3Client) {
+    this.send = mockSend;
+  };
   return {
-    S3Client: vi.fn(() => ({ send: mockSend })),
-    PutObjectCommand: vi.fn((input) => ({ _type: "PutObject", input })),
-    GetObjectCommand: vi.fn((input) => ({ _type: "GetObject", input })),
-    DeleteObjectCommand: vi.fn((input) => ({ _type: "DeleteObject", input })),
-    HeadObjectCommand: vi.fn((input) => ({ _type: "HeadObject", input })),
-    HeadBucketCommand: vi.fn((input) => ({ _type: "HeadBucket", input })),
-    CreateBucketCommand: vi.fn((input) => ({ _type: "CreateBucket", input })),
-    ListObjectsV2Command: vi.fn((input) => ({ _type: "ListObjectsV2", input })),
+    S3Client: MockClient,
+    PutObjectCommand: vi.fn(class { constructor(public input: unknown) {} }),
+    GetObjectCommand: vi.fn(class { constructor(public input: unknown) {} }),
+    DeleteObjectCommand: vi.fn(class { constructor(public input: unknown) {} }),
+    HeadObjectCommand: vi.fn(class { constructor(public input: unknown) {} }),
+    HeadBucketCommand: vi.fn(class { constructor(public input: unknown) {} }),
+    CreateBucketCommand: vi.fn(class { constructor(public input: unknown) {} }),
+    ListObjectsV2Command: vi.fn(class { constructor(public input: unknown) {} }),
   };
 });
 
@@ -37,15 +41,13 @@ const mockConfig: StorageConfig = {
 
 describe("S3Provider", () => {
   let provider: S3Provider;
-  let mockSend: ReturnType<typeof vi.fn>;
 
   beforeEach(() => {
     vi.clearAllMocks();
     provider = new S3Provider(mockConfig);
-    // Get the mock send function from the instantiated client
-    const clientInstance = vi.mocked(S3Client).mock.results[0]?.value;
-    mockSend = clientInstance?.send;
+
   });
+
 
   describe("constructor", () => {
     it("should set provider name to s3", () => {
@@ -74,7 +76,6 @@ describe("S3Provider", () => {
         documentId: "doc-456",
         content,
       });
-
       expect(result.ok).toBe(true);
       if (result.ok) {
         expect(result.value.key).toBe("campaigns/camp-123/documents/doc-456");
