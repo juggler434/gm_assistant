@@ -8,13 +8,14 @@
  */
 
 import type { FastifyInstance } from "fastify";
-import { sql } from "drizzle-orm";
+import { sql, desc, eq } from "drizzle-orm";
 import { requireAuth } from "@/modules/auth/index.js";
 import { db } from "@/db/index.js";
 import { users } from "@/db/schema/users.js";
 import { campaigns } from "@/db/schema/campaigns.js";
 import { documents } from "@/db/schema/documents.js";
 import { chunks } from "@/db/schema/chunks.js";
+import { authEvents } from "@/db/schema/auth-events.js";
 import { isMetricsEnabled } from "@/services/metrics/index.js";
 
 export async function metricsRoutes(app: FastifyInstance): Promise<void> {
@@ -89,5 +90,43 @@ export async function metricsRoutes(app: FastifyInstance): Promise<void> {
       },
       generated_at: new Date().toISOString(),
     });
+  });
+
+  // GET /api/admin/metrics/auth-events — Recent auth events with optional filters
+  app.get("/auth-events", async (request, reply) => {
+    const query = request.query as {
+      type?: string;
+      limit?: string;
+    };
+
+    const limit = Math.min(Math.max(parseInt(query.limit ?? "50", 10) || 50, 1), 200);
+
+    const conditions = [];
+    if (query.type) {
+      conditions.push(eq(authEvents.eventType, query.type as typeof authEvents.eventType.enumValues[number]));
+    }
+
+    const baseQuery = db
+      .select({
+        id: authEvents.id,
+        userId: authEvents.userId,
+        eventType: authEvents.eventType,
+        ip: authEvents.ip,
+        userAgent: authEvents.userAgent,
+        metadata: authEvents.metadata,
+        createdAt: authEvents.createdAt,
+        userEmail: users.email,
+      })
+      .from(authEvents)
+      .leftJoin(users, eq(authEvents.userId, users.id))
+      .orderBy(desc(authEvents.createdAt))
+      .limit(limit);
+
+    const rows =
+      conditions.length > 0
+        ? await baseQuery.where(conditions[0]!)
+        : await baseQuery;
+
+    return reply.status(200).send({ events: rows });
   });
 }

@@ -13,3 +13,4 @@ export * from "./adventures.js";
 export * from "./conversations.js";
 export * from "./sessions.js";
 export * from "./session-summaries.js";
+export * from "./auth-events.js";
