@@ -57,7 +57,12 @@ export interface LoginRequest {
   password: string;
 }
 
-/** Response from register and login endpoints */
+/** Response from register endpoint (uniform for security — no user enumeration) */
+export interface RegisterResponse {
+  message: string;
+}
+
+/** Response from login and /me endpoints */
 export interface AuthResponse {
   user: AuthUser;
 }

@@ -8,7 +8,6 @@ import { Label } from "@/components/ui/label";
 import { Button } from "@/components/ui/button";
 import { Spinner } from "@/components/ui/spinner";
 import { useAuth } from "@/hooks/use-auth";
-import { ApiError } from "@/lib/api-client";
 import { getPasswordStrength, type PasswordStrength } from "@/lib/password-strength";
 
 const strengthConfig: Record<PasswordStrength, { label: string; color: string; width: string }> = {
@@ -71,16 +70,10 @@ export function RegisterPage() {
 
     setIsSubmitting(true);
     try {
-      const authedUser = await register(name.trim(), email.trim(), password);
-      navigate(authedUser.emailVerified ? "/campaigns" : "/verify-email");
-    } catch (err) {
-      if (err instanceof ApiError && err.statusCode === 409) {
-        setFieldErrors((prev) => ({ ...prev, email: "This email is already registered" }));
-      } else if (err instanceof ApiError) {
-        setError(err.message);
-      } else {
-        setError("Something went wrong. Please try again.");
-      }
+      await register(name.trim(), email.trim(), password);
+      navigate("/verify-email");
+    } catch {
+      setError("Something went wrong. Please try again.");
     } finally {
       setIsSubmitting(false);
     }

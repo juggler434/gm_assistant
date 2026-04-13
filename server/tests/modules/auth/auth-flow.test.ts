@@ -64,6 +64,7 @@ vi.mock("@/modules/auth/email-verification.js", () => ({
 vi.mock("@/services/email/factory.js", () => ({
   getEmailService: vi.fn(() => ({
     sendVerificationEmail: vi.fn().mockResolvedValue({ ok: true, value: {} }),
+    sendDuplicateRegistrationEmail: vi.fn().mockResolvedValue({ ok: true, value: {} }),
     providerName: "log",
   })),
   createEmailService: vi.fn(),
@@ -152,12 +153,7 @@ describe("Full Authentication Flow", () => {
       expect(response.statusCode).toBe(201);
 
       const body = JSON.parse(response.body);
-      expect(body.user).toEqual({
-        id: "user-abc-123",
-        email: "player@example.com",
-        name: "Test Player",
-        emailVerified: false,
-      });
+      expect(body.message).toBe("Registration successful. Please check your email to verify your account.");
 
       // Verify password was hashed before storage
       expect(argon2.hash).toHaveBeenCalledWith("securepass123");
@@ -225,8 +221,9 @@ describe("Full Authentication Flow", () => {
       await app.close();
     });
 
-    it("should reject registration with duplicate email", async () => {
+    it("should return same 201 for duplicate email (no enumeration)", async () => {
       vi.mocked(findUserByEmail).mockResolvedValue(mockUser);
+      vi.mocked(argon2.hash).mockResolvedValue("dummy-hash");
 
       const app = await buildTestApp();
 
@@ -240,14 +237,13 @@ describe("Full Authentication Flow", () => {
         },
       });
 
-      expect(response.statusCode).toBe(409);
+      expect(response.statusCode).toBe(201);
 
       const body = JSON.parse(response.body);
-      expect(body.error).toBe("Conflict");
-      expect(body.message).toBe("Email already registered");
+      expect(body.message).toBe("Registration successful. Please check your email to verify your account.");
 
-      // Should not attempt to hash or create user
-      expect(argon2.hash).not.toHaveBeenCalled();
+      // Should perform dummy hash but not create user
+      expect(argon2.hash).toHaveBeenCalledWith("securepass123");
       expect(createUser).not.toHaveBeenCalled();
       expect(createSession).not.toHaveBeenCalled();
 

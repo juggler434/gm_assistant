@@ -18,10 +18,10 @@
     "test": "vitest run",
     "test:watch": "vitest",
     "test:coverage": "vitest run --coverage",
-    "db:generate": "tsx ../node_modules/drizzle-kit/bin.cjs generate",
-    "db:migrate": "tsx ../node_modules/drizzle-kit/bin.cjs migrate",
-    "db:push": "tsx ../node_modules/drizzle-kit/bin.cjs push",
-    "db:studio": "tsx ../node_modules/drizzle-kit/bin.cjs studio",
+    "db:generate": "npx drizzle-kit generate",
+    "db:migrate": "npx drizzle-kit migrate",
+    "db:push": "npx drizzle-kit push",
+    "db:studio": "npx drizzle-kit studio",
     "db:setup": "tsx src/db/setup.ts"
   },
   "keywords": [
@@ -42,7 +42,7 @@
     "@typescript-eslint/eslint-plugin": "^8.0.0",
     "@typescript-eslint/parser": "^8.0.0",
     "@vitest/coverage-v8": "^4.1.4",
-    "drizzle-kit": "^0.18.1",
+    "drizzle-kit": "^0.31.10",
     "eslint": "^9.0.0",
     "eslint-config-prettier": "^9.0.0",
     "form-data": "^4.0.5",

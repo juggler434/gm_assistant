@@ -59,6 +59,7 @@ vi.mock("@/modules/auth/email-verification.js", () => ({
 vi.mock("@/services/email/factory.js", () => ({
   getEmailService: vi.fn(() => ({
     sendVerificationEmail: vi.fn().mockResolvedValue({ ok: true, value: {} }),
+    sendDuplicateRegistrationEmail: vi.fn().mockResolvedValue({ ok: true, value: {} }),
     providerName: "log",
   })),
   createEmailService: vi.fn(),
@@ -236,7 +237,7 @@ describe("Register Route Handler", () => {
     return buildApp({ logger: false });
   }
 
-  it("should return 201 and user data on successful registration", async () => {
+  it("should return 201 and set session cookie on successful registration", async () => {
     vi.mocked(findUserByEmail).mockResolvedValue(null);
     vi.mocked(argon2.hash).mockResolvedValue("hashed-password");
     vi.mocked(createUser).mockResolvedValue(mockNewUser);
@@ -257,12 +258,7 @@ describe("Register Route Handler", () => {
     expect(response.statusCode).toBe(201);
 
     const body = JSON.parse(response.body);
-    expect(body.user).toEqual({
-      id: "user-123",
-      email: "newuser@example.com",
-      name: "New User",
-      emailVerified: false,
-    });
+    expect(body.message).toBe("Registration successful. Please check your email to verify your account.");
 
     // Verify session cookie is set
     const cookies = response.cookies;
@@ -273,7 +269,7 @@ describe("Register Route Handler", () => {
     await app.close();
   });
 
-  it("should return 409 when email already exists", async () => {
+  it("should return 201 with same response when email already exists (no enumeration)", async () => {
     const existingUser: User = {
       id: "existing-user",
       email: "existing@example.com",
@@ -284,6 +280,7 @@ describe("Register Route Handler", () => {
       updatedAt: new Date(),
     };
     vi.mocked(findUserByEmail).mockResolvedValue(existingUser);
+    vi.mocked(argon2.hash).mockResolvedValue("dummy-hash");
 
     const app = await buildTestApp();
 
@@ -297,15 +294,20 @@ describe("Register Route Handler", () => {
       },
     });
 
-    expect(response.statusCode).toBe(409);
+    // Same status and message shape as success — prevents user enumeration
+    expect(response.statusCode).toBe(201);
 
     const body = JSON.parse(response.body);
-    expect(body.error).toBe("Conflict");
-    expect(body.message).toBe("Email already registered");
+    expect(body.message).toBe("Registration successful. Please check your email to verify your account.");
 
-    // Should not attempt to hash password or create user
-    expect(argon2.hash).not.toHaveBeenCalled();
+    // Should perform dummy hash (timing attack prevention) but not create user
+    expect(argon2.hash).toHaveBeenCalledWith("password123");
     expect(createUser).not.toHaveBeenCalled();
+    expect(createSession).not.toHaveBeenCalled();
+
+    // Should not set a session cookie
+    const sessionCookie = response.cookies.find((c) => c.name === "session_token");
+    expect(sessionCookie).toBeUndefined();
 
     await app.close();
   });
