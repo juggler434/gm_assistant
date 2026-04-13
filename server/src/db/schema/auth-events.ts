@@ -13,6 +13,7 @@ import { users } from "./users.js";
 
 export const authEventTypeEnum = pgEnum("auth_event_type", [
   "register",
+  "register_duplicate",
   "login_success",
   "login_failure",
   "logout",

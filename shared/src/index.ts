@@ -105,6 +105,7 @@ export type {
 export type {
   ApiErrorResponse,
   RegisterRequest,
+  RegisterResponse,
   LoginRequest,
   AuthResponse,
   CreateCampaignRequest,

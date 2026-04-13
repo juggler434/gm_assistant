@@ -110,6 +110,25 @@ export class EmailService {
     });
   }
 
+  /** Notify an existing user that someone tried to register with their email. */
+  async sendDuplicateRegistrationEmail(
+    context: { to: string; recipientName: string }
+  ): Promise<Result<SendEmailResponse, EmailError>> {
+    const subject = "Someone tried to create an account with your email — The Grimoire";
+    const text = [
+      `Hi ${context.recipientName},`,
+      "",
+      "Someone just tried to create a new account using your email address. If this was you, you can log in to your existing account instead.",
+      "",
+      "If you didn't try to register, no action is needed — your account is safe.",
+      "",
+      "— The Grimoire",
+    ].join("\n");
+    const html = buildDuplicateRegistrationHtml(context.recipientName);
+
+    return this.send({ to: context.to, subject, text, html });
+  }
+
   /** Send the email-verification message. */
   async sendVerificationEmail(
     context: VerificationEmailContext
@@ -231,6 +250,44 @@ function buildVerificationHtml(context: VerificationEmailContext, hours: number)
         <tr><td style="text-align:center;padding-top:24px;">
           <p style="margin:0;font-size:12px;color:#9d9baf;">
             If you didn't create an account, you can safely ignore this email.
+          </p>
+        </td></tr>
+      </table>
+    </td></tr>
+  </table>
+</body>
+</html>`;
+}
+
+function buildDuplicateRegistrationHtml(recipientName: string): string {
+  const name = escapeHtml(recipientName);
+
+  return `<!DOCTYPE html>
+<html lang="en">
+<head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1.0"></head>
+<body style="margin:0;padding:0;background-color:#0f0f14;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,sans-serif;">
+  <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="background-color:#0f0f14;padding:40px 16px;">
+    <tr><td align="center">
+      <table role="presentation" width="480" cellpadding="0" cellspacing="0" style="max-width:480px;width:100%;">
+        <!-- Header -->
+        <tr><td style="text-align:center;padding-bottom:32px;">
+          <span style="font-size:28px;">&#128214;</span>
+          <h1 style="margin:8px 0 0;font-size:24px;font-weight:700;color:#e8e6e3;letter-spacing:-0.5px;">The Grimoire</h1>
+        </td></tr>
+        <!-- Card -->
+        <tr><td style="background-color:#1e1e28;border:1px solid #3a3a4a;border-radius:12px;padding:32px 28px;">
+          <p style="margin:0 0 8px;font-size:16px;color:#e8e6e3;">Hi ${name},</p>
+          <p style="margin:0 0 24px;font-size:14px;line-height:1.6;color:#9d9baf;">
+            Someone just tried to create a new account using your email address. If this was you, you can log in to your existing account instead.
+          </p>
+          <p style="margin:0;font-size:14px;line-height:1.6;color:#9d9baf;">
+            If you didn't try to register, no action is needed — your account is safe.
+          </p>
+        </td></tr>
+        <!-- Footer -->
+        <tr><td style="text-align:center;padding-top:24px;">
+          <p style="margin:0;font-size:12px;color:#9d9baf;">
+            You're receiving this because someone used your email to attempt registration.
           </p>
         </td></tr>
       </table>

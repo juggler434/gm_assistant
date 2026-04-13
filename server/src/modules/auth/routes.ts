@@ -15,7 +15,9 @@ import { config } from "@/config/index.js";
 import { recordAuthEvent } from "./audit-log.js";
 
 export async function authRoutes(app: FastifyInstance): Promise<void> {
-  app.post("/register", { config: { rateLimit: { max: 5, timeWindow: "15 minutes" } } }, async (request, reply) => {
+  app.post("/register", { config: { rateLimit: { max: 3, timeWindow: "15 minutes" } } }, async (request, reply) => {
+    const REGISTER_SUCCESS_MESSAGE = "Registration successful. Please check your email to verify your account.";
+
     // 1. Validate body with Zod
     const parseResult = registerBodySchema.safeParse(request.body);
     if (!parseResult.success) {
@@ -30,11 +32,17 @@ export async function authRoutes(app: FastifyInstance): Promise<void> {
     // 2. Check for existing user
     const existing = await findUserByEmail(email);
     if (existing) {
-      return reply.status(409).send({
-        statusCode: 409,
-        error: "Conflict",
-        message: "Email already registered",
-      });
+      // Perform a dummy hash to match timing of the success path
+      await argon2.hash(password);
+
+      recordAuthEvent({ userId: existing.id, eventType: "register_duplicate", request });
+
+      // Notify the existing user (fire-and-forget)
+      const emailService = getEmailService();
+      emailService.sendDuplicateRegistrationEmail({ to: existing.email, recipientName: existing.name })
+        .catch((error) => request.log.error({ error }, "Failed to send duplicate registration email"));
+
+      return reply.status(201).send({ message: REGISTER_SUCCESS_MESSAGE });
     }
 
     // 3. Hash password with argon2
@@ -62,7 +70,7 @@ export async function authRoutes(app: FastifyInstance): Promise<void> {
       });
     }
 
-    // 6. Set cookie and return user
+    // 6. Set cookie
     setSessionCookie(reply, sessionResult.value.token);
 
     identifyUser(newUser.id, { email: newUser.email, name: newUser.name });
@@ -74,14 +82,7 @@ export async function authRoutes(app: FastifyInstance): Promise<void> {
       (error) => request.log.error({ error }, "Failed to send verification email after registration")
     );
 
-    return reply.status(201).send({
-      user: {
-        id: newUser.id,
-        email: newUser.email,
-        name: newUser.name,
-        emailVerified: false,
-      },
-    });
+    return reply.status(201).send({ message: REGISTER_SUCCESS_MESSAGE });
   });
 
   app.post("/login", { config: { rateLimit: { max: 5, timeWindow: "15 minutes" } } }, async (request, reply) => {

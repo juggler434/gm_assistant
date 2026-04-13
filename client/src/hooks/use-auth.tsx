@@ -2,8 +2,8 @@
 
 import { createContext, useContext, useState, useEffect, useCallback, type ReactNode } from "react";
 import { useQueryClient } from "@tanstack/react-query";
-import { api, ApiError } from "@/lib/api-client";
-import type { AuthResponse, AuthUser } from "@/types";
+import { api } from "@/lib/api-client";
+import type { AuthResponse, AuthUser, RegisterResponse } from "@/types";
 
 interface AuthContextValue {
   user: AuthUser | null;
@@ -11,7 +11,7 @@ interface AuthContextValue {
   isEmailVerified: boolean;
   isLoading: boolean;
   login: (email: string, password: string) => Promise<AuthUser>;
-  register: (name: string, email: string, password: string) => Promise<AuthUser>;
+  register: (name: string, email: string, password: string) => Promise<void>;
   logout: () => Promise<void>;
   /** Refresh user data from the server (e.g. after email verification). */
   refreshUser: () => Promise<void>;
@@ -53,14 +53,21 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     return data.user;
   }, []);
 
-  const register = useCallback(async (name: string, email: string, password: string): Promise<AuthUser> => {
-    const data = await api.post<AuthResponse>("/api/auth/register", {
+  const register = useCallback(async (name: string, email: string, password: string): Promise<void> => {
+    await api.post<RegisterResponse>("/api/auth/register", {
       name,
       email,
       password,
     });
-    setUser(data.user);
-    return data.user;
+    // If registration created a new account, a session cookie was set.
+    // Check /me to pick up the session (if any). For duplicate emails
+    // the server returns the same 201 but sets no session.
+    try {
+      const data = await api.get<AuthResponse>("/api/auth/me");
+      setUser(data.user);
+    } catch {
+      // No session — duplicate email or other edge case. That's expected.
+    }
   }, []);
 
   const logout = useCallback(async () => {

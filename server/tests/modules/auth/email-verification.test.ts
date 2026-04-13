@@ -26,6 +26,7 @@ vi.mock("@/modules/auth/email-verification.js", () => ({
 vi.mock("@/services/email/factory.js", () => ({
   getEmailService: vi.fn(() => ({
     sendVerificationEmail: vi.fn().mockResolvedValue({ ok: true, value: {} }),
+    sendDuplicateRegistrationEmail: vi.fn().mockResolvedValue({ ok: true, value: {} }),
     providerName: "log",
   })),
   createEmailService: vi.fn(),
@@ -214,7 +215,7 @@ describe("Registration sends verification email", () => {
   beforeEach(() => vi.clearAllMocks());
   afterEach(() => vi.restoreAllMocks());
 
-  it("includes emailVerified: false in register response", async () => {
+  it("returns generic success message on register (no user data)", async () => {
     vi.mocked(findUserByEmail).mockResolvedValue(null);
     vi.mocked(argon2.hash).mockResolvedValue("hashed-pw");
     vi.mocked(createUser).mockResolvedValue(baseUser);
@@ -233,7 +234,9 @@ describe("Registration sends verification email", () => {
 
     expect(res.statusCode).toBe(201);
     const body = JSON.parse(res.body);
-    expect(body.user.emailVerified).toBe(false);
+    expect(body.message).toBe("Registration successful. Please check your email to verify your account.");
+    // No user object exposed — prevents enumeration
+    expect(body.user).toBeUndefined();
     await app.close();
   });
 });
