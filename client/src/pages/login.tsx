@@ -9,12 +9,31 @@ import { Button } from "@/components/ui/button";
 import { Spinner } from "@/components/ui/spinner";
 import { useAuth } from "@/hooks/use-auth";
 import { ApiError } from "@/lib/api-client";
+import { GoogleSignInButton } from "@/components/auth/google-sign-in-button";
+
+const OAUTH_ERROR_MESSAGES: Record<string, string> = {
+  access_denied: "Google sign-in was cancelled.",
+  email_not_verified: "Your Google account email is not verified.",
+  account_not_linkable:
+    "An account with this email already exists. Please sign in with your password first, then link Google from your account settings.",
+  invalid_state: "Your sign-in attempt expired. Please try again.",
+  token_exchange_failed: "We couldn't complete Google sign-in. Please try again.",
+  session_failed: "We couldn't start your session. Please try again.",
+  link_failed: "We couldn't link your Google account. Please try again.",
+  create_failed: "We couldn't create your account. Please try again.",
+  invalid_request: "Invalid Google sign-in request.",
+  unknown_error: "Something went wrong with Google sign-in.",
+};
 
 export function LoginPage() {
   const { login } = useAuth();
   const navigate = useNavigate();
   const [searchParams] = useSearchParams();
   const resetSuccess = searchParams.get("reset") === "success";
+  const oauthErrorCode = searchParams.get("oauth_error");
+  const oauthError = oauthErrorCode
+    ? OAUTH_ERROR_MESSAGES[oauthErrorCode] ?? OAUTH_ERROR_MESSAGES.unknown_error
+    : null;
 
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
@@ -79,12 +98,12 @@ export function LoginPage() {
             </div>
           )}
 
-          {error && (
+          {(error || oauthError) && (
             <div
               role="alert"
               className="rounded-md border border-destructive/50 bg-destructive/10 px-3 py-2 text-sm text-destructive"
             >
-              {error}
+              {error ?? oauthError}
             </div>
           )}
 
@@ -139,6 +158,16 @@ export function LoginPage() {
           <Button type="submit" className="w-full" disabled={isSubmitting}>
             {isSubmitting ? <Spinner label="Signing in" /> : "Sign In"}
           </Button>
+
+          <div className="relative flex items-center py-1">
+            <div className="flex-grow border-t border-border" />
+            <span className="mx-3 text-xs uppercase tracking-wider text-muted-foreground">
+              or
+            </span>
+            <div className="flex-grow border-t border-border" />
+          </div>
+
+          <GoogleSignInButton label="Sign in with Google" disabled={isSubmitting} />
 
           <p className="text-center text-sm text-muted-foreground">
             Don&apos;t have an account?{" "}

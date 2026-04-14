@@ -13,7 +13,7 @@ import {
   registerAuth,
 } from "@/plugins/index.js";
 import { registerMetrics } from "@/plugins/metrics.js";
-import { authRoutes, csrfProtection } from "@/modules/auth/index.js";
+import { authRoutes, googleOAuthRoutes, csrfProtection } from "@/modules/auth/index.js";
 import { campaignRoutes } from "@/modules/campaigns/index.js";
 import { documentRoutes } from "@/modules/documents/index.js";
 import { generationRoutes } from "@/modules/generation/index.js";
@@ -86,6 +86,7 @@ export async function buildApp(options: AppOptions = {}): Promise<FastifyInstanc
 
   // Register routes
   await app.register(authRoutes, { prefix: "/api/auth" });
+  await app.register(googleOAuthRoutes, { prefix: "/api/auth" });
   await app.register(campaignRoutes, { prefix: "/api/campaigns" });
   await app.register(documentRoutes, { prefix: "/api/campaigns" });
   await app.register(generationRoutes, { prefix: "/api/campaigns" });

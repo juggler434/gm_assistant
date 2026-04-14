@@ -120,8 +120,10 @@ export async function authRoutes(app: FastifyInstance): Promise<void> {
       });
     }
 
-    // 4. Verify password against hash
-    const passwordValid = await argon2.verify(user.passwordHash, password);
+    // 4. Verify password against hash (OAuth-only accounts have no password hash)
+    const passwordValid =
+      user.passwordHash !== null &&
+      (await argon2.verify(user.passwordHash, password));
     if (!passwordValid) {
       await recordFailedAttempt(email);
       recordAuthEvent({ userId: user.id, eventType: "login_failure", request, metadata: { reason: "invalid_password" } });

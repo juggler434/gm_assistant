@@ -27,12 +27,23 @@ export {
 
 // Routes
 export { authRoutes } from "./routes.js";
+export { googleOAuthRoutes } from "./google-routes.js";
 
 // Schemas
 export { registerBodySchema, type RegisterBody, forgotPasswordBodySchema, type ForgotPasswordBody, resetPasswordBodySchema, type ResetPasswordBody } from "./schemas.js";
 
 // Repository
-export { findUserByEmail, findUserById, createUser, markEmailVerified, isEmailVerified, updatePassword } from "./repository.js";
+export {
+  findUserByEmail,
+  findUserById,
+  createUser,
+  markEmailVerified,
+  isEmailVerified,
+  updatePassword,
+  findAuthIdentity,
+  createAuthIdentity,
+  createOAuthUser,
+} from "./repository.js";
 
 // Email verification
 export {

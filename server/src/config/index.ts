@@ -46,6 +46,11 @@ export const config = {
     updateAgeHours: env.SESSION_UPDATE_AGE_HOURS,
     cookieName: "session_token",
   },
+  googleOauth: {
+    clientId: env.GOOGLE_OAUTH_CLIENT_ID,
+    clientSecret: env.GOOGLE_OAUTH_CLIENT_SECRET,
+    redirectUri: env.GOOGLE_OAUTH_REDIRECT_URI,
+  },
   ocr: {
     serviceUrl: env.OCR_SERVICE_URL,
     timeout: env.OCR_TIMEOUT,

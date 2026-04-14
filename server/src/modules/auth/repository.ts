@@ -1,8 +1,14 @@
 // SPDX-License-Identifier: AGPL-3.0-or-later
 
-import { eq } from "drizzle-orm";
+import { and, eq } from "drizzle-orm";
 import { db } from "@/db/index.js";
-import { users, type User, type NewUser } from "@/db/schema/index.js";
+import {
+  users,
+  authIdentities,
+  type User,
+  type NewUser,
+  type AuthIdentity,
+} from "@/db/schema/index.js";
 
 export async function findUserByEmail(email: string): Promise<User | null> {
   const result = await db
@@ -27,6 +33,75 @@ export async function createUser(
 ): Promise<User | null> {
   const result = await db.insert(users).values(data).returning();
   return result[0] ?? null;
+}
+
+/**
+ * Find an existing auth identity for a provider + providerAccountId pair.
+ */
+export async function findAuthIdentity(
+  provider: string,
+  providerAccountId: string
+): Promise<AuthIdentity | null> {
+  const result = await db
+    .select()
+    .from(authIdentities)
+    .where(
+      and(
+        eq(authIdentities.provider, provider),
+        eq(authIdentities.providerAccountId, providerAccountId)
+      )
+    )
+    .limit(1);
+  return result[0] ?? null;
+}
+
+/**
+ * Create an auth identity linking a user to a provider account.
+ */
+export async function createAuthIdentity(
+  userId: string,
+  provider: string,
+  providerAccountId: string
+): Promise<AuthIdentity | null> {
+  const result = await db
+    .insert(authIdentities)
+    .values({ userId, provider, providerAccountId })
+    .returning();
+  return result[0] ?? null;
+}
+
+/**
+ * Create a user with no password (OAuth-only) and link them to a provider
+ * identity in the same transaction. The new user's email is pre-verified
+ * because the OAuth provider has already asserted email ownership.
+ */
+export async function createOAuthUser(params: {
+  email: string;
+  name: string;
+  provider: string;
+  providerAccountId: string;
+}): Promise<User | null> {
+  return db.transaction(async (tx) => {
+    const inserted = await tx
+      .insert(users)
+      .values({
+        email: params.email,
+        name: params.name,
+        passwordHash: null,
+        emailVerifiedAt: new Date(),
+      })
+      .returning();
+    const user = inserted[0];
+    if (!user) return null;
+
+    await tx.insert(authIdentities).values({
+      userId: user.id,
+      provider: params.provider,
+      providerAccountId: params.providerAccountId,
+    });
+
+    return user;
+  });
 }
 
 export async function markEmailVerified(userId: string): Promise<User | null> {
