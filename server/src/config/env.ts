@@ -63,6 +63,11 @@ const envSchema = z
     SESSION_MAX_AGE_DAYS: z.coerce.number().int().positive().default(30),
     SESSION_UPDATE_AGE_HOURS: z.coerce.number().int().positive().default(1),
 
+    // Google OAuth (optional — Google sign-in disabled if not set)
+    GOOGLE_OAUTH_CLIENT_ID: z.string().optional(),
+    GOOGLE_OAUTH_CLIENT_SECRET: z.string().optional(),
+    GOOGLE_OAUTH_REDIRECT_URI: z.string().url().optional(),
+
     // OCR Service
     OCR_SERVICE_URL: z.string().url().optional(),
     OCR_TIMEOUT: z.coerce.number().int().positive().default(300000),

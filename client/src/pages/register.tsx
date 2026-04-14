@@ -9,6 +9,7 @@ import { Button } from "@/components/ui/button";
 import { Spinner } from "@/components/ui/spinner";
 import { useAuth } from "@/hooks/use-auth";
 import { getPasswordStrength, type PasswordStrength } from "@/lib/password-strength";
+import { GoogleSignInButton } from "@/components/auth/google-sign-in-button";
 
 const strengthConfig: Record<PasswordStrength, { label: string; color: string; width: string }> = {
   weak: { label: "Weak", color: "bg-destructive", width: "w-1/3" },
@@ -212,6 +213,16 @@ export function RegisterPage() {
           <Button type="submit" className="w-full" disabled={isSubmitting}>
             {isSubmitting ? <Spinner label="Creating account" /> : "Create Account"}
           </Button>
+
+          <div className="relative flex items-center py-1">
+            <div className="flex-grow border-t border-border" />
+            <span className="mx-3 text-xs uppercase tracking-wider text-muted-foreground">
+              or
+            </span>
+            <div className="flex-grow border-t border-border" />
+          </div>
+
+          <GoogleSignInButton label="Sign up with Google" disabled={isSubmitting} />
 
           <p className="text-center text-sm text-muted-foreground">
             Already have an account?{" "}
