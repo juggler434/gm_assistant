@@ -63,6 +63,20 @@ vi.mock("@/jobs/factory.js", () => ({
   DEFAULT_JOB_OPTIONS: {},
 }));
 
+vi.mock("@/modules/auth/mfa-repository.js", () => ({
+  findUserMfa: vi.fn().mockResolvedValue(null),
+  upsertPendingSecret: vi.fn(),
+  enableMfa: vi.fn(),
+  disableMfa: vi.fn(),
+  consumeRecoveryCodeHash: vi.fn(),
+}));
+
+vi.mock("@/modules/auth/mfa-pending.js", () => ({
+  createMfaPendingToken: vi.fn(),
+  consumeMfaPendingToken: vi.fn(),
+  MFA_PENDING_TTL_SECONDS: 300,
+}));
+
 import { findUserByEmail, findUserById, createUser, markEmailVerified } from "@/modules/auth/repository.js";
 import { createSession, validateSessionToken } from "@/modules/auth/session.js";
 import { createVerificationToken, consumeVerificationToken } from "@/modules/auth/email-verification.js";

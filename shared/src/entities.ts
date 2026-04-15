@@ -28,6 +28,8 @@ export interface AuthUser {
   email: string;
   name: string;
   emailVerified: boolean;
+  /** Whether TOTP-based 2FA is currently enabled for this account. */
+  mfaEnabled: boolean;
 }
 
 // ============================================================================

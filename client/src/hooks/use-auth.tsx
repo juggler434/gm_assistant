@@ -3,14 +3,28 @@
 import { createContext, useContext, useState, useEffect, useCallback, type ReactNode } from "react";
 import { useQueryClient } from "@tanstack/react-query";
 import { api, ApiError } from "@/lib/api-client";
-import type { AuthResponse, AuthUser, RegisterResponse } from "@/types";
+import type { AuthResponse, AuthUser, LoginResponse, RegisterResponse } from "@/types";
+
+/**
+ * Result of calling `login()`. Either the user is fully authenticated, or
+ * the account has MFA enabled and we need to collect a second factor before
+ * issuing a session.
+ */
+export type LoginResult =
+  | { kind: "authenticated"; user: AuthUser }
+  | { kind: "mfa_required"; mfaToken: string };
 
 interface AuthContextValue {
   user: AuthUser | null;
   isAuthenticated: boolean;
   isEmailVerified: boolean;
   isLoading: boolean;
-  login: (email: string, password: string) => Promise<AuthUser>;
+  login: (email: string, password: string) => Promise<LoginResult>;
+  /**
+   * Complete an MFA challenge after `login()` returned `mfa_required`.
+   * Sets the session cookie and updates local user state on success.
+   */
+  completeMfaLogin: (mfaToken: string, code: string) => Promise<AuthUser>;
   register: (name: string, email: string, password: string) => Promise<void>;
   logout: () => Promise<void>;
   /** Refresh user data from the server (e.g. after email verification). */
@@ -44,31 +58,49 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     };
   }, []);
 
-  const login = useCallback(async (email: string, password: string): Promise<AuthUser> => {
-    const data = await api.post<AuthResponse>("/api/auth/login", {
+  const login = useCallback(async (email: string, password: string): Promise<LoginResult> => {
+    const data = await api.post<LoginResponse>("/api/auth/login", {
       email,
       password,
     });
+    if ("mfaRequired" in data) {
+      return { kind: "mfa_required", mfaToken: data.mfaToken };
+    }
     setUser(data.user);
-    return data.user;
+    return { kind: "authenticated", user: data.user };
   }, []);
 
-  const register = useCallback(async (name: string, email: string, password: string): Promise<void> => {
-    await api.post<RegisterResponse>("/api/auth/register", {
-      name,
-      email,
-      password,
-    });
-    // If registration created a new account, a session cookie was set.
-    // Check /me to pick up the session (if any). For duplicate emails
-    // the server returns the same 201 but sets no session.
-    try {
-      const data = await api.get<AuthResponse>("/api/auth/me");
+  const completeMfaLogin = useCallback(
+    async (mfaToken: string, code: string): Promise<AuthUser> => {
+      const data = await api.post<AuthResponse>("/api/auth/login/mfa", {
+        mfaToken,
+        code,
+      });
       setUser(data.user);
-    } catch {
-      // No session — duplicate email or other edge case. That's expected.
-    }
-  }, []);
+      return data.user;
+    },
+    []
+  );
+
+  const register = useCallback(
+    async (name: string, email: string, password: string): Promise<void> => {
+      await api.post<RegisterResponse>("/api/auth/register", {
+        name,
+        email,
+        password,
+      });
+      // If registration created a new account, a session cookie was set.
+      // Check /me to pick up the session (if any). For duplicate emails
+      // the server returns the same 201 but sets no session.
+      try {
+        const data = await api.get<AuthResponse>("/api/auth/me");
+        setUser(data.user);
+      } catch {
+        // No session — duplicate email or other edge case. That's expected.
+      }
+    },
+    []
+  );
 
   const logout = useCallback(async () => {
     try {
@@ -101,6 +133,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         isEmailVerified: !!user?.emailVerified,
         isLoading,
         login,
+        completeMfaLogin,
         register,
         logout,
         refreshUser,

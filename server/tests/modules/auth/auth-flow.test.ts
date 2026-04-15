@@ -71,6 +71,20 @@ vi.mock("@/services/email/factory.js", () => ({
   __resetEmailServiceForTests: vi.fn(),
 }));
 
+vi.mock("@/modules/auth/mfa-repository.js", () => ({
+  findUserMfa: vi.fn().mockResolvedValue(null),
+  upsertPendingSecret: vi.fn(),
+  enableMfa: vi.fn(),
+  disableMfa: vi.fn(),
+  consumeRecoveryCodeHash: vi.fn(),
+}));
+
+vi.mock("@/modules/auth/mfa-pending.js", () => ({
+  createMfaPendingToken: vi.fn(),
+  consumeMfaPendingToken: vi.fn(),
+  MFA_PENDING_TTL_SECONDS: 300,
+}));
+
 // Import mocked modules
 import { findUserByEmail, createUser } from "@/modules/auth/repository.js";
 import {
@@ -282,6 +296,7 @@ describe("Full Authentication Flow", () => {
         email: "player@example.com",
         name: "Test Player",
         emailVerified: false,
+        mfaEnabled: false,
       });
 
       // Verify password was verified against stored hash

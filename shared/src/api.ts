@@ -62,9 +62,53 @@ export interface RegisterResponse {
   message: string;
 }
 
-/** Response from login and /me endpoints */
+/** Standard session response — used by /me, /login when no MFA, and /login/mfa */
 export interface AuthResponse {
   user: AuthUser;
+}
+
+/** Returned by /login when the account has MFA enabled. No session cookie is set. */
+export interface LoginMfaChallengeResponse {
+  mfaRequired: true;
+  mfaToken: string;
+}
+
+/** Discriminated union of possible /login responses. */
+export type LoginResponse = AuthResponse | LoginMfaChallengeResponse;
+
+/** POST /api/auth/login/mfa - request body */
+export interface MfaLoginRequest {
+  mfaToken: string;
+  /** 6-digit TOTP code or a recovery code. */
+  code: string;
+}
+
+/** POST /api/auth/mfa/setup - response body */
+export interface MfaSetupResponse {
+  /** Base32 TOTP secret (for manual entry). */
+  secret: string;
+  /** otpauth:// URI for QR rendering. */
+  otpauthUri: string;
+}
+
+/** POST /api/auth/mfa/enable - request body */
+export interface MfaEnableRequest {
+  /** 6-digit TOTP code from the authenticator app. */
+  code: string;
+}
+
+/** POST /api/auth/mfa/enable - response body */
+export interface MfaEnableResponse {
+  message: string;
+  /** One-time recovery codes, displayed to the user once. */
+  recoveryCodes: string[];
+}
+
+/** POST /api/auth/mfa/disable - request body */
+export interface MfaDisableRequest {
+  password: string;
+  /** 6-digit TOTP code or a recovery code. */
+  code: string;
 }
 
 // ============================================================================

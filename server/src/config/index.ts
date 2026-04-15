@@ -46,6 +46,13 @@ export const config = {
     updateAgeHours: env.SESSION_UPDATE_AGE_HOURS,
     cookieName: "session_token",
   },
+  mfa: {
+    // 32 bytes hex. A dev-only default so tests and local dev don't need to set it.
+    encryptionKey:
+      env.MFA_ENCRYPTION_KEY ??
+      "0000000000000000000000000000000000000000000000000000000000000000",
+    issuer: "GM Assistant",
+  },
   googleOauth: {
     clientId: env.GOOGLE_OAUTH_CLIENT_ID,
     clientSecret: env.GOOGLE_OAUTH_CLIENT_SECRET,

@@ -66,6 +66,20 @@ vi.mock("@/services/email/factory.js", () => ({
   __resetEmailServiceForTests: vi.fn(),
 }));
 
+vi.mock("@/modules/auth/mfa-repository.js", () => ({
+  findUserMfa: vi.fn().mockResolvedValue(null),
+  upsertPendingSecret: vi.fn(),
+  enableMfa: vi.fn(),
+  disableMfa: vi.fn(),
+  consumeRecoveryCodeHash: vi.fn(),
+}));
+
+vi.mock("@/modules/auth/mfa-pending.js", () => ({
+  createMfaPendingToken: vi.fn(),
+  consumeMfaPendingToken: vi.fn(),
+  MFA_PENDING_TTL_SECONDS: 300,
+}));
+
 import { findUserById } from "@/modules/auth/repository.js";
 import { validateSessionToken } from "@/modules/auth/session.js";
 import type { User } from "@/db/schema/index.js";
@@ -124,6 +138,7 @@ describe("GET /api/auth/me", () => {
       email: "test@example.com",
       name: "Test User",
       emailVerified: false,
+      mfaEnabled: false,
     });
 
     expect(findUserById).toHaveBeenCalledWith("user-123");

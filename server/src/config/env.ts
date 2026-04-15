@@ -63,6 +63,9 @@ const envSchema = z
     SESSION_MAX_AGE_DAYS: z.coerce.number().int().positive().default(30),
     SESSION_UPDATE_AGE_HOURS: z.coerce.number().int().positive().default(1),
 
+    // MFA / 2FA (AES-256-GCM key for encrypting TOTP secrets at rest, 32 bytes hex)
+    MFA_ENCRYPTION_KEY: z.string().optional(),
+
     // Google OAuth (optional — Google sign-in disabled if not set)
     GOOGLE_OAUTH_CLIENT_ID: z.string().optional(),
     GOOGLE_OAUTH_CLIENT_SECRET: z.string().optional(),
@@ -131,6 +134,20 @@ const envSchema = z
           code: z.ZodIssueCode.custom,
           message: "SESSION_SECRET must be at least 32 characters in production",
           path: ["SESSION_SECRET"],
+        });
+      }
+
+      if (!data.MFA_ENCRYPTION_KEY) {
+        ctx.addIssue({
+          code: z.ZodIssueCode.custom,
+          message: "MFA_ENCRYPTION_KEY is required in production (64 hex chars / 32 bytes)",
+          path: ["MFA_ENCRYPTION_KEY"],
+        });
+      } else if (!/^[0-9a-fA-F]{64}$/.test(data.MFA_ENCRYPTION_KEY)) {
+        ctx.addIssue({
+          code: z.ZodIssueCode.custom,
+          message: "MFA_ENCRYPTION_KEY must be 64 hex characters (32 bytes)",
+          path: ["MFA_ENCRYPTION_KEY"],
         });
       }
 

@@ -1,6 +1,7 @@
 // SPDX-License-Identifier: AGPL-3.0-or-later
 
-import { LogOut, User } from "lucide-react";
+import { LogOut, Shield, User } from "lucide-react";
+import { useNavigate } from "react-router-dom";
 import { useAuth } from "@/hooks/use-auth";
 import {
   DropdownMenu,
@@ -13,6 +14,7 @@ import {
 
 export function UserMenu() {
   const { user, logout } = useAuth();
+  const navigate = useNavigate();
 
   return (
     <DropdownMenu>
@@ -29,6 +31,11 @@ export function UserMenu() {
             <p className="text-xs leading-none text-muted-foreground">{user?.email}</p>
           </div>
         </DropdownMenuLabel>
+        <DropdownMenuSeparator />
+        <DropdownMenuItem className="cursor-pointer" onSelect={() => navigate("/account/security")}>
+          <Shield className="h-4 w-4" />
+          <span>Account security</span>
+        </DropdownMenuItem>
         <DropdownMenuSeparator />
         <DropdownMenuItem
           className="cursor-pointer text-destructive focus:text-destructive"
