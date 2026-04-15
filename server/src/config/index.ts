@@ -36,10 +36,6 @@ export const config = {
   anthropic: {
     apiKey: env.ANTHROPIC_API_KEY,
   },
-  auth: {
-    jwtSecret: env.JWT_SECRET ?? "dev-secret-change-in-production",
-    jwtExpiresIn: env.JWT_EXPIRES_IN,
-  },
   session: {
     secret: env.SESSION_SECRET ?? "dev-session-secret-change-in-production",
     maxAgeDays: env.SESSION_MAX_AGE_DAYS,

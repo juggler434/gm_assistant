@@ -97,7 +97,6 @@ case "$provider_choice" in
 esac
 
 # Generate secrets
-JWT_SECRET=$(openssl rand -base64 48)
 SESSION_SECRET=$(openssl rand -base64 48)
 
 # Write .env
@@ -137,10 +136,6 @@ GOOGLE_AI_API_KEY=${GOOGLE_AI_API_KEY}
 
 # Anthropic API Key
 ANTHROPIC_API_KEY=${ANTHROPIC_API_KEY}
-
-# Authentication
-JWT_SECRET=${JWT_SECRET}
-JWT_EXPIRES_IN=7d
 
 # Session
 SESSION_SECRET=${SESSION_SECRET}
