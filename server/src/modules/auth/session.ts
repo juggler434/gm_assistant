@@ -11,6 +11,12 @@ const ALLOWED_CHARACTERS = "abcdefghijkmnpqrstuvwxyz23456789";
 const SESSION_ID_LENGTH = 24;
 const SECRET_LENGTH = 24;
 const SESSION_KEY_PREFIX = "session:";
+const USER_SESSIONS_KEY_PREFIX = "user:";
+const USER_SESSIONS_KEY_SUFFIX = ":sessions";
+
+function userSessionsKey(userId: string): string {
+  return `${USER_SESSIONS_KEY_PREFIX}${userId}${USER_SESSIONS_KEY_SUFFIX}`;
+}
 
 /** Session data stored in Redis */
 interface StoredSession {
@@ -104,12 +110,14 @@ export async function createSession(userId: string): Promise<Result<{ session: V
       createdAt: now.toISOString(),
     };
 
-    await redis.set(
-      `${SESSION_KEY_PREFIX}${sessionId}`,
-      JSON.stringify(sessionData),
-      "EX",
-      getSessionTtlSeconds()
-    );
+    const ttl = getSessionTtlSeconds();
+    const userKey = userSessionsKey(userId);
+    await redis
+      .pipeline()
+      .set(`${SESSION_KEY_PREFIX}${sessionId}`, JSON.stringify(sessionData), "EX", ttl)
+      .sadd(userKey, sessionId)
+      .expire(userKey, ttl)
+      .exec();
 
     return ok({
       session: {
@@ -157,7 +165,12 @@ export async function validateSessionToken(token: string): Promise<Result<Valida
     }
 
     // Refresh TTL (sliding expiration)
-    await redis.expire(key, getSessionTtlSeconds());
+    const ttl = getSessionTtlSeconds();
+    await redis
+      .pipeline()
+      .expire(key, ttl)
+      .expire(userSessionsKey(session.userId), ttl)
+      .exec();
 
     const now = new Date();
     return ok({
@@ -177,7 +190,16 @@ export async function validateSessionToken(token: string): Promise<Result<Valida
 export async function invalidateSession(sessionId: string): Promise<Result<void, SessionError>> {
   try {
     const redis = getSessionRedis();
-    await redis.del(`${SESSION_KEY_PREFIX}${sessionId}`);
+    const key = `${SESSION_KEY_PREFIX}${sessionId}`;
+    const data = await redis.get(key);
+
+    const pipeline = redis.pipeline().del(key);
+    if (data) {
+      const session: StoredSession = JSON.parse(data);
+      pipeline.srem(userSessionsKey(session.userId), sessionId);
+    }
+    await pipeline.exec();
+
     return ok(undefined);
   } catch (cause) {
     return err({ code: "DATABASE_ERROR", cause });
@@ -186,41 +208,20 @@ export async function invalidateSession(sessionId: string): Promise<Result<void,
 
 /**
  * Invalidate all sessions for a user.
- * Uses SCAN to find matching keys without blocking Redis.
+ * Uses the `user:{id}:sessions` index to avoid scanning every session key in Redis.
  */
 export async function invalidateAllUserSessions(userId: string): Promise<Result<void, SessionError>> {
   try {
     const redis = getSessionRedis();
-    let cursor = "0";
-    const keysToDelete: string[] = [];
+    const userKey = userSessionsKey(userId);
+    const sessionIds = await redis.smembers(userKey);
 
-    // Use SCAN to iterate through all session keys
-    do {
-      const [nextCursor, keys] = await redis.scan(
-        cursor,
-        "MATCH",
-        `${SESSION_KEY_PREFIX}*`,
-        "COUNT",
-        100
-      );
-      cursor = nextCursor;
-
-      // Check each key to see if it belongs to the user
-      for (const key of keys) {
-        const data = await redis.get(key);
-        if (data) {
-          const session: StoredSession = JSON.parse(data);
-          if (session.userId === userId) {
-            keysToDelete.push(key);
-          }
-        }
-      }
-    } while (cursor !== "0");
-
-    // Delete all matching keys
-    if (keysToDelete.length > 0) {
-      await redis.del(...keysToDelete);
+    const pipeline = redis.pipeline();
+    for (const sessionId of sessionIds) {
+      pipeline.del(`${SESSION_KEY_PREFIX}${sessionId}`);
     }
+    pipeline.del(userKey);
+    await pipeline.exec();
 
     return ok(undefined);
   } catch (cause) {
