@@ -28,6 +28,7 @@ export {
 // Routes
 export { authRoutes } from "./routes.js";
 export { googleOAuthRoutes } from "./google-routes.js";
+export { mfaRoutes } from "./mfa-routes.js";
 
 // Schemas
 export { registerBodySchema, type RegisterBody, forgotPasswordBodySchema, type ForgotPasswordBody, resetPasswordBodySchema, type ResetPasswordBody } from "./schemas.js";
@@ -70,3 +71,28 @@ export {
   MAX_FAILED_ATTEMPTS,
   LOCKOUT_DURATION_SECONDS,
 } from "./brute-force.js";
+
+// MFA / 2FA
+export {
+  encryptSecret,
+  decryptSecret,
+  generateTotpSecret,
+  buildOtpAuthUri,
+  verifyTotp,
+  generateRecoveryCodes,
+  hashRecoveryCode,
+  normalizeRecoveryCode,
+  MFA_CONSTANTS,
+} from "./mfa.js";
+export {
+  findUserMfa,
+  upsertPendingSecret,
+  enableMfa,
+  disableMfa,
+  consumeRecoveryCodeHash,
+} from "./mfa-repository.js";
+export {
+  createMfaPendingToken,
+  consumeMfaPendingToken,
+  MFA_PENDING_TTL_SECONDS,
+} from "./mfa-pending.js";

@@ -42,6 +42,19 @@ vi.mock("@/modules/auth/audit-log.js", () => ({
   purgeOldAuthEvents: vi.fn(),
 }));
 
+vi.mock("@/modules/auth/mfa-repository.js", () => ({
+  findUserMfa: vi.fn(),
+  createUserMfa: vi.fn(),
+  enableUserMfa: vi.fn(),
+  disableUserMfa: vi.fn(),
+  consumeRecoveryCode: vi.fn(),
+}));
+
+vi.mock("@/modules/auth/mfa-pending.js", () => ({
+  createMfaPendingToken: vi.fn(),
+  consumeMfaPendingToken: vi.fn(),
+}));
+
 vi.mock("@/services/metrics/service.js", () => ({
   trackEvent: vi.fn(),
   identifyUser: vi.fn(),
@@ -89,6 +102,8 @@ import {
   consumeState,
   exchangeCodeForUserInfo,
 } from "@/modules/auth/google-oauth.js";
+import { findUserMfa } from "@/modules/auth/mfa-repository.js";
+import { createMfaPendingToken } from "@/modules/auth/mfa-pending.js";
 import type { User, AuthIdentity } from "@/db/schema/index.js";
 
 const VALID_OAUTH_CONFIG = {
@@ -162,6 +177,7 @@ describe("Google OAuth callback", () => {
   beforeEach(() => {
     vi.clearAllMocks();
     vi.mocked(getGoogleOAuthConfig).mockReturnValue(VALID_OAUTH_CONFIG);
+    vi.mocked(findUserMfa).mockResolvedValue(null);
   });
 
   it("redirects to login with invalid_state when state is unknown", async () => {
@@ -349,6 +365,51 @@ describe("Google OAuth callback", () => {
     expect(createOAuthUser).not.toHaveBeenCalled();
     expect(createAuthIdentity).not.toHaveBeenCalled();
     expect(createSession).toHaveBeenCalledWith("user-existing");
+    await app.close();
+  });
+
+  it("redirects to MFA challenge when the linked account has MFA enabled", async () => {
+    vi.mocked(consumeState).mockResolvedValue({
+      ok: true,
+      value: { codeVerifier: "verifier" },
+    });
+    vi.mocked(exchangeCodeForUserInfo).mockResolvedValue({
+      ok: true,
+      value: GOOGLE_USER,
+    });
+    const existingIdentity: AuthIdentity = {
+      id: "identity-existing",
+      userId: "user-mfa",
+      provider: "google",
+      providerAccountId: GOOGLE_USER.sub,
+      createdAt: new Date(),
+    };
+    vi.mocked(findAuthIdentity).mockResolvedValue(existingIdentity);
+    vi.mocked(findUserMfa).mockResolvedValue({
+      id: "mfa-1",
+      userId: "user-mfa",
+      secretEncrypted: "enc",
+      enabledAt: new Date(),
+      recoveryCodesHash: [],
+      createdAt: new Date(),
+      updatedAt: new Date(),
+    });
+    vi.mocked(createMfaPendingToken).mockResolvedValue({
+      ok: true,
+      value: { token: "pending-token-123", expiresAt: new Date() },
+    });
+
+    const app = await buildTestApp();
+    const res = await app.inject({
+      method: "GET",
+      url: "/api/auth/google/callback?code=c&state=s",
+    });
+
+    expect(res.statusCode).toBe(302);
+    expect(res.headers.location).toContain("mfa_token=pending-token-123");
+    expect(createSession).not.toHaveBeenCalled();
+    const cookie = res.cookies.find((c) => c.name === "session_token");
+    expect(cookie).toBeUndefined();
     await app.close();
   });
 

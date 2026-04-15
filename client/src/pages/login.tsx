@@ -1,6 +1,6 @@
 // SPDX-License-Identifier: AGPL-3.0-or-later
 
-import { useState, type FormEvent } from "react";
+import { useEffect, useState, type FormEvent } from "react";
 import { Link, useNavigate, useSearchParams } from "react-router-dom";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
@@ -26,13 +26,13 @@ const OAUTH_ERROR_MESSAGES: Record<string, string> = {
 };
 
 export function LoginPage() {
-  const { login } = useAuth();
+  const { login, completeMfaLogin } = useAuth();
   const navigate = useNavigate();
   const [searchParams] = useSearchParams();
   const resetSuccess = searchParams.get("reset") === "success";
   const oauthErrorCode = searchParams.get("oauth_error");
   const oauthError = oauthErrorCode
-    ? OAUTH_ERROR_MESSAGES[oauthErrorCode] ?? OAUTH_ERROR_MESSAGES.unknown_error
+    ? (OAUTH_ERROR_MESSAGES[oauthErrorCode] ?? OAUTH_ERROR_MESSAGES.unknown_error)
     : null;
 
   const [email, setEmail] = useState("");
@@ -40,6 +40,20 @@ export function LoginPage() {
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [fieldErrors, setFieldErrors] = useState<Record<string, string>>({});
+  const [mfaToken, setMfaToken] = useState<string | null>(null);
+  const [mfaCode, setMfaCode] = useState("");
+  const [mfaReturnTo, setMfaReturnTo] = useState<string | null>(null);
+
+  // Pick up an mfa_token from the URL (e.g. after Google OAuth callback
+  // redirected here because MFA is enabled on the account).
+  useEffect(() => {
+    const urlMfaToken = searchParams.get("mfa_token");
+    if (urlMfaToken) {
+      setMfaToken(urlMfaToken);
+      const returnTo = searchParams.get("return_to");
+      if (returnTo) setMfaReturnTo(returnTo);
+    }
+  }, [searchParams]);
 
   function validate(): boolean {
     const errors: Record<string, string> = {};
@@ -66,11 +80,18 @@ export function LoginPage() {
 
     setIsSubmitting(true);
     try {
-      const authedUser = await login(email.trim(), password);
-      navigate(authedUser.emailVerified ? "/campaigns" : "/verify-email");
+      const result = await login(email.trim(), password);
+      if (result.kind === "mfa_required") {
+        setMfaToken(result.mfaToken);
+        setPassword("");
+        return;
+      }
+      navigate(result.user.emailVerified ? "/campaigns" : "/verify-email");
     } catch (err) {
       if (err instanceof ApiError && err.statusCode === 401) {
         setError("Invalid email or password.");
+      } else if (err instanceof ApiError && err.statusCode === 429) {
+        setError(err.message);
       } else if (err instanceof ApiError) {
         setError(err.message);
       } else {
@@ -79,6 +100,102 @@ export function LoginPage() {
     } finally {
       setIsSubmitting(false);
     }
+  }
+
+  async function handleMfaSubmit(e: FormEvent) {
+    e.preventDefault();
+    setError(null);
+
+    const trimmed = mfaCode.trim();
+    if (!trimmed) {
+      setError("Enter your 6-digit code or a recovery code.");
+      return;
+    }
+    if (!mfaToken) return;
+
+    setIsSubmitting(true);
+    try {
+      const user = await completeMfaLogin(mfaToken, trimmed);
+      const fallback = user.emailVerified ? "/campaigns" : "/verify-email";
+      navigate(mfaReturnTo ?? fallback);
+    } catch (err) {
+      if (err instanceof ApiError && err.statusCode === 401) {
+        // The pending token is consumed on any attempt by some code paths,
+        // so we leave it in place and let the user retry with a fresh code.
+        // If the server says expired, it will return 401 again and the user
+        // can re-enter their password.
+        setError(err.message || "Invalid or expired code.");
+      } else if (err instanceof ApiError) {
+        setError(err.message);
+      } else {
+        setError("Something went wrong. Please try again.");
+      }
+    } finally {
+      setIsSubmitting(false);
+    }
+  }
+
+  function cancelMfa() {
+    setMfaToken(null);
+    setMfaCode("");
+    setMfaReturnTo(null);
+    setError(null);
+  }
+
+  if (mfaToken) {
+    return (
+      <Card>
+        <CardHeader className="text-center">
+          <CardTitle className="text-2xl">Two-Factor Authentication</CardTitle>
+          <CardDescription>
+            Enter the 6-digit code from your authenticator app, or use a recovery code.
+          </CardDescription>
+        </CardHeader>
+        <CardContent>
+          <form onSubmit={handleMfaSubmit} className="space-y-4" noValidate>
+            {error && (
+              <div
+                role="alert"
+                className="rounded-md border border-destructive/50 bg-destructive/10 px-3 py-2 text-sm text-destructive"
+              >
+                {error}
+              </div>
+            )}
+
+            <div className="space-y-2">
+              <Label htmlFor="mfa-code">Verification code</Label>
+              <Input
+                id="mfa-code"
+                type="text"
+                inputMode="text"
+                autoComplete="one-time-code"
+                placeholder="123456"
+                value={mfaCode}
+                onChange={(e) => setMfaCode(e.target.value)}
+                autoFocus
+              />
+              <p className="text-xs text-muted-foreground">
+                Lost access to your app? Enter a recovery code instead.
+              </p>
+            </div>
+
+            <Button type="submit" className="w-full" disabled={isSubmitting}>
+              {isSubmitting ? <Spinner label="Verifying" /> : "Verify"}
+            </Button>
+
+            <Button
+              type="button"
+              variant="ghost"
+              className="w-full"
+              onClick={cancelMfa}
+              disabled={isSubmitting}
+            >
+              Back to sign in
+            </Button>
+          </form>
+        </CardContent>
+      </Card>
+    );
   }
 
   return (
@@ -161,9 +278,7 @@ export function LoginPage() {
 
           <div className="relative flex items-center py-1">
             <div className="flex-grow border-t border-border" />
-            <span className="mx-3 text-xs uppercase tracking-wider text-muted-foreground">
-              or
-            </span>
+            <span className="mx-3 text-xs uppercase tracking-wider text-muted-foreground">or</span>
             <div className="flex-grow border-t border-border" />
           </div>
 

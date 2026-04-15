@@ -20,6 +20,13 @@ export const authEventTypeEnum = pgEnum("auth_event_type", [
   "password_reset_request",
   "password_reset_complete",
   "sessions_invalidated",
+  "mfa_setup_started",
+  "mfa_enabled",
+  "mfa_disabled",
+  "mfa_challenge_issued",
+  "mfa_challenge_success",
+  "mfa_challenge_failure",
+  "mfa_recovery_used",
 ]);
 
 export const authEvents = pgTable(

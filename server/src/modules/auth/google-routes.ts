@@ -20,6 +20,8 @@ import {
   consumeState,
   exchangeCodeForUserInfo,
 } from "./google-oauth.js";
+import { findUserMfa } from "./mfa-repository.js";
+import { createMfaPendingToken } from "./mfa-pending.js";
 
 const callbackQuerySchema = z.object({
   code: z.string().min(1).optional(),
@@ -193,6 +195,32 @@ export async function googleOAuthRoutes(app: FastifyInstance): Promise<void> {
 
     if (!userId) {
       return redirectWithError(reply, "unknown_error");
+    }
+
+    // If MFA is enabled, short-circuit: redirect to the login page with a
+    // pending token so the user can complete the second factor.
+    const mfa = await findUserMfa(userId);
+    if (mfa?.enabledAt) {
+      const pendingResult = await createMfaPendingToken(userId);
+      if (!pendingResult.ok) {
+        request.log.error(
+          { error: pendingResult.error },
+          "Failed to create MFA-pending token after Google sign-in"
+        );
+        return redirectWithError(reply, "mfa_challenge_failed");
+      }
+      recordAuthEvent({
+        userId,
+        eventType: "mfa_challenge_issued",
+        request,
+        metadata: { provider: GOOGLE_PROVIDER },
+      });
+      const mfaUrl = new globalThis.URL("/login", config.appUrl);
+      mfaUrl.searchParams.set("mfa_token", pendingResult.value.token);
+      if (stateResult.value.returnTo) {
+        mfaUrl.searchParams.set("return_to", stateResult.value.returnTo);
+      }
+      return reply.redirect(mfaUrl.toString(), 302);
     }
 
     const sessionResult = await createSession(userId);

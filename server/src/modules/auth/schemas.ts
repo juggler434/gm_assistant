@@ -39,3 +39,32 @@ export const resetPasswordBodySchema = z.object({
 });
 
 export type ResetPasswordBody = z.infer<typeof resetPasswordBodySchema>;
+
+// MFA / 2FA — accept either a 6-digit TOTP or a formatted 10-hex recovery code.
+const totpOrRecoveryCode = z
+  .string()
+  .min(1)
+  .max(32)
+  .refine((v) => /^\d{6}$/.test(v.replace(/\s+/g, "")) || /^[0-9a-fA-F-]{10,13}$/.test(v), {
+    message: "Must be a 6-digit code or a recovery code",
+  });
+
+export const mfaEnableBodySchema = z.object({
+  code: z.string().regex(/^\d{6}$/, "TOTP code must be 6 digits"),
+});
+
+export type MfaEnableBody = z.infer<typeof mfaEnableBodySchema>;
+
+export const mfaLoginBodySchema = z.object({
+  mfaToken: z.string().min(1),
+  code: totpOrRecoveryCode,
+});
+
+export type MfaLoginBody = z.infer<typeof mfaLoginBodySchema>;
+
+export const mfaDisableBodySchema = z.object({
+  password: z.string().min(1),
+  code: totpOrRecoveryCode,
+});
+
+export type MfaDisableBody = z.infer<typeof mfaDisableBodySchema>;

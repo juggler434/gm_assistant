@@ -15,3 +15,4 @@ export * from "./sessions.js";
 export * from "./session-summaries.js";
 export * from "./auth-events.js";
 export * from "./auth-identities.js";
+export * from "./user-mfa.js";

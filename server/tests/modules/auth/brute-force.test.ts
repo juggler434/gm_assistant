@@ -72,6 +72,20 @@ vi.mock("@/modules/auth/brute-force.js", () => ({
   LOCKOUT_DURATION_SECONDS: 900,
 }));
 
+vi.mock("@/modules/auth/mfa-repository.js", () => ({
+  findUserMfa: vi.fn().mockResolvedValue(null),
+  upsertPendingSecret: vi.fn(),
+  enableMfa: vi.fn(),
+  disableMfa: vi.fn(),
+  consumeRecoveryCodeHash: vi.fn(),
+}));
+
+vi.mock("@/modules/auth/mfa-pending.js", () => ({
+  createMfaPendingToken: vi.fn(),
+  consumeMfaPendingToken: vi.fn(),
+  MFA_PENDING_TTL_SECONDS: 300,
+}));
+
 import { findUserByEmail } from "@/modules/auth/repository.js";
 import { createSession } from "@/modules/auth/session.js";
 import { checkBruteForce, recordFailedAttempt, resetFailedAttempts } from "@/modules/auth/brute-force.js";

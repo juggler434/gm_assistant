@@ -24,6 +24,7 @@ import { AdventuresPage } from "@/pages/campaign-adventures";
 import { SessionsPage } from "@/pages/campaign-sessions";
 import { SessionDetailPage } from "@/pages/campaign-session-detail";
 import { SettingsPage } from "@/pages/campaign-settings";
+import { AccountSecurityPage } from "@/pages/account-security";
 import { LandingPage } from "@/pages/landing";
 import { VerifyEmailPage } from "@/pages/verify-email";
 import { ForgotPasswordPage } from "@/pages/forgot-password";
@@ -63,6 +64,7 @@ function App() {
               <Route element={<ProtectedRoute />}>
                 <Route element={<AppLayout />}>
                   <Route path="/campaigns" element={<CampaignListPage />} />
+                  <Route path="/account/security" element={<AccountSecurityPage />} />
                   <Route path="/campaigns/:id" element={<CampaignLayout />}>
                     <Route index element={<Navigate to="documents" replace />} />
                     <Route path="documents" element={<DocumentsPage />} />

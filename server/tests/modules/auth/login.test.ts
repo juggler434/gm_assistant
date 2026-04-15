@@ -29,6 +29,20 @@ vi.mock("@/modules/auth/brute-force.js", () => ({
   resetFailedAttempts: vi.fn().mockResolvedValue(undefined),
 }));
 
+vi.mock("@/modules/auth/mfa-repository.js", () => ({
+  findUserMfa: vi.fn().mockResolvedValue(null),
+  upsertPendingSecret: vi.fn(),
+  enableMfa: vi.fn(),
+  disableMfa: vi.fn(),
+  consumeRecoveryCodeHash: vi.fn(),
+}));
+
+vi.mock("@/modules/auth/mfa-pending.js", () => ({
+  createMfaPendingToken: vi.fn(),
+  consumeMfaPendingToken: vi.fn(),
+  MFA_PENDING_TTL_SECONDS: 300,
+}));
+
 vi.mock("@/services/metrics/service.js", () => ({
   trackEvent: vi.fn(),
   identifyUser: vi.fn(),
@@ -209,6 +223,7 @@ describe("Login Route Handler", () => {
       email: "test@example.com",
       name: "Test User",
       emailVerified: false,
+      mfaEnabled: false,
     });
 
     // Verify session cookie is set

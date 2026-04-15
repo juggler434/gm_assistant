@@ -55,7 +55,9 @@ export const api = {
   post<T>(url: string, body?: unknown): Promise<T> {
     return request<T>(url, {
       method: "POST",
-      headers: jsonHeaders(),
+      // Only set application/json when we actually have a body. Fastify
+      // rejects requests that declare a JSON content-type but send no body.
+      headers: body !== undefined ? jsonHeaders() : undefined,
       body: body !== undefined ? JSON.stringify(body) : undefined,
     });
   },

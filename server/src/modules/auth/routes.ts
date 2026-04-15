@@ -13,6 +13,8 @@ import { checkBruteForce, recordFailedAttempt, resetFailedAttempts } from "./bru
 import { getEmailService } from "@/services/email/index.js";
 import { config } from "@/config/index.js";
 import { recordAuthEvent } from "./audit-log.js";
+import { findUserMfa } from "./mfa-repository.js";
+import { createMfaPendingToken } from "./mfa-pending.js";
 
 export async function authRoutes(app: FastifyInstance): Promise<void> {
   app.post("/register", { config: { rateLimit: { max: 3, timeWindow: "15 minutes" } } }, async (request, reply) => {
@@ -137,7 +139,26 @@ export async function authRoutes(app: FastifyInstance): Promise<void> {
     // 5. Successful login — reset brute-force counter
     await resetFailedAttempts(email);
 
-    // 6. Create new session
+    // 6. If MFA is enabled, short-circuit: issue a pending token instead of a session.
+    const mfa = await findUserMfa(user.id);
+    if (mfa?.enabledAt) {
+      const pendingResult = await createMfaPendingToken(user.id);
+      if (!pendingResult.ok) {
+        request.log.error({ error: pendingResult.error }, "Failed to create MFA-pending token");
+        return reply.status(500).send({
+          statusCode: 500,
+          error: "Internal Server Error",
+          message: "Failed to start MFA challenge",
+        });
+      }
+      recordAuthEvent({ userId: user.id, eventType: "mfa_challenge_issued", request });
+      return reply.status(200).send({
+        mfaRequired: true,
+        mfaToken: pendingResult.value.token,
+      });
+    }
+
+    // 7. Create new session
     const sessionResult = await createSession(user.id);
     if (!sessionResult.ok) {
       request.log.error({ error: sessionResult.error }, "Failed to create session during login");
@@ -148,7 +169,7 @@ export async function authRoutes(app: FastifyInstance): Promise<void> {
       });
     }
 
-    // 7. Set cookie and return user
+    // 8. Set cookie and return user
     setSessionCookie(reply, sessionResult.value.token);
 
     trackEvent(user.id, "user_logged_in");
@@ -160,6 +181,7 @@ export async function authRoutes(app: FastifyInstance): Promise<void> {
         email: user.email,
         name: user.name,
         emailVerified: user.emailVerifiedAt !== null,
+        mfaEnabled: mfa?.enabledAt != null,
       },
     });
   });
@@ -174,12 +196,15 @@ export async function authRoutes(app: FastifyInstance): Promise<void> {
       });
     }
 
+    const mfa = await findUserMfa(user.id);
+
     return reply.status(200).send({
       user: {
         id: user.id,
         email: user.email,
         name: user.name,
         emailVerified: user.emailVerifiedAt !== null,
+        mfaEnabled: mfa?.enabledAt != null,
       },
     });
   });
@@ -236,6 +261,8 @@ export async function authRoutes(app: FastifyInstance): Promise<void> {
 
     trackEvent(userId, "email_verified");
 
+    const mfa = await findUserMfa(user.id);
+
     return reply.status(200).send({
       message: "Email verified successfully",
       user: {
@@ -243,6 +270,7 @@ export async function authRoutes(app: FastifyInstance): Promise<void> {
         email: user.email,
         name: user.name,
         emailVerified: true,
+        mfaEnabled: mfa?.enabledAt != null,
       },
     });
   });
