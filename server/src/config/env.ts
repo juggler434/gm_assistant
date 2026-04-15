@@ -54,10 +54,6 @@ const envSchema = z
     // Anthropic (Claude)
     ANTHROPIC_API_KEY: z.string().optional(),
 
-    // Auth
-    JWT_SECRET: z.string().optional(),
-    JWT_EXPIRES_IN: z.string().default("7d"),
-
     // Session
     SESSION_SECRET: z.string().optional(),
     SESSION_MAX_AGE_DAYS: z.coerce.number().int().positive().default(30),
@@ -109,20 +105,6 @@ const envSchema = z
   .superRefine((data, ctx) => {
     // In production, require critical environment variables
     if (data.NODE_ENV === "production") {
-      if (!data.JWT_SECRET) {
-        ctx.addIssue({
-          code: z.ZodIssueCode.custom,
-          message: "JWT_SECRET is required in production",
-          path: ["JWT_SECRET"],
-        });
-      } else if (data.JWT_SECRET.length < 32) {
-        ctx.addIssue({
-          code: z.ZodIssueCode.custom,
-          message: "JWT_SECRET must be at least 32 characters in production",
-          path: ["JWT_SECRET"],
-        });
-      }
-
       if (!data.SESSION_SECRET) {
         ctx.addIssue({
           code: z.ZodIssueCode.custom,
