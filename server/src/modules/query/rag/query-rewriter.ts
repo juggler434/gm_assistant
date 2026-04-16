@@ -14,6 +14,7 @@
 
 import { type Result, ok } from "@/types/index.js";
 import type { LLMService } from "@/services/llm/service.js";
+import { stripSourceSentinels } from "./sanitize.js";
 import type { ConversationMessage, RAGError } from "./types.js";
 
 // ============================================================================
@@ -72,7 +73,7 @@ export async function rewriteQuery(
     { role: "system" as const, content: REWRITE_SYSTEM_PROMPT },
     ...recentHistory.map((msg) => ({
       role: msg.role as "user" | "assistant",
-      content: msg.content,
+      content: stripSourceSentinels(msg.content),
     })),
     {
       role: "user" as const,
