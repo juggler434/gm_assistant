@@ -9,6 +9,7 @@
  */
 
 import type { HybridSearchResult } from "@/modules/knowledge/retrieval/hybrid-search.js";
+import { stripSourceSentinels } from "./sanitize.js";
 import type {
   SourceCitation,
   BuiltContext,
@@ -47,43 +48,42 @@ export function estimateTokens(text: string): number {
 }
 
 /**
- * Formats a single chunk with its citation marker for inclusion in the context.
+ * Formats a single chunk wrapped in a <source> tag. Everything inside the tag
+ * is untrusted attacker-controlled data; the system prompt instructs the LLM
+ * to treat tag contents as data, not instructions.
  */
 function formatChunkEntry(citationIndex: number, result: HybridSearchResult): string {
-  const parts: string[] = [];
-
-  // Header with citation marker and source info
-  const sourceInfo: string[] = [`[${citationIndex}]`];
+  const headerParts: string[] = [];
 
   if (result.document.documentType === "transcript") {
-    // Transcript sources: show session title, timestamp range, and date
     const metadata = result.document.metadata as Record<string, unknown>;
     const sessionTitle = (metadata?.sessionTitle as string) ?? result.document.name;
-    sourceInfo.push(sessionTitle);
+    headerParts.push(stripSourceSentinels(sessionTitle));
     if (result.chunk.section) {
-      sourceInfo.push(`(${result.chunk.section})`);
+      headerParts.push(`(${stripSourceSentinels(result.chunk.section)})`);
     }
     if (metadata?.sessionDate) {
       const date = new Date(metadata.sessionDate as string);
-      sourceInfo.push(
-        `[${date.toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" })}]`,
-      );
+      if (!isNaN(date.getTime())) {
+        headerParts.push(
+          `[${date.toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" })}]`,
+        );
+      }
     }
   } else {
-    // Document sources: show document name, section, page
-    sourceInfo.push(result.document.name);
+    headerParts.push(stripSourceSentinels(result.document.name));
     if (result.chunk.section) {
-      sourceInfo.push(`- ${result.chunk.section}`);
+      headerParts.push(`- ${stripSourceSentinels(result.chunk.section)}`);
     }
     if (result.chunk.pageNumber !== null) {
-      sourceInfo.push(`(p. ${result.chunk.pageNumber})`);
+      headerParts.push(`(p. ${result.chunk.pageNumber})`);
     }
   }
 
-  parts.push(sourceInfo.join(" "));
-  parts.push(result.chunk.content);
+  const header = headerParts.join(" ");
+  const body = stripSourceSentinels(result.chunk.content);
 
-  return parts.join("\n");
+  return `<source id="${citationIndex}">\n[${citationIndex}] ${header}\n${body}\n</source>`;
 }
 
 // ============================================================================
@@ -164,7 +164,7 @@ export function buildContext(
     sources.push(citation);
   }
 
-  const contextText = contextParts.join("\n\n---\n\n");
+  const contextText = contextParts.join("\n\n");
 
   return {
     contextText,
