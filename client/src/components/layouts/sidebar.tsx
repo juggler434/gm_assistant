@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: AGPL-3.0-or-later
 
 import { NavLink, useParams } from "react-router-dom";
-import { LayoutDashboard, FileText, MessageSquare, Sparkles, Bookmark, ScrollText, BookOpen, Users, MapPin, Clock, Settings } from "lucide-react";
+import { LayoutDashboard, FileText, MessageSquare, Sparkles, Bookmark, ScrollText, BookOpen, Users, MapPin, Clock, Settings, CreditCard } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { CampaignSwitcher } from "@/components/layouts/campaign-switcher";
 
@@ -56,6 +56,22 @@ export function Sidebar({ onNavigate }: SidebarProps) {
         >
           <LayoutDashboard className="h-4 w-4" />
           Campaigns
+        </NavLink>
+
+        <NavLink
+          to="/billing"
+          onClick={onNavigate}
+          className={({ isActive }) =>
+            cn(
+              "flex items-center gap-3 rounded-md px-3 py-2 text-sm font-medium transition-colors",
+              isActive
+                ? "bg-sidebar-accent text-sidebar-accent-foreground"
+                : "text-sidebar-muted-foreground hover:bg-sidebar-accent/50 hover:text-sidebar-foreground"
+            )
+          }
+        >
+          <CreditCard className="h-4 w-4" />
+          Billing
         </NavLink>
 
         {/* Campaign-specific navigation */}

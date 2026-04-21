@@ -16,6 +16,7 @@ import {
   deleteCampaign,
   getCampaignStats,
 } from "./repository.js";
+import { checkCampaignLimit, isStripeConfigured } from "@/modules/billing/index.js";
 import { findDocumentsByCampaignId } from "@/modules/documents/repository.js";
 import { findNpcsByCampaignId } from "@/modules/npcs/repository.js";
 import { findLocationsByCampaignId } from "@/modules/locations/repository.js";
@@ -41,6 +42,20 @@ export async function campaignRoutes(app: FastifyInstance): Promise<void> {
 
     const { name, description } = parseResult.data;
     const userId = request.userId!;
+
+    if (isStripeConfigured()) {
+      const limit = await checkCampaignLimit(userId);
+      if (!limit.allowed) {
+        return reply.status(402).send({
+          statusCode: 402,
+          error: "Payment Required",
+          message: `Campaign limit reached (${limit.current}/${limit.limit}). Please upgrade your plan.`,
+          feature: "campaigns",
+          current: limit.current,
+          limit: limit.limit,
+        });
+      }
+    }
 
     const campaign = await createCampaign({
       userId,

@@ -27,6 +27,7 @@ import { conversationRoutes } from "@/modules/conversations/index.js";
 import { sessionRoutes } from "@/modules/sessions/index.js";
 import { transcriptionRoutes } from "@/modules/transcription/index.js";
 import { metricsRoutes } from "@/modules/metrics/routes.js";
+import { billingRoutes, billingWebhookRoutes } from "@/modules/billing/index.js";
 
 export interface AppOptions {
   logger?: boolean;
@@ -66,6 +67,9 @@ export async function buildApp(options: AppOptions = {}): Promise<FastifyInstanc
     if (!request.url.startsWith("/api/")) {
       return;
     }
+    if (request.url === "/api/billing/webhook") {
+      return;
+    }
     await csrfProtection(request, reply);
   });
 
@@ -101,6 +105,8 @@ export async function buildApp(options: AppOptions = {}): Promise<FastifyInstanc
   await app.register(sessionRoutes, { prefix: "/api/campaigns" });
   await app.register(transcriptionRoutes, { prefix: "/api/campaigns" });
   await app.register(metricsRoutes, { prefix: "/api/admin/metrics" });
+  await app.register(billingRoutes, { prefix: "/api/billing" });
+  await app.register(billingWebhookRoutes, { prefix: "/api/billing" });
 
   // Health check endpoint
   app.get("/health", async () => {

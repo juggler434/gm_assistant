@@ -10,4 +10,4 @@
  */
 
 export type * from "@gm-assistant/shared";
-export { SUPPORTED_MIME_TYPES, SUPPORTED_AUDIO_MIME_TYPES } from "@gm-assistant/shared";
+export { SUPPORTED_MIME_TYPES, SUPPORTED_AUDIO_MIME_TYPES, PLAN_TIERS } from "@gm-assistant/shared";

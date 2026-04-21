@@ -3,6 +3,7 @@
 import type { FastifyInstance } from "fastify";
 import { requireAuth, requireVerifiedEmail } from "@/modules/auth/index.js";
 import { findCampaignByIdAndUserId } from "@/modules/campaigns/index.js";
+import { checkUsageLimit, recordUsage, isStripeConfigured } from "@/modules/billing/index.js";
 import { createLLMService } from "@/services/llm/factory.js";
 import { trackEvent } from "@/services/metrics/index.js";
 import { generateAdventureHooks } from "./generators/adventure-hook.js";
@@ -38,6 +39,20 @@ export async function generationRoutes(app: FastifyInstance): Promise<void> {
   // All generation routes require authentication and verified email
   app.addHook("preHandler", requireAuth);
   app.addHook("preHandler", requireVerifiedEmail);
+  app.addHook("preHandler", async (request, reply) => {
+    if (!isStripeConfigured() || !request.userId) return;
+    const limit = await checkUsageLimit(request.userId, "contentGenerations");
+    if (!limit.allowed) {
+      reply.status(402).send({
+        statusCode: 402,
+        error: "Payment Required",
+        message: `Content generation limit reached (${limit.current}/${limit.limit}). Please upgrade your plan.`,
+        feature: "contentGenerations",
+        current: limit.current,
+        limit: limit.limit,
+      });
+    }
+  });
 
   // POST /api/campaigns/:campaignId/generate/hooks - Generate adventure hooks
   app.post("/:campaignId/generate/hooks", async (request, reply) => {
@@ -108,6 +123,7 @@ export async function generationRoutes(app: FastifyInstance): Promise<void> {
       });
     }
 
+    if (isStripeConfigured()) await recordUsage(userId, "contentGenerations");
     trackEvent(userId, "hooks_generated", {
       campaign_id: campaignId,
       tone,
@@ -217,6 +233,7 @@ export async function generationRoutes(app: FastifyInstance): Promise<void> {
       });
     }
 
+    if (isStripeConfigured()) await recordUsage(userId, "contentGenerations");
     trackEvent(userId, "npcs_generated", {
       campaign_id: campaignId,
       tone,
@@ -322,6 +339,7 @@ export async function generationRoutes(app: FastifyInstance): Promise<void> {
       });
     }
 
+    if (isStripeConfigured()) await recordUsage(userId, "contentGenerations");
     trackEvent(userId, "locations_generated", {
       campaign_id: campaignId,
       tone,
@@ -425,6 +443,7 @@ export async function generationRoutes(app: FastifyInstance): Promise<void> {
       });
     }
 
+    if (isStripeConfigured()) await recordUsage(userId, "contentGenerations");
     trackEvent(userId, "outlines_generated", {
       campaign_id: campaignId,
       tone,
@@ -539,6 +558,7 @@ export async function generationRoutes(app: FastifyInstance): Promise<void> {
         return reply;
       }
 
+      if (isStripeConfigured()) await recordUsage(userId, "contentGenerations");
       trackEvent(userId, "adventure_generated", {
         campaign_id: campaignId,
         tone,
@@ -576,6 +596,7 @@ export async function generationRoutes(app: FastifyInstance): Promise<void> {
       });
     }
 
+    if (isStripeConfigured()) await recordUsage(userId, "contentGenerations");
     trackEvent(userId, "adventure_generated", {
       campaign_id: campaignId,
       tone,
