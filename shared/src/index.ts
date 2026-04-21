@@ -171,5 +171,21 @@ export type {
   SupportedMimeType,
 } from "./api.js";
 
+// Billing types
+export type {
+  PlanId,
+  PlanLimits,
+  PlanTier,
+  SubscriptionStatus,
+  SubscriptionInfo,
+  UsageFeature,
+  UsageInfo,
+  BillingStatusResponse,
+  CheckoutRequest,
+  CheckoutResponse,
+  PortalResponse,
+} from "./billing.js";
+
 // Runtime values
 export { SUPPORTED_MIME_TYPES, SUPPORTED_AUDIO_MIME_TYPES } from "./api.js";
+export { PLAN_TIERS } from "./billing.js";

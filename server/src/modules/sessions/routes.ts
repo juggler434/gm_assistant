@@ -7,6 +7,7 @@ import { findCampaignByIdAndUserId } from "@/modules/campaigns/index.js";
 import { createStorageService } from "@/services/storage/index.js";
 import { createQueue } from "@/jobs/index.js";
 import { trackEvent } from "@/services/metrics/index.js";
+import { checkUsageLimit, recordUsage, isStripeConfigured } from "@/modules/billing/index.js";
 import {
   campaignIdParamSchema,
   sessionParamsSchema,
@@ -727,6 +728,20 @@ export async function sessionRoutes(app: FastifyInstance): Promise<void> {
       });
     }
 
+    if (isStripeConfigured()) {
+      const limit = await checkUsageLimit(userId, "sessionSummaries");
+      if (!limit.allowed) {
+        return reply.status(402).send({
+          statusCode: 402,
+          error: "Payment Required",
+          message: `Session summary limit reached (${limit.current}/${limit.limit}). Please upgrade your plan.`,
+          feature: "sessionSummaries",
+          current: limit.current,
+          limit: limit.limit,
+        });
+      }
+    }
+
     // Check if a summary already exists
     const existing = await findSummaryBySessionId(id);
     if (existing && existing.status === "generating") {
@@ -776,6 +791,10 @@ export async function sessionRoutes(app: FastifyInstance): Promise<void> {
         { error: queueResult.error, sessionId: id },
         "Failed to queue summary generation"
       );
+    }
+
+    if (isStripeConfigured()) {
+      await recordUsage(userId, "sessionSummaries");
     }
 
     trackEvent(userId, "session_summary_requested", {

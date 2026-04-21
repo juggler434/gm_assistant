@@ -80,6 +80,13 @@ const envSchema = z
     DIARIZATION_BASE_URL: z.string().url().optional(),
     DIARIZATION_TIMEOUT: z.coerce.number().int().positive().default(120000),
 
+    // Stripe Billing
+    STRIPE_SECRET_KEY: z.string().optional(),
+    STRIPE_WEBHOOK_SECRET: z.string().optional(),
+    STRIPE_PRICE_ID_ACOLYTE: z.string().optional(),
+    STRIPE_PRICE_ID_WIZARD: z.string().optional(),
+    STRIPE_PRICE_ID_ARCHMAGE: z.string().optional(),
+
     // PostHog Analytics
     POSTHOG_API_KEY: z.string().optional(),
     POSTHOG_HOST: z.string().url().optional(),

@@ -4,6 +4,7 @@ import type { FastifyInstance } from "fastify";
 import { randomUUID } from "node:crypto";
 import { requireAuth, requireVerifiedEmail } from "@/modules/auth/index.js";
 import { findCampaignByIdAndUserId } from "@/modules/campaigns/index.js";
+import { checkStorageLimit, isStripeConfigured } from "@/modules/billing/index.js";
 import { createStorageService } from "@/services/storage/index.js";
 import { createQueue } from "@/jobs/index.js";
 import { trackEvent } from "@/services/metrics/index.js";
@@ -107,6 +108,20 @@ export async function documentRoutes(app: FastifyInstance): Promise<void> {
     }
     const fileBuffer = Buffer.concat(chunks);
     const fileSize = fileBuffer.length;
+
+    if (isStripeConfigured()) {
+      const limit = await checkStorageLimit(userId, fileSize);
+      if (!limit.allowed) {
+        return reply.status(402).send({
+          statusCode: 402,
+          error: "Payment Required",
+          message: `Storage limit reached. Please upgrade your plan.`,
+          feature: "storageBytes",
+          current: limit.current,
+          limit: limit.limit,
+        });
+      }
+    }
 
     // Parse optional metadata from form fields (available now that file stream is consumed)
     const fields: Record<string, string> = {};

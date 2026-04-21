@@ -67,6 +67,15 @@ export const config = {
     baseUrl: env.DIARIZATION_BASE_URL,
     timeout: env.DIARIZATION_TIMEOUT,
   },
+  stripe: {
+    secretKey: env.STRIPE_SECRET_KEY,
+    webhookSecret: env.STRIPE_WEBHOOK_SECRET,
+    prices: {
+      acolyte: env.STRIPE_PRICE_ID_ACOLYTE,
+      wizard: env.STRIPE_PRICE_ID_WIZARD,
+      archmage: env.STRIPE_PRICE_ID_ARCHMAGE,
+    },
+  },
   posthog: {
     apiKey: env.POSTHOG_API_KEY,
     host: env.POSTHOG_HOST,

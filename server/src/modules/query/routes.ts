@@ -3,6 +3,7 @@
 import type { FastifyInstance } from "fastify";
 import { requireAuth } from "@/modules/auth/index.js";
 import { findCampaignByIdAndUserId } from "@/modules/campaigns/index.js";
+import { checkUsageLimit, recordUsage, isStripeConfigured } from "@/modules/billing/index.js";
 import { createLLMService } from "@/services/llm/index.js";
 import { trackEvent } from "@/services/metrics/index.js";
 import { executeRAGPipeline } from "./rag/index.js";
@@ -41,6 +42,20 @@ export async function queryRoutes(app: FastifyInstance): Promise<void> {
         error: "Not Found",
         message: "Campaign not found",
       });
+    }
+
+    if (isStripeConfigured()) {
+      const limit = await checkUsageLimit(userId, "ragQueries");
+      if (!limit.allowed) {
+        return reply.status(402).send({
+          statusCode: 402,
+          error: "Payment Required",
+          message: `RAG query limit reached (${limit.current}/${limit.limit}). Please upgrade your plan.`,
+          feature: "ragQueries",
+          current: limit.current,
+          limit: limit.limit,
+        });
+      }
     }
 
     // Validate request body
@@ -120,6 +135,10 @@ export async function queryRoutes(app: FastifyInstance): Promise<void> {
           ? "medium"
           : "low";
 
+    if (isStripeConfigured()) {
+      await recordUsage(userId, "ragQueries");
+    }
+
     trackEvent(userId, "campaign_queried", {
       campaign_id: campaignId,
       confidence: confidenceLabel,
@@ -160,6 +179,20 @@ export async function queryRoutes(app: FastifyInstance): Promise<void> {
         error: "Not Found",
         message: "Campaign not found",
       });
+    }
+
+    if (isStripeConfigured()) {
+      const limit = await checkUsageLimit(userId, "ragQueries");
+      if (!limit.allowed) {
+        return reply.status(402).send({
+          statusCode: 402,
+          error: "Payment Required",
+          message: `RAG query limit reached (${limit.current}/${limit.limit}). Please upgrade your plan.`,
+          feature: "ragQueries",
+          current: limit.current,
+          limit: limit.limit,
+        });
+      }
     }
 
     // Validate request body
@@ -232,6 +265,10 @@ export async function queryRoutes(app: FastifyInstance): Promise<void> {
         : result.value.confidence >= 0.4
           ? "medium"
           : "low";
+
+    if (isStripeConfigured()) {
+      await recordUsage(userId, "ragQueries");
+    }
 
     trackEvent(userId, "session_history_queried", {
       campaign_id: campaignId,

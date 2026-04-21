@@ -25,6 +25,8 @@ import { SessionsPage } from "@/pages/campaign-sessions";
 import { SessionDetailPage } from "@/pages/campaign-session-detail";
 import { SettingsPage } from "@/pages/campaign-settings";
 import { AccountSecurityPage } from "@/pages/account-security";
+import { BillingPage } from "@/pages/billing";
+import { ChoosePlanPage } from "@/pages/choose-plan";
 import { LandingPage } from "@/pages/landing";
 import { VerifyEmailPage } from "@/pages/verify-email";
 import { ForgotPasswordPage } from "@/pages/forgot-password";
@@ -60,10 +62,14 @@ function App() {
               {/* Email verification (authenticated but not necessarily verified) */}
               <Route path="/verify-email" element={<VerifyEmailPage />} />
 
+              {/* Plan selection (authenticated + verified, but no subscription yet) */}
+              <Route path="/choose-plan" element={<ChoosePlanPage />} />
+
               {/* Protected routes */}
               <Route element={<ProtectedRoute />}>
                 <Route element={<AppLayout />}>
                   <Route path="/campaigns" element={<CampaignListPage />} />
+                  <Route path="/billing" element={<BillingPage />} />
                   <Route path="/account/security" element={<AccountSecurityPage />} />
                   <Route path="/campaigns/:id" element={<CampaignLayout />}>
                     <Route index element={<Navigate to="documents" replace />} />
