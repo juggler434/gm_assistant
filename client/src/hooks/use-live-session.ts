@@ -80,6 +80,14 @@ export function useLiveSession({
 
   const socketRef = useRef<WebSocket | null>(null);
   const titleRef = useRef<string>("");
+  const pingTimerRef = useRef<ReturnType<typeof setInterval> | null>(null);
+
+  const clearPingTimer = useCallback(() => {
+    if (pingTimerRef.current) {
+      clearInterval(pingTimerRef.current);
+      pingTimerRef.current = null;
+    }
+  }, []);
 
   const sendMessage = useCallback((msg: Record<string, unknown>) => {
     const ws = socketRef.current;
@@ -153,12 +161,13 @@ export function useLiveSession({
   // Cleanup WebSocket on unmount
   useEffect(() => {
     return () => {
+      clearPingTimer();
       if (socketRef.current) {
         socketRef.current.close();
         socketRef.current = null;
       }
     };
-  }, []);
+  }, [clearPingTimer]);
 
   const startRecording = useCallback(
     (title?: string) => {
@@ -181,6 +190,13 @@ export function useLiveSession({
         });
 
         setState("recording");
+
+        // Keepalive: ping every 30s so the server's inactivity timer doesn't
+        // fire when the tab is backgrounded and MediaRecorder chunks throttle.
+        clearPingTimer();
+        pingTimerRef.current = setInterval(() => {
+          sendMessage({ event: "ping" });
+        }, 30_000);
       };
 
       ws.onmessage = (event) => {
@@ -193,12 +209,14 @@ export function useLiveSession({
       };
 
       ws.onerror = () => {
+        clearPingTimer();
         setError("WebSocket connection failed");
         setState("error");
         recorder.stop();
       };
 
       ws.onclose = (event) => {
+        clearPingTimer();
         // Only set error if we weren't expecting the close
         if (state !== "stopping" && state !== "stopped" && state !== "idle") {
           if (event.code !== 1000) {
@@ -209,7 +227,7 @@ export function useLiveSession({
         }
       };
     },
-    [campaignId, recorder, sendMessage, handleServerMessage, state]
+    [campaignId, recorder, sendMessage, handleServerMessage, state, clearPingTimer]
   );
 
   const stopRecording = useCallback(async () => {
@@ -252,6 +270,7 @@ export function useLiveSession({
   );
 
   const reset = useCallback(() => {
+    clearPingTimer();
     if (socketRef.current) {
       socketRef.current.close();
       socketRef.current = null;
@@ -263,7 +282,7 @@ export function useLiveSession({
     setTranscript("");
     setSegments([]);
     setMarkers([]);
-  }, [recorder]);
+  }, [recorder, clearPingTimer]);
 
   return {
     state,

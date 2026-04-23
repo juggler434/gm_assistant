@@ -601,6 +601,9 @@ export async function transcriptionRoutes(
             case "stop":
               await handleStop(state, socket, request.log);
               break;
+            case "ping":
+              if (state.isRecording) resetInactivityTimers(state, socket);
+              break;
           }
         } catch (error) {
           request.log.error(

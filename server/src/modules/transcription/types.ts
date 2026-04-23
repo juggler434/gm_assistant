@@ -32,12 +32,17 @@ export interface StopMessage {
   event: "stop";
 }
 
+export interface PingMessage {
+  event: "ping";
+}
+
 export type ClientMessage =
   | StartMessage
   | AudioMessage
   | MarkerMessage
   | FinalAudioMessage
-  | StopMessage;
+  | StopMessage
+  | PingMessage;
 
 /** Server → Client message types */
 
