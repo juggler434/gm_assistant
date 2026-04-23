@@ -29,12 +29,17 @@ const stopMessageSchema = z.object({
   event: z.literal("stop"),
 });
 
+const pingMessageSchema = z.object({
+  event: z.literal("ping"),
+});
+
 export const clientMessageSchema = z.discriminatedUnion("event", [
   startMessageSchema,
   audioMessageSchema,
   markerMessageSchema,
   finalAudioMessageSchema,
   stopMessageSchema,
+  pingMessageSchema,
 ]);
 
 export const campaignIdParamSchema = z.object({
