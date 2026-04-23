@@ -139,6 +139,26 @@ describe("Register Schema Validation", () => {
       expect(result.success).toBe(true);
     });
 
+    it("should reject password longer than 256 characters", () => {
+      const result = registerBodySchema.safeParse({
+        email: "test@example.com",
+        password: "a".repeat(257),
+        name: "Test User",
+      });
+
+      expect(result.success).toBe(false);
+    });
+
+    it("should accept password with exactly 256 characters", () => {
+      const result = registerBodySchema.safeParse({
+        email: "test@example.com",
+        password: "a".repeat(256),
+        name: "Test User",
+      });
+
+      expect(result.success).toBe(true);
+    });
+
     it("should reject empty name", () => {
       const result = registerBodySchema.safeParse({
         email: "test@example.com",
