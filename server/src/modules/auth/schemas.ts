@@ -2,9 +2,11 @@
 
 import { z } from "zod";
 
+const passwordSchema = z.string().min(8).max(256);
+
 export const registerBodySchema = z.object({
   email: z.string().email(),
-  password: z.string().min(8),
+  password: passwordSchema,
   name: z.string().min(1).max(255),
 });
 
@@ -35,7 +37,7 @@ export type ForgotPasswordBody = z.infer<typeof forgotPasswordBodySchema>;
 
 export const resetPasswordBodySchema = z.object({
   token: z.string().min(1),
-  password: z.string().min(8),
+  password: passwordSchema,
 });
 
 export type ResetPasswordBody = z.infer<typeof resetPasswordBodySchema>;

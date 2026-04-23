@@ -251,6 +251,17 @@ describe("Password Reset Flow", () => {
       expect(response.statusCode).toBe(400);
     });
 
+    it("should return 400 for password longer than 256 characters", async () => {
+      const app = await buildTestApp();
+      const response = await app.inject({
+        method: "POST",
+        url: "/api/auth/reset-password",
+        payload: { token: "valid-token", password: "a".repeat(257) },
+      });
+
+      expect(response.statusCode).toBe(400);
+    });
+
     it("should return 400 for missing token", async () => {
       const app = await buildTestApp();
       const response = await app.inject({
