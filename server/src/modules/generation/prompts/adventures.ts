@@ -850,18 +850,23 @@ export function buildNodeDetailPrompt(
   const wantStatBlocks = options.includeStatBlocks !== false;
   const hasRulebook = !!ctx.rulebookText;
   let statBlockInstruction: string;
+  let statBlockExample: string;
 
   if (!wantStatBlocks) {
     statBlockInstruction = "\n- Set statBlock to null for all encounters.";
+    statBlockExample = "null";
   } else if (hasRulebook) {
     statBlockInstruction =
-      "\n- Include a \"statBlock\" object for EVERY encounter." +
+      "\n- You MUST include a \"statBlock\" object for EVERY encounter (never null)." +
       " Derive the format and mechanics from the RULEBOOK section below." +
       " Do NOT assume D&D attributes unless that is what the RULEBOOK uses.";
+    statBlockExample = `{ "...keys and structure derived from the RULEBOOK's game system..." }`;
   } else {
     statBlockInstruction =
-      "\n- Include a \"statBlock\" object for each encounter with stats appropriate for the game system in the context." +
+      "\n- You MUST include a \"statBlock\" object for EVERY encounter (never null)." +
+      " Use stats appropriate for the game system in the context." +
       " If no game system is evident, use a generic format.";
+    statBlockExample = `{ "...system-appropriate stats..." }`;
   }
 
   const system = `You are a creative tabletop RPG game master assistant. Your tone is ${tone.toUpperCase()}: ${toneDescriptions[tone]}.
@@ -908,7 +913,7 @@ Respond with valid JSON:
         "difficulty": "easy|medium|hard|deadly",
         "creatures": ["Creature (count)"],
         "tactics": "How they fight and use the environment",
-        "statBlock": null
+        "statBlock": ${statBlockExample}
       }
     ],
     "treasure": ["Reward 1"],

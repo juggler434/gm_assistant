@@ -52,9 +52,16 @@ export function UploadSessionDialog({ open, onOpenChange, campaignId }: UploadSe
     [onOpenChange, resetForm]
   );
 
-  const onDrop = useCallback((acceptedFiles: File[]) => {
-    if (acceptedFiles.length > 0) {
-      setFile(acceptedFiles[0]);
+  const onDrop = useCallback(async (acceptedFiles: File[]) => {
+    if (acceptedFiles.length === 0) return;
+    const picked = acceptedFiles[0];
+    try {
+      // Detach from disk to avoid Chrome's ERR_UPLOAD_FILE_CHANGED when
+      // antivirus/cloud-sync touches the file between selection and upload.
+      const buf = await picked.arrayBuffer();
+      setFile(new File([buf], picked.name, { type: picked.type }));
+    } catch {
+      toast.error("Failed to read file");
     }
   }, []);
 
