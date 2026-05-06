@@ -184,11 +184,17 @@ function recoverTruncatedJson(text: string): unknown | null {
   return null;
 }
 
+interface ParsedLLMJson {
+  summary: GeneratedSummary;
+  truncated: boolean;
+}
+
 /**
  * Parse a JSON response from the LLM, handling potential markdown fences
- * and truncated output.
+ * and truncated output. `truncated` is true when JSON recovery had to be
+ * used — the caller can decide whether to retry instead of saving partial output.
  */
-function parseLLMJson(text: string): GeneratedSummary {
+function parseLLMJson(text: string): ParsedLLMJson {
   let cleaned = text.trim();
   // Strip markdown code fences if present
   if (cleaned.startsWith("```")) {
@@ -196,11 +202,13 @@ function parseLLMJson(text: string): GeneratedSummary {
   }
 
   let parsed: unknown;
+  let truncated = false;
   try {
     parsed = JSON.parse(cleaned);
   } catch {
     // LLM response was likely truncated due to token limit — attempt recovery
     parsed = recoverTruncatedJson(cleaned);
+    truncated = true;
     if (parsed == null) {
       throw new Error(
         `Failed to parse LLM summary response as JSON (length=${cleaned.length}). ` +
@@ -211,22 +219,25 @@ function parseLLMJson(text: string): GeneratedSummary {
 
   const obj = parsed as Record<string, unknown>;
   return {
-    content: typeof obj.content === "string" ? obj.content : "",
-    keyEvents: Array.isArray(obj.keyEvents)
-      ? obj.keyEvents.filter((s: unknown) => typeof s === "string")
-      : [],
-    npcsEncountered: Array.isArray(obj.npcsEncountered)
-      ? obj.npcsEncountered.filter((s: unknown) => typeof s === "string")
-      : [],
-    locationsVisited: Array.isArray(obj.locationsVisited)
-      ? obj.locationsVisited.filter((s: unknown) => typeof s === "string")
-      : [],
-    itemsAcquired: Array.isArray(obj.itemsAcquired)
-      ? obj.itemsAcquired.filter((s: unknown) => typeof s === "string")
-      : [],
-    openQuestions: Array.isArray(obj.openQuestions)
-      ? obj.openQuestions.filter((s: unknown) => typeof s === "string")
-      : [],
+    truncated,
+    summary: {
+      content: typeof obj.content === "string" ? obj.content : "",
+      keyEvents: Array.isArray(obj.keyEvents)
+        ? obj.keyEvents.filter((s: unknown) => typeof s === "string")
+        : [],
+      npcsEncountered: Array.isArray(obj.npcsEncountered)
+        ? obj.npcsEncountered.filter((s: unknown) => typeof s === "string")
+        : [],
+      locationsVisited: Array.isArray(obj.locationsVisited)
+        ? obj.locationsVisited.filter((s: unknown) => typeof s === "string")
+        : [],
+      itemsAcquired: Array.isArray(obj.itemsAcquired)
+        ? obj.itemsAcquired.filter((s: unknown) => typeof s === "string")
+        : [],
+      openQuestions: Array.isArray(obj.openQuestions)
+        ? obj.openQuestions.filter((s: unknown) => typeof s === "string")
+        : [],
+    },
   };
 }
 
@@ -282,7 +293,12 @@ export async function generateSessionSummary(
     // If the response is suspiciously short, the model likely ran out of
     // context window. Fall through to the chunked path instead of failing.
     if (responseText.length >= MIN_VALID_RESPONSE_CHARS) {
-      return parseLLMJson(responseText);
+      const parsed = parseLLMJson(responseText);
+      // If JSON recovery was needed the output is mid-sentence — retry chunked
+      // so we don't save a truncated summary.
+      if (!parsed.truncated) {
+        return parsed.summary;
+      }
     }
     // else: fall through to multi-pass chunking below
   }
@@ -312,7 +328,7 @@ export async function generateSessionSummary(
       throw new Error(`LLM chunk summary failed: ${result.error.message}`);
     }
 
-    chunkSummaries.push(parseLLMJson(result.value.message.content));
+    chunkSummaries.push(parseLLMJson(result.value.message.content).summary);
   }
 
   // Combine chunk summaries
@@ -339,5 +355,5 @@ export async function generateSessionSummary(
     throw new Error(`LLM combine failed: ${combineResult.error.message}`);
   }
 
-  return parseLLMJson(combineResult.value.message.content);
+  return parseLLMJson(combineResult.value.message.content).summary;
 }

@@ -116,8 +116,25 @@ function SceneDetail({ scene, index }: SceneDetailProps) {
                   <p className="text-xs text-muted-foreground">{stripCitations(enc.description)}</p>
                   {enc.creatures.length > 0 && (
                     <p className="text-xs text-muted-foreground">
-                      Creatures: {enc.creatures.map(stripCitations).join(", ")}
+                      <span className="font-medium">Creatures:</span>{" "}
+                      {enc.creatures.map(stripCitations).join(", ")}
                     </p>
+                  )}
+                  {enc.tactics && (
+                    <p className="text-xs text-muted-foreground">
+                      <span className="font-medium">Tactics:</span>{" "}
+                      {stripCitations(enc.tactics)}
+                    </p>
+                  )}
+                  {enc.statBlock && (
+                    <details className="mt-2">
+                      <summary className="cursor-pointer text-xs font-medium text-primary">
+                        Stat Block
+                      </summary>
+                      <pre className="mt-1 overflow-x-auto rounded bg-background p-2 text-[11px] text-muted-foreground">
+                        {JSON.stringify(enc.statBlock, null, 2)}
+                      </pre>
+                    </details>
                   )}
                 </div>
               ))}
@@ -279,8 +296,25 @@ function NodeDetail({ node, index, allNodes }: NodeDetailProps) {
                   <p className="text-xs text-muted-foreground">{stripCitations(enc.description)}</p>
                   {enc.creatures.length > 0 && (
                     <p className="text-xs text-muted-foreground">
-                      Creatures: {enc.creatures.map(stripCitations).join(", ")}
+                      <span className="font-medium">Creatures:</span>{" "}
+                      {enc.creatures.map(stripCitations).join(", ")}
                     </p>
+                  )}
+                  {enc.tactics && (
+                    <p className="text-xs text-muted-foreground">
+                      <span className="font-medium">Tactics:</span>{" "}
+                      {stripCitations(enc.tactics)}
+                    </p>
+                  )}
+                  {enc.statBlock && (
+                    <details className="mt-2">
+                      <summary className="cursor-pointer text-xs font-medium text-primary">
+                        Stat Block
+                      </summary>
+                      <pre className="mt-1 overflow-x-auto rounded bg-background p-2 text-[11px] text-muted-foreground">
+                        {JSON.stringify(enc.statBlock, null, 2)}
+                      </pre>
+                    </details>
                   )}
                 </div>
               ))}

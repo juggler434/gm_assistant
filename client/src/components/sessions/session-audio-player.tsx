@@ -49,6 +49,7 @@ interface SessionAudioPlayerProps {
   sessionId: string;
   markers: TranscriptMarker[];
   audioRef: React.RefObject<HTMLAudioElement | null>;
+  fallbackDuration: number | null;
 }
 
 interface EditingMarker {
@@ -64,6 +65,7 @@ export function SessionAudioPlayer({
   sessionId,
   markers,
   audioRef,
+  fallbackDuration,
 }: SessionAudioPlayerProps) {
   const { data: audioData, isLoading: audioLoading } = useSessionAudioUrl(
     campaignId,
@@ -75,7 +77,13 @@ export function SessionAudioPlayer({
 
   const [isPlaying, setIsPlaying] = useState(false);
   const [currentTime, setCurrentTime] = useState(0);
-  const [duration, setDuration] = useState(0);
+  const [audioDuration, setAudioDuration] = useState(0);
+  // <audio> reports 0/Infinity for WebM/Opus with no container duration header.
+  // Fall back to the server-side duration measured during transcription.
+  const duration =
+    Number.isFinite(audioDuration) && audioDuration > 0
+      ? audioDuration
+      : fallbackDuration ?? 0;
   const [showMarkerForm, setShowMarkerForm] = useState(false);
   const [markerTime, setMarkerTime] = useState(0);
   const [markerLabel, setMarkerLabel] = useState("");
@@ -239,7 +247,7 @@ export function SessionAudioPlayer({
           src={audioData.url}
           preload="metadata"
           onTimeUpdate={(e) => setCurrentTime(e.currentTarget.currentTime)}
-          onDurationChange={(e) => setDuration(e.currentTarget.duration)}
+          onDurationChange={(e) => setAudioDuration(e.currentTarget.duration)}
           onEnded={() => setIsPlaying(false)}
           onPlay={() => setIsPlaying(true)}
           onPause={() => setIsPlaying(false)}

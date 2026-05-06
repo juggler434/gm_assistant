@@ -182,6 +182,7 @@ export function SessionDetailPage() {
           sessionId={sessionId}
           markers={transcript?.markers ?? []}
           audioRef={audioRef}
+          fallbackDuration={session.duration}
         />
       )}
 
