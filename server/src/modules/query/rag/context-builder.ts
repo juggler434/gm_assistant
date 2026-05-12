@@ -48,6 +48,25 @@ export function estimateTokens(text: string): number {
 }
 
 /**
+ * Format a page reference for a citation header. Returns "p. 5" for a single
+ * page or "pp. 5-7" when the cited content spans a range.
+ */
+export function formatPageReference(
+  pageNumber: number | null,
+  endPageNumber: number | null,
+): string | null {
+  if (pageNumber === null) return null;
+  if (endPageNumber === null || endPageNumber === pageNumber) {
+    return `p. ${pageNumber}`;
+  }
+  if (endPageNumber < pageNumber) {
+    // Defensive: corrupted range, fall back to single page
+    return `p. ${pageNumber}`;
+  }
+  return `pp. ${pageNumber}-${endPageNumber}`;
+}
+
+/**
  * Formats a single chunk wrapped in a <source> tag. Everything inside the tag
  * is untrusted attacker-controlled data; the system prompt instructs the LLM
  * to treat tag contents as data, not instructions.
@@ -75,8 +94,12 @@ function formatChunkEntry(citationIndex: number, result: HybridSearchResult): st
     if (result.chunk.section) {
       headerParts.push(`- ${stripSourceSentinels(result.chunk.section)}`);
     }
-    if (result.chunk.pageNumber !== null) {
-      headerParts.push(`(p. ${result.chunk.pageNumber})`);
+    const pageRef = formatPageReference(
+      result.chunk.pageNumber,
+      result.chunk.endPageNumber,
+    );
+    if (pageRef !== null) {
+      headerParts.push(`(${pageRef})`);
     }
   }
 
@@ -149,6 +172,7 @@ export function buildContext(
       documentId: result.document.id,
       documentType: result.document.documentType,
       pageNumber: result.chunk.pageNumber,
+      endPageNumber: result.chunk.endPageNumber,
       section: result.chunk.section,
       relevanceScore: result.score,
     };

@@ -22,6 +22,7 @@ export interface HybridSearchResult {
     chunkIndex: number;
     tokenCount: number;
     pageNumber: number | null;
+    endPageNumber: number | null;
     section: string | null;
     createdAt: Date;
   };

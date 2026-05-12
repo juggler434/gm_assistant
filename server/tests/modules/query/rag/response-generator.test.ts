@@ -1,8 +1,20 @@
 // SPDX-License-Identifier: AGPL-3.0-or-later
 
 import { describe, it, expect, vi, beforeEach } from "vitest";
-import { computeConfidence } from "@/modules/query/rag/response-generator.js";
+import { computeConfidence, filterCitedSources } from "@/modules/query/rag/response-generator.js";
 import type { SourceCitation } from "@/modules/query/rag/types.js";
+
+function makeSource(index: number, docName: string, page: number | null = null): SourceCitation {
+  return {
+    index,
+    documentName: docName,
+    documentId: `doc-${index}`,
+    documentType: "rulebook",
+    pageNumber: page,
+    section: null,
+    relevanceScore: 0.5,
+  };
+}
 
 // Hoist mock functions
 const { mockChat } = vi.hoisted(() => ({
@@ -115,6 +127,66 @@ describe("Response Generator", () => {
     });
   });
 
+  describe("filterCitedSources", () => {
+    it("returns only the sources actually cited in the answer", () => {
+      const sources = [
+        makeSource(1, "Book A"),
+        makeSource(2, "Book B"),
+        makeSource(3, "Book C"),
+      ];
+      const { answer, cited } = filterCitedSources(
+        "The dragon breathes fire [2].",
+        sources,
+      );
+
+      expect(cited).toHaveLength(1);
+      expect(cited[0]?.documentName).toBe("Book B");
+      // Renumbered to [1] since it's the only cited source
+      expect(cited[0]?.index).toBe(1);
+      expect(answer).toBe("The dragon breathes fire [1].");
+    });
+
+    it("renumbers multiple citations in order of first appearance", () => {
+      const sources = [
+        makeSource(1, "Book A"),
+        makeSource(2, "Book B"),
+        makeSource(3, "Book C"),
+      ];
+      const { answer, cited } = filterCitedSources(
+        "First [3], then [1], then [3] again.",
+        sources,
+      );
+
+      expect(cited).toHaveLength(2);
+      expect(cited[0]?.documentName).toBe("Book C");
+      expect(cited[0]?.index).toBe(1);
+      expect(cited[1]?.documentName).toBe("Book A");
+      expect(cited[1]?.index).toBe(2);
+      expect(answer).toBe("First [1], then [2], then [1] again.");
+    });
+
+    it("returns empty cited list when answer has no citations", () => {
+      const sources = [makeSource(1, "Book A")];
+      const { answer, cited } = filterCitedSources("No citations here.", sources);
+
+      expect(cited).toHaveLength(0);
+      expect(answer).toBe("No citations here.");
+    });
+
+    it("ignores citation markers that point to non-existent sources", () => {
+      const sources = [makeSource(1, "Book A")];
+      const { answer, cited } = filterCitedSources(
+        "Per [1] and [99] which is hallucinated.",
+        sources,
+      );
+
+      expect(cited).toHaveLength(1);
+      expect(cited[0]?.index).toBe(1);
+      // [99] is left in place since we can't map it
+      expect(answer).toBe("Per [1] and [99] which is hallucinated.");
+    });
+  });
+
   describe("generateResponse", () => {
     it("should generate an answer from LLM with sources", async () => {
       const llm = makeMockLLMService();
@@ -143,6 +215,37 @@ describe("Response Generator", () => {
           completionTokens: 20,
           totalTokens: 120,
         });
+      }
+    });
+
+    it("should filter out sources the LLM did not cite", async () => {
+      const llm = makeMockLLMService();
+      const context = makeContext({
+        contextText: "[1] Book A\n...\n[2] Book B\n...\n[3] Book C\n...",
+        sources: [
+          makeSource(1, "Book A"),
+          makeSource(2, "Book B"),
+          makeSource(3, "Book C"),
+        ],
+        chunksUsed: 3,
+      });
+
+      mockChat.mockResolvedValue({
+        ok: true,
+        value: {
+          message: { role: "assistant", content: "Only Book B matters here [2]." },
+          model: "llama3",
+        },
+      });
+
+      const result = await generateResponse("Q?", context, llm);
+
+      expect(result.ok).toBe(true);
+      if (result.ok) {
+        expect(result.value.sources).toHaveLength(1);
+        expect(result.value.sources[0]?.documentName).toBe("Book B");
+        expect(result.value.sources[0]?.index).toBe(1);
+        expect(result.value.answer).toBe("Only Book B matters here [1].");
       }
     });
 

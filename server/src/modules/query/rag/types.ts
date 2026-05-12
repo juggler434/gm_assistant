@@ -26,8 +26,11 @@ export interface SourceCitation {
   documentId: string;
   /** Document type (e.g. "rulebook", "notes", "transcript") */
   documentType: string;
-  /** Page number, if available */
+  /** Page number where the cited content starts, if available */
   pageNumber: number | null;
+  /** Page number where the cited content ends, if it spans multiple pages.
+   *  Null or equal to pageNumber when the citation fits on a single page. */
+  endPageNumber: number | null;
   /** Section heading, if available */
   section: string | null;
   /** Relevance score from hybrid search (0-1) */

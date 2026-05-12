@@ -89,7 +89,8 @@ function buildChunk(
   startOffset: number,
   endOffset: number,
   pageNumber: number | undefined,
-  section: string | undefined
+  section: string | undefined,
+  endPageNumber?: number
 ): DocumentChunk {
   const chunk: DocumentChunk = {
     content,
@@ -100,6 +101,9 @@ function buildChunk(
   };
   if (pageNumber !== undefined) {
     chunk.pageNumber = pageNumber;
+  }
+  if (endPageNumber !== undefined) {
+    chunk.endPageNumber = endPageNumber;
   }
   if (section !== undefined) {
     chunk.section = section;
@@ -132,6 +136,20 @@ function findPageNumber(pages: PdfChunkingInput["pages"], offset: number): numbe
     return pages[pages.length - 1]!.pageNumber;
   }
   return undefined;
+}
+
+/**
+ * Find the last page touched by a chunk that ends at the exclusive offset
+ * `endOffset`. We probe the position just before `endOffset` so a chunk that
+ * ends exactly on a page boundary is attributed to the page it actually
+ * contains content on, not the next one.
+ */
+function findEndPageNumber(
+  pages: PdfChunkingInput["pages"],
+  endOffset: number,
+): number | undefined {
+  if (endOffset <= 0) return undefined;
+  return findPageNumber(pages, endOffset - 1);
 }
 
 // ============================================================================
@@ -219,9 +237,13 @@ function chunkFixedSize(
     const chunkContent = content.slice(currentPos, endPos).trim();
 
     if (chunkContent.length > 0) {
-      // Determine page number for PDF inputs
+      // Determine page number for PDF inputs (start and end pages may differ
+      // for chunks that span a page break)
       const pageNumber = isPdfInput(input)
         ? findPageNumber(input.pages, currentPos)
+        : undefined;
+      const endPageNumber = isPdfInput(input)
+        ? findEndPageNumber(input.pages, endPos)
         : undefined;
 
       // Determine section from text input
@@ -243,7 +265,8 @@ function chunkFixedSize(
         currentPos,
         endPos,
         pageNumber,
-        section
+        section,
+        endPageNumber,
       ));
 
       chunkIndex++;
@@ -641,6 +664,9 @@ function chunkMarkdownAware(
       const pageNumber = isPdfInput(input)
         ? findPageNumber(input.pages, currentPos)
         : undefined;
+      const endPageNumber = isPdfInput(input)
+        ? findEndPageNumber(input.pages, endPos)
+        : undefined;
 
       chunks.push(buildChunk(
         chunkContent,
@@ -649,7 +675,8 @@ function chunkMarkdownAware(
         currentPos,
         endPos,
         pageNumber,
-        section
+        section,
+        endPageNumber,
       ));
 
       chunkIndex++;

@@ -4,6 +4,7 @@ import { describe, it, expect } from "vitest";
 import {
   buildContext,
   estimateTokens,
+  formatPageReference,
 } from "@/modules/query/rag/context-builder.js";
 import type { HybridSearchResult } from "@/modules/knowledge/retrieval/hybrid-search.js";
 
@@ -16,6 +17,7 @@ function makeSearchResult(
     documentName: string;
     documentType: string;
     pageNumber: number | null;
+    endPageNumber: number | null;
     section: string | null;
   }> = {},
 ): HybridSearchResult {
@@ -26,6 +28,7 @@ function makeSearchResult(
       chunkIndex: 0,
       tokenCount: 10,
       pageNumber: "pageNumber" in overrides ? overrides.pageNumber ?? null : 1,
+      endPageNumber: "endPageNumber" in overrides ? overrides.endPageNumber ?? null : null,
       section: "section" in overrides ? overrides.section ?? null : "Monsters",
       createdAt: new Date("2024-01-01T00:00:00Z"),
     },
@@ -42,6 +45,25 @@ function makeSearchResult(
 }
 
 describe("Context Builder", () => {
+  describe("formatPageReference", () => {
+    it("returns null when no page number is set", () => {
+      expect(formatPageReference(null, null)).toBeNull();
+    });
+
+    it('returns "p. N" for a single page', () => {
+      expect(formatPageReference(5, null)).toBe("p. 5");
+      expect(formatPageReference(5, 5)).toBe("p. 5");
+    });
+
+    it('returns "pp. N-M" when end page is greater than start page', () => {
+      expect(formatPageReference(5, 7)).toBe("pp. 5-7");
+    });
+
+    it("falls back to start page when end is corrupted (less than start)", () => {
+      expect(formatPageReference(7, 5)).toBe("p. 7");
+    });
+  });
+
   describe("estimateTokens", () => {
     it("should estimate tokens using ~4 chars per token", () => {
       expect(estimateTokens("hello world")).toBe(3); // 11 chars -> ceil(11/4) = 3
@@ -89,6 +111,23 @@ describe("Context Builder", () => {
       expect(context.contextText).toContain("Player Handbook");
       expect(context.contextText).toContain("Combat Rules");
       expect(context.contextText).toContain("p. 42");
+    });
+
+    it("should render a page range when chunk spans multiple pages", () => {
+      const results = [
+        makeSearchResult({
+          content: "Spanning content",
+          documentName: "Player Handbook",
+          pageNumber: 42,
+          endPageNumber: 44,
+        }),
+      ];
+
+      const context = buildContext(results);
+
+      expect(context.contextText).toContain("pp. 42-44");
+      expect(context.sources[0]?.pageNumber).toBe(42);
+      expect(context.sources[0]?.endPageNumber).toBe(44);
     });
 
     it("should respect maxTokens budget", () => {

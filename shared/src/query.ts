@@ -28,6 +28,8 @@ export interface AnswerSource {
   documentId: string;
   documentType: string;
   pageNumber: number | null;
+  /** Last page touched by the cited content; equals pageNumber for a single-page citation. */
+  endPageNumber?: number | null;
   section: string | null;
   relevanceScore: number;
   /** Citation index used in generated text (e.g. [1], [2]) */

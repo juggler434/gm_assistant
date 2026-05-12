@@ -19,6 +19,8 @@ function makeResult(
   chunkIndex: number,
   content: string,
   score = 0.9,
+  pageNumber: number | null = 1,
+  endPageNumber: number | null = null,
 ): HybridSearchResult {
   return {
     chunk: {
@@ -26,7 +28,8 @@ function makeResult(
       content,
       chunkIndex,
       tokenCount: 10,
-      pageNumber: 1,
+      pageNumber,
+      endPageNumber,
       section: null,
       createdAt: new Date("2024-01-01"),
     },
@@ -57,8 +60,8 @@ describe("expandNeighborChunks", () => {
     const results = [makeResult("c2", "doc-1", 2, "Middle chunk.")];
 
     mockUnsafe.mockResolvedValue([
-      { id: "c1", document_id: "doc-1", chunk_index: 1, content: "Previous chunk.", token_count: 5 },
-      { id: "c3", document_id: "doc-1", chunk_index: 3, content: "Next chunk.", token_count: 5 },
+      { id: "c1", document_id: "doc-1", chunk_index: 1, content: "Previous chunk.", token_count: 5, page_number: null, end_page_number: null },
+      { id: "c3", document_id: "doc-1", chunk_index: 3, content: "Next chunk.", token_count: 5, page_number: null, end_page_number: null },
     ]);
 
     await expandNeighborChunks(results);
@@ -72,7 +75,7 @@ describe("expandNeighborChunks", () => {
     const results = [makeResult("c2", "doc-1", 2, "Last chunk.")];
 
     mockUnsafe.mockResolvedValue([
-      { id: "c1", document_id: "doc-1", chunk_index: 1, content: "Before.", token_count: 5 },
+      { id: "c1", document_id: "doc-1", chunk_index: 1, content: "Before.", token_count: 5, page_number: null, end_page_number: null },
     ]);
 
     await expandNeighborChunks(results);
@@ -84,7 +87,7 @@ describe("expandNeighborChunks", () => {
     const results = [makeResult("c0", "doc-1", 0, "First chunk.")];
 
     mockUnsafe.mockResolvedValue([
-      { id: "c1", document_id: "doc-1", chunk_index: 1, content: "After.", token_count: 5 },
+      { id: "c1", document_id: "doc-1", chunk_index: 1, content: "After.", token_count: 5, page_number: null, end_page_number: null },
     ]);
 
     await expandNeighborChunks(results);
@@ -101,11 +104,11 @@ describe("expandNeighborChunks", () => {
 
     mockUnsafe.mockResolvedValue([
       // c1 is a neighbor of c2 but already in results
-      { id: "c1", document_id: "doc-1", chunk_index: 1, content: "Chunk one.", token_count: 5 },
+      { id: "c1", document_id: "doc-1", chunk_index: 1, content: "Chunk one.", token_count: 5, page_number: null, end_page_number: null },
       // c0 is a neighbor of c1
-      { id: "c0", document_id: "doc-1", chunk_index: 0, content: "Chunk zero.", token_count: 5 },
+      { id: "c0", document_id: "doc-1", chunk_index: 0, content: "Chunk zero.", token_count: 5, page_number: null, end_page_number: null },
       // c3 is a neighbor of c2
-      { id: "c3", document_id: "doc-1", chunk_index: 3, content: "Chunk three.", token_count: 5 },
+      { id: "c3", document_id: "doc-1", chunk_index: 3, content: "Chunk three.", token_count: 5, page_number: null, end_page_number: null },
     ]);
 
     await expandNeighborChunks(results);
@@ -123,9 +126,9 @@ describe("expandNeighborChunks", () => {
     ];
 
     mockUnsafe.mockResolvedValue([
-      { id: "a0", document_id: "doc-a", chunk_index: 0, content: "Doc A prev.", token_count: 5 },
-      { id: "a2", document_id: "doc-a", chunk_index: 2, content: "Doc A next.", token_count: 5 },
-      { id: "b0", document_id: "doc-b", chunk_index: 0, content: "Doc B prev.", token_count: 5 },
+      { id: "a0", document_id: "doc-a", chunk_index: 0, content: "Doc A prev.", token_count: 5, page_number: null, end_page_number: null },
+      { id: "a2", document_id: "doc-a", chunk_index: 2, content: "Doc A next.", token_count: 5, page_number: null, end_page_number: null },
+      { id: "b0", document_id: "doc-b", chunk_index: 0, content: "Doc B prev.", token_count: 5, page_number: null, end_page_number: null },
     ]);
 
     await expandNeighborChunks(results);
@@ -152,5 +155,48 @@ describe("expandNeighborChunks", () => {
     await expandNeighborChunks(results);
 
     expect(results[0].chunk.content).toBe("Lonely chunk.");
+  });
+
+  it("should widen page range to cover prepended and appended neighbors", async () => {
+    // Matched chunk is on page 5; prev neighbor on page 4, next neighbor on page 6.
+    const results = [makeResult("c2", "doc-1", 2, "Middle.", 0.9, 5, 5)];
+
+    mockUnsafe.mockResolvedValue([
+      { id: "c1", document_id: "doc-1", chunk_index: 1, content: "Prev.", token_count: 5, page_number: 4, end_page_number: 4 },
+      { id: "c3", document_id: "doc-1", chunk_index: 3, content: "Next.", token_count: 5, page_number: 6, end_page_number: 7 },
+    ]);
+
+    await expandNeighborChunks(results);
+
+    expect(results[0].chunk.pageNumber).toBe(4);
+    expect(results[0].chunk.endPageNumber).toBe(7);
+  });
+
+  it("should leave page range alone when neighbors have null page numbers", async () => {
+    // Legacy chunks indexed before endPageNumber existed have null page metadata.
+    const results = [makeResult("c2", "doc-1", 2, "Middle.", 0.9, 5, 5)];
+
+    mockUnsafe.mockResolvedValue([
+      { id: "c1", document_id: "doc-1", chunk_index: 1, content: "Prev.", token_count: 5, page_number: null, end_page_number: null },
+      { id: "c3", document_id: "doc-1", chunk_index: 3, content: "Next.", token_count: 5, page_number: null, end_page_number: null },
+    ]);
+
+    await expandNeighborChunks(results);
+
+    expect(results[0].chunk.pageNumber).toBe(5);
+    expect(results[0].chunk.endPageNumber).toBe(5);
+  });
+
+  it("should fall back to neighbor pageNumber when its endPageNumber is null", async () => {
+    const results = [makeResult("c2", "doc-1", 2, "Middle.", 0.9, 5, null)];
+
+    mockUnsafe.mockResolvedValue([
+      { id: "c3", document_id: "doc-1", chunk_index: 3, content: "Next.", token_count: 5, page_number: 6, end_page_number: null },
+    ]);
+
+    await expandNeighborChunks(results);
+
+    expect(results[0].chunk.pageNumber).toBe(5);
+    expect(results[0].chunk.endPageNumber).toBe(6);
   });
 });

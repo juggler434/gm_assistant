@@ -19,6 +19,7 @@ export interface VectorSearchResult {
     chunkIndex: number;
     tokenCount: number;
     pageNumber: number | null;
+    endPageNumber: number | null;
     section: string | null;
     createdAt: Date;
   };
@@ -164,6 +165,7 @@ export async function searchChunksByVector(
         c.chunk_index,
         c.token_count,
         c.page_number,
+        c.end_page_number,
         c.section,
         c.created_at as chunk_created_at,
         c.embedding <=> '${embeddingStr}'::vector as distance,
@@ -187,6 +189,7 @@ export async function searchChunksByVector(
       chunk_index: number;
       token_count: number;
       page_number: number | null;
+      end_page_number: number | null;
       section: string | null;
       chunk_created_at: Date;
       distance: number;
@@ -204,6 +207,7 @@ export async function searchChunksByVector(
         chunkIndex: row.chunk_index,
         tokenCount: row.token_count,
         pageNumber: row.page_number,
+        endPageNumber: row.end_page_number,
         section: row.section,
         createdAt: row.chunk_created_at,
       },

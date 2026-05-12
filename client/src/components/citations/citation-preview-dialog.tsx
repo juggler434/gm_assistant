@@ -51,7 +51,12 @@ export function CitationPreviewDialog({
 }: CitationPreviewDialogProps) {
   const locationParts: string[] = [];
   if (source?.pageNumber != null) {
-    locationParts.push(`Page ${source.pageNumber}`);
+    const end = source.endPageNumber;
+    if (end != null && end > source.pageNumber) {
+      locationParts.push(`Pages ${source.pageNumber}-${end}`);
+    } else {
+      locationParts.push(`Page ${source.pageNumber}`);
+    }
   }
   if (source?.section) {
     locationParts.push(source.section);

@@ -219,6 +219,7 @@ async function storeChunks(
     chunkIndex: number;
     tokenCount: number;
     pageNumber?: number;
+    endPageNumber?: number;
     section?: string;
     embedding: number[];
   }>,
@@ -233,6 +234,7 @@ async function storeChunks(
     chunkIndex: c.chunkIndex,
     tokenCount: c.tokenCount,
     pageNumber: c.pageNumber ?? null,
+    endPageNumber: c.endPageNumber ?? null,
     section: c.section ?? null,
   }));
 
@@ -560,6 +562,7 @@ async function handleDocumentIndexing(
       chunkIndex: number;
       tokenCount: number;
       pageNumber?: number;
+      endPageNumber?: number;
       section?: string;
       embedding: number[];
     } = {
@@ -569,6 +572,7 @@ async function handleDocumentIndexing(
       embedding: embeddings[i]!,
     };
     if (c.pageNumber !== undefined) row.pageNumber = c.pageNumber;
+    if (c.endPageNumber !== undefined) row.endPageNumber = c.endPageNumber;
     if (c.section !== undefined) row.section = c.section;
     return row;
   });

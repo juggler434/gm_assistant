@@ -24,8 +24,11 @@ export interface DocumentChunk {
   chunkIndex: number;
   /** Estimated token count for this chunk */
   tokenCount: number;
-  /** Page number if from a paginated document (1-indexed) */
+  /** Page number where the chunk starts, if from a paginated document (1-indexed) */
   pageNumber?: number;
+  /** Page number where the chunk ends, if it spans multiple pages (1-indexed).
+   *  Equals pageNumber for chunks that fit on a single page. */
+  endPageNumber?: number;
   /** Section heading or name for citation */
   section?: string;
   /** Character offset where this chunk starts in the original document */

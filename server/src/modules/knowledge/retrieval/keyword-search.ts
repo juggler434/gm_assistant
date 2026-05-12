@@ -18,6 +18,7 @@ export interface KeywordSearchResult {
     chunkIndex: number;
     tokenCount: number;
     pageNumber: number | null;
+    endPageNumber: number | null;
     section: string | null;
     createdAt: Date;
   };
@@ -162,6 +163,7 @@ async function executeKeywordSearch(
       c.chunk_index,
       c.token_count,
       c.page_number,
+      c.end_page_number,
       c.section,
       c.created_at as chunk_created_at,
       ts_rank(to_tsvector($2::regconfig, c.content), ${tsquerySql}) as rank,
@@ -185,6 +187,7 @@ async function executeKeywordSearch(
     chunk_index: number;
     token_count: number;
     page_number: number | null;
+    end_page_number: number | null;
     section: string | null;
     chunk_created_at: Date;
     rank: number;
@@ -201,6 +204,7 @@ async function executeKeywordSearch(
       chunkIndex: row.chunk_index,
       tokenCount: row.token_count,
       pageNumber: row.page_number,
+      endPageNumber: row.end_page_number,
       section: row.section,
       createdAt: row.chunk_created_at,
     },

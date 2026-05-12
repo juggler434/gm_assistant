@@ -38,6 +38,7 @@ export const chunks = pgTable(
 
     // Source location in document
     pageNumber: integer("page_number"),
+    endPageNumber: integer("end_page_number"),
     section: text("section"),
 
     // Timestamps

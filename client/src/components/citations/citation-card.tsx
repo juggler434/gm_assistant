@@ -54,7 +54,12 @@ export function CitationCard({
 
   const locationParts: string[] = [];
   if (source.pageNumber != null) {
-    locationParts.push(`p. ${source.pageNumber}`);
+    const end = source.endPageNumber;
+    if (end != null && end > source.pageNumber) {
+      locationParts.push(`pp. ${source.pageNumber}-${end}`);
+    } else {
+      locationParts.push(`p. ${source.pageNumber}`);
+    }
   }
   if (source.section) {
     locationParts.push(source.section);
